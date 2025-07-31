@@ -1,0 +1,13 @@
+.header {
+  height: 50px;
+  background-color: #7f1e80;
+  opacity: 0.9;
+  color: white;
+  display: flex;
+  align-items: center;
+  padding-left: 20px;
+}
+
+.header-title {
+  font-family:'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', 'Geneva', 'Verdana', 'sans-serif';
+}

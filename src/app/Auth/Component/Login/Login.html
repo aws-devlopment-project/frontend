@@ -1,0 +1,75 @@
+<div class="login-catchphrase">
+    <h2>Login</h2>
+    <p>Make a habit with Good Friends</p>
+</div>
+
+<div class="loginView">
+    <div class="loginOrSign">
+        <div class="selectLogin" (click)="toggle(true)" [class.loginCollapsed]="clickLogin()">Login</div>
+        <div class="selectSign" (click)="toggle(false)" [class.signCollapsed]="!clickLogin()">Sign Up</div>
+    </div>
+    @if (clickLogin() == true) {
+        <form id="aws-login-form" class="login-form" [formGroup]="loginForm" (ngSubmit)="onSubmit($event)">
+            <div class="form-row">
+                <div class="form-col">
+                    <label class="form-label">Email</label>
+                    <input class="form-control" type="email" formControlName="email">
+                    @if (loginForm.get('email')?.invalid && loginForm.get('email')?.touched) {
+                        <small class="text-danger">
+                            이메일을 입력해주세요
+                        </small>
+                    }
+                </div>
+                <div class="form-col">
+                    <label class="form-label">Password</label>
+                    <input class="form-control" type="password" formControlName="password" />
+                    @if (loginForm.get('password')?.invalid && loginForm.get('password')?.touched) {
+                        <small class="text-danger">
+                            비밀번호를 입력해주세요
+                        </small>
+                    }
+                </div>
+            </div>
+        </form>
+        <div class="failureLogin" [class.collapsed]="!successLogin()">
+            <p class="alert-account">등록되지 않은 계정입니다!</p>
+            <p class="find-password" (click)="passwordReset()">비밀번호를 잊어버리셨나요?</p>
+        </div>
+        <button class="btn btn-aws" type="submit" form="aws-login-form" [disabled]="loginForm.invalid">Sign In With AWS</button>
+        <div class="btn btn-google">Sign In With Google</div>
+    } @else if (signUpNextStep() == false) {
+        <form id="aws-sign-up-form" class="login-form" [formGroup]="loginForm" (ngSubmit)="onSubmit($event)">
+            <div class="form-row">
+                <div class="form-col">
+                    <label class="form-label">Email</label>
+                    <input class="form-control" type="email" formControlName="email">
+                    @if (loginForm.get('email')?.invalid && loginForm.get('email')?.touched) {
+                        <small class="text-danger">
+                            이메일을 입력해주세요
+                        </small>
+                    }
+                </div>
+                <div class="form-col">
+                    <label class="form-label">Password</label>
+                    <input class="form-control" type="password" formControlName="password" />
+                    @if (loginForm.get('password')?.invalid && loginForm.get('password')?.touched) {
+                        <small class="text-danger">
+                            비밀번호를 입력해주세요
+                        </small>
+                    }
+                </div>
+            </div>
+        </form>
+        <button class="btn btn-sign-up-aws" type="submit" form="aws-sign-up-form" [disabled]="loginForm.invalid">Sign Up With AWS</button>
+    } @else {
+        <form id="verifciation-form" class="login-form" [formGroup]="loginForm" (ngSubmit)="onSubmit($event)">
+            <div class="form-row">
+                <div class="form-col">
+                    <label class="form-label">Verification Code</label>
+                    <input class="form-control" type="text" formControlName="verificationCode" />
+                </div>
+            </div>
+        </form>
+        <button class="btn btn-sign-up-aws" type="submit" form="aws-verification-form" [disabled]="emailForm.invalid">Check Verification Code</button>
+    }
+</div>
