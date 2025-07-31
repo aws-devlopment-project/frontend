@@ -1,0 +1,24 @@
+.searchBar {
+    display: flex;
+    margin-left: 15px;
+    width: 500px;
+    height: 30px;
+    border-radius: 10px;
+    background-color: violet;
+    opacity: 0.5;
+}
+
+.searchBar input {
+    top: 0;
+    left: 0;
+    width: 500px;
+    background-color: violet;
+    border-radius: 10px;
+    color: black;
+    border: none;
+}
+
+.searchIcon {
+    padding-left: 5px;
+    padding-top: 5px;
+}

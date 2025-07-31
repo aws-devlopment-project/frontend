@@ -1,0 +1,35 @@
+<div class="MenuWrapper">
+    <aside class="menuBar">
+        <div class="menuBarIcon" (click)="toggle()">
+            <mat-icon aria-hidden="false" aria-label="home icon" fontIcon="house"></mat-icon>
+            <p>home</p>
+        </div>
+        <div class="menuBarIcon" (click)="toggle()">
+            <mat-icon aria-hidden="false" aria-label="group icon" fontIcon="group"></mat-icon>
+            <p>dm</p>
+        </div>
+    </aside>
+    <aside class="groupBar" [class.collapsed]="!isShown()">
+        <div class="toggleBarContainer">
+            <div class="toggleBar">
+                <mat-icon aria-hidden="false" aria-label="arrow_right icon" fontIcon="arrow_right"></mat-icon>
+                <p>0원 챌린지</p>
+            </div>
+        </div>
+        <div class="toggleBarContainer">
+            <div class="toggleBar">
+                <mat-icon aria-hidden="false" aria-label="arrow_right icon" fontIcon="arrow_right"></mat-icon>
+                <p>J처럼 살기</p>
+            </div>
+            <div class="clubBar"># ENTJ 모여라!</div>
+            <div class="clubBar"># ESTP 모여라!</div>
+            <div class="clubBar"># 삼양 모여라!</div>
+        </div>
+        <div class="toggleBarContainer">
+            <div class="toggleBar">
+                <mat-icon aria-hidden="false" aria-label="arrow_right icon" fontIcon="arrow_right"></mat-icon>
+                <p>작심삼일</p>
+            </div>
+        </div>
+    </aside>
+</div>

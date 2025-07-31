@@ -1,0 +1,80 @@
+.MenuWrapper {
+    display: flex;
+    height: 100vh;
+}
+
+.menuBar {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 65px;
+    background-color: #7f1e80;
+    opacity: 0.8;
+    color: white;
+    border-right: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.menuBarIcon {
+    text-align: center;
+    margin: 10px;
+    border-radius: 10px;
+}
+
+.menuBarIcon p {
+    font-size: 10px;
+    text-align: center;
+    padding: 0;
+    margin: 0;
+}
+
+.groupBar {
+    display: flex;
+    flex-direction: column;
+    width: 250px;
+    height: 100vh;
+    background-color: #7f1e80;
+    opacity: 0.8;
+    transition: width 0.3s ease;
+    color: rgb(226, 216, 216);
+    font-family:'Segoe UI'
+}
+
+.groupBar.collapsed {
+    width: 0;
+    font-size: 0;
+    overflow: hidden;
+}
+
+.toggleBarContainer {
+    padding: 0;
+    margin: 0;
+}
+
+.toggleBarContainer mat-icon {
+    padding-top: 12px;
+}
+
+.toggleBar {
+    display: flex;
+    flex-direction: row;
+}
+
+.clubBar {
+    /* padding-left: 25px;
+    padding-bottom: 13px; */
+    color: gray;
+    font-size: 0px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.clubBar:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.menuBarIcon:hover {
+    background-color: rgba(202, 215, 175, 0.522);
+    transition: background-color 0.5s ease-out;
+    transform: scale(1.2);
+    transition: transform 0.4s ease;
+}
