@@ -1,24 +1,182 @@
 .searchBar {
     display: flex;
-    margin-left: 15px;
-    width: 500px;
-    height: 30px;
-    border-radius: 10px;
-    background-color: violet;
-    opacity: 0.5;
+    align-items: center;
+    max-width: 400px;
+    width: 100%;
+    height: 36px;
+    border-radius: 8px;
+    background-color: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    transition: all 0.2s ease;
+    position: relative;
+    backdrop-filter: blur(10px);
 }
 
-.searchBar input {
-    top: 0;
-    left: 0;
-    width: 500px;
-    background-color: violet;
-    border-radius: 10px;
-    color: black;
-    border: none;
+.searchBar:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.searchBar:focus-within {
+    background-color: #ffffff;
+    border-color: #68d391;
+    box-shadow: 0 0 0 2px rgba(104, 211, 145, 0.3);
+}
+
+.searchBar:focus-within .searchIcon {
+    color: #3182ce;
+}
+
+.searchBar:focus-within .search-bar-input::placeholder {
+    color: #a0aec0;
 }
 
 .searchIcon {
-    padding-left: 5px;
-    padding-top: 5px;
+    padding: 0 12px;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 18px;
+    transition: color 0.2s ease;
+    flex-shrink: 0;
+}
+
+.searchBar:focus-within .searchIcon {
+    color: #3182ce;
+}
+
+.search-bar-input {
+    flex: 1;
+    height: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 14px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    padding-right: 12px;
+    font-weight: 500;
+}
+
+.search-bar-input::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 400;
+}
+
+.searchBar:focus-within .search-bar-input {
+    color: #2d3748;
+}
+
+.searchBar:focus-within .search-bar-input::placeholder {
+    color: #a0aec0;
+}
+
+/* 키보드 단축키 표시 */
+.search-shortcut {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.15);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    transition: opacity 0.2s ease;
+    font-weight: 600;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.searchBar:focus-within .search-shortcut {
+    opacity: 0;
+}
+
+/* 검색 결과 드롭다운 (향후 확장용) */
+.search-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    margin-top: 4px;
+    z-index: 1000;
+    display: none;
+    backdrop-filter: blur(20px);
+}
+
+.search-dropdown.show {
+    display: block;
+}
+
+.search-result-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid #f7fafc;
+    transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.search-result-item:hover {
+    background-color: #f8f9fa;
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.search-result-icon {
+    color: #3182ce;
+    font-size: 16px;
+}
+
+.search-result-text {
+    flex: 1;
+}
+
+.search-result-title {
+    font-weight: 600;
+    color: #2d3748;
+    font-size: 14px;
+}
+
+.search-result-subtitle {
+    color: #718096;
+    font-size: 12px;
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+    .searchBar {
+        max-width: 200px;
+        height: 32px;
+    }
+    
+    .searchIcon {
+        padding: 0 8px;
+        font-size: 16px;
+    }
+    
+    .search-bar-input {
+        font-size: 14px;
+        padding-right: 8px;
+    }
+    
+    .search-shortcut {
+        display: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .searchBar {
+        max-width: 150px;
+    }
+    
+    .search-bar-input::placeholder {
+        font-size: 13px;
+    }
 }

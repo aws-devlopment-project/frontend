@@ -1,35 +1,131 @@
 <div class="MenuWrapper">
     <aside class="menuBar">
-        <div class="menuBarIcon" (click)="toggle()">
-            <mat-icon aria-hidden="false" aria-label="home icon" fontIcon="house"></mat-icon>
-            <p>home</p>
+        <div class="menuBarIcon" 
+             (click)="setActiveTab('home')"
+             [class.active]="isActiveTab('home')"
+             title="홈">
+            <mat-icon>home</mat-icon>
+            <p>홈</p>
         </div>
-        <div class="menuBarIcon" (click)="toggle()">
-            <mat-icon aria-hidden="false" aria-label="group icon" fontIcon="group"></mat-icon>
-            <p>dm</p>
+        <div class="menuBarIcon" 
+             (click)="toggle(); setActiveTab('challenge')"
+             [class.active]="isActiveTab('challenge')"
+             title="챌린지">
+            <mat-icon>group</mat-icon>
+            <p>그룹</p>
+        </div>
+        <div class="menuBarIcon"
+             (click)="setActiveTab('dashboard')"
+             [class.active]="isActiveTab('dashboard')"
+             title="대시보드">
+            <mat-icon>analytics</mat-icon>
+            <p>활동내역</p>
+        </div>
+        <div class="menuBarIcon"
+             (click)="setActiveTab('member')"
+             [class.active]="isActiveTab('member')"
+             title="회원관리">
+            <mat-icon>admin_panel_settings</mat-icon>
+            <p>관리</p>
         </div>
     </aside>
+    
     <aside class="groupBar" [class.collapsed]="!isShown()">
+        <div class="workspace-header">
+            <h2 class="workspace-name">Nameless</h2>
+            <div class="workspace-status">
+                <span class="status-indicator"></span>
+                <span>온라인</span>
+            </div>
+        </div>
+
         <div class="toggleBarContainer">
-            <div class="toggleBar">
-                <mat-icon aria-hidden="false" aria-label="arrow_right icon" fontIcon="arrow_right"></mat-icon>
+            <div class="toggleBar" 
+                 (click)="toggleSection('challenge')"
+                 [class.expanded]="expandedSections().includes('challenge')">
+                <mat-icon>keyboard_arrow_right</mat-icon>
                 <p>0원 챌린지</p>
             </div>
+            @if (expandedSections().includes('challenge')) {
+                <div class="channel-list">
+                    <div class="clubBar" 
+                         [class.active]="selectedChannel() === 'general'"
+                         (click)="selectChannel('general')">
+                        일반
+                    </div>
+                    <div class="clubBar" 
+                         [class.active]="selectedChannel() === 'quest'"
+                         (click)="selectChannel('quest')">
+                        일일 퀘스트
+                        <span class="unread-indicator">3</span>
+                    </div>
+                    <div class="clubBar" 
+                         [class.active]="selectedChannel() === 'tips'"
+                         (click)="selectChannel('tips')">
+                        팁 공유
+                    </div>
+                </div>
+            }
         </div>
+
         <div class="toggleBarContainer">
-            <div class="toggleBar">
-                <mat-icon aria-hidden="false" aria-label="arrow_right icon" fontIcon="arrow_right"></mat-icon>
+            <div class="toggleBar" 
+                 (click)="toggleSection('lifestyle')"
+                 [class.expanded]="expandedSections().includes('lifestyle')">
+                <mat-icon>keyboard_arrow_right</mat-icon>
                 <p>J처럼 살기</p>
             </div>
-            <div class="clubBar"># ENTJ 모여라!</div>
-            <div class="clubBar"># ESTP 모여라!</div>
-            <div class="clubBar"># 삼양 모여라!</div>
+            @if (expandedSections().includes('lifestyle')) {
+                <div class="channel-list">
+                    <div class="clubBar" 
+                         [class.active]="selectedChannel() === 'entj'"
+                         (click)="selectChannel('entj')">
+                        ENTJ 모여라!
+                        <span class="unread-indicator">12</span>
+                    </div>
+                    <div class="clubBar" 
+                         [class.active]="selectedChannel() === 'estp'"
+                         (click)="selectChannel('estp')">
+                        ESTP 모여라!
+                    </div>
+                    <div class="clubBar" 
+                         [class.active]="selectedChannel() === 'samyang'"
+                         (click)="selectChannel('samyang')">
+                        삼양 모여라!
+                    </div>
+                </div>
+            }
         </div>
+
         <div class="toggleBarContainer">
-            <div class="toggleBar">
-                <mat-icon aria-hidden="false" aria-label="arrow_right icon" fontIcon="arrow_right"></mat-icon>
+            <div class="toggleBar" 
+                 (click)="toggleSection('resolution')"
+                 [class.expanded]="expandedSections().includes('resolution')">
+                <mat-icon>keyboard_arrow_right</mat-icon>
                 <p>작심삼일</p>
             </div>
+            @if (expandedSections().includes('resolution')) {
+                <div class="channel-list">
+                    <div class="clubBar" 
+                         [class.active]="selectedChannel() === 'workout'"
+                         (click)="selectChannel('workout')">
+                        운동하기
+                    </div>
+                    <div class="clubBar" 
+                         [class.active]="selectedChannel() === 'study'"
+                         (click)="selectChannel('study')">
+                        공부하기
+                        <span class="unread-indicator">7</span>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="sidebar-actions">
+            <button class="action-button" (click)="browseChannels()">
+                <mat-icon>explore</mat-icon>
+                그룹 둘러보기
+            </button>
         </div>
     </aside>
 </div>

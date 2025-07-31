@@ -1,4 +1,16 @@
 <div class="searchBar">
     <mat-icon fontIcon="search" class="searchIcon"></mat-icon>
-    <input class="search-bar-input" type="text" />
+    <input 
+        class="search-bar-input" 
+        type="text" 
+        placeholder="Nameless 검색"
+        aria-label="검색"
+        autocomplete="off"
+        [value]="searchValue()"
+        (input)="onSearchInput($event)"
+        (focus)="onSearchFocus()"
+        (blur)="onSearchBlur()"
+        #searchInput
+    />
+    <span class="search-shortcut">⌘K</span>
 </div>

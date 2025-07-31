@@ -1,4 +1,27 @@
 <header class="header">
-  <span class="header-title">Nameless</span>
-  <app-header-searchBar></app-header-searchBar>
+  <div class="header-left">
+    <h1 class="header-title">Nameless</h1>
+    @if (showSearch()) {
+      <app-header-searchBar 
+        (searchQuery)="onSearchQuery($event)">
+      </app-header-searchBar>
+    }
+  </div>
+  
+  <div class="header-actions">
+    <button class="header-button" 
+            (click)="onNotificationClick()"
+            aria-label="알림" 
+            title="알림">
+      <mat-icon>notifications_none</mat-icon>
+      <span class="notification-badge">3</span>
+    </button>
+    
+    <button class="header-button" 
+            (click)="onHelpClick()"
+            aria-label="도움말" 
+            title="도움말">
+      <mat-icon>help_outline</mat-icon>
+    </button>
+  </div>
 </header>

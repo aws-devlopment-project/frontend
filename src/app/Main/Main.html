@@ -1,0 +1,47 @@
+<div class="app-container">
+  <!-- 사이드바 -->
+  <app-sidebar 
+    [activeTab]="activeTab()"
+    (navigationChange)="onNavigationChange($event)">
+  </app-sidebar>
+
+  <!-- 메인 콘텐츠 영역 -->
+  <div class="main-area">
+    <!-- 헤더 -->
+    <app-header>
+      [currentPage]="currentPage()"
+      [showSearch]="true"
+      (searchQuery)="onSearchQuery($event)"
+      (notificationClick)="onNotificationClick()"
+      (helpClick)="onHelpClick()"
+      (profileClick)="onProfileClick()">
+    </app-header>
+
+    <!-- 콘텐츠 영역 -->
+    <main class="content-area">
+      @switch (activeTab()) {
+        @case ('home') {
+          <app-home-dashboard></app-home-dashboard>
+        }
+        @case ('challenge') {
+          <app-group-dashboard></app-group-dashboard>
+        }
+        @case ('dashboard') {
+          <div class="page-placeholder">
+            <h2>📊 대시보드</h2>
+            <p>분석 대시보드 컴포넌트가 여기에 표시됩니다.</p>
+          </div>
+        }
+        @case ('member') {
+          <div class="page-placeholder">
+            <h2>👑 회원관리</h2>
+            <p>회원관리 컴포넌트가 여기에 표시됩니다.</p>
+          </div>
+        }
+        @default {
+          <app-home-dashboard></app-home-dashboard>
+        }
+      }
+    </main>
+  </div>
+</div>

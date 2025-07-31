@@ -15,69 +15,206 @@ export class LoginComponent implements OnInit {
     clickLogin = signal(true);
     successLogin = signal(true);
     signUpNextStep = signal(false);
+    isLoading = signal(false);
 
     loginForm: FormGroup = new FormGroup({});
     emailForm: FormGroup = new FormGroup({});
-    constructor(private fb: FormBuilder, private auth: LoginService, private router: Router) {
-    }
+    
+    constructor(
+        private fb: FormBuilder, 
+        private auth: LoginService, 
+        private router: Router
+    ) {}
 
     ngOnInit(): void {
+        this.initializeForms();
+    }
+
+    private initializeForms(): void {
         this.loginForm = this.fb.group({
             email: ['', [Validators.required, Validators.email]],
-            password: ['', Validators.required],
+            password: ['', [Validators.required, Validators.minLength(8)]],
         });
+        
         this.emailForm = this.fb.group({
-            verificationCode: ['', [Validators.required, Validators.minLength(6)]]
-        })
+            verificationCode: ['', [Validators.required, Validators.minLength(6), Validators.maxLength(6)]]
+        });
     }
 
     toggle(flag: boolean): void {
-        this.clickLogin.update((value) => value = flag);
+        this.clickLogin.update(() => flag);
+        // 탭 전환 시 에러 상태 리셋
+        this.successLogin.update(() => true);
+        this.signUpNextStep.update(() => false);
     }
 
     async onSubmit(event: Event): Promise<void> {
+        event.preventDefault();
+        
         const formElement = event.target as HTMLFormElement;
         const formId = formElement.id;
-        if (formId === "aws-login-form") {
-            const { email, password } = this.loginForm.value;
+        
+        // 로딩 상태 시작
+        this.isLoading.update(() => true);
+        
+        try {
+            switch (formId) {
+                case "aws-login-form":
+                    await this.handleLogin();
+                    break;
+                case "aws-sign-up-form":
+                    await this.handleSignUp();
+                    break;
+                case "verification-form":
+                    await this.handleVerification();
+                    break;
+                default:
+                    console.warn('Unknown form submitted:', formId);
+            }
+        } catch (error) {
+            console.error('Form submission error:', error);
+            this.handleError(error);
+        } finally {
+            // 로딩 상태 종료
+            this.isLoading.update(() => false);
+        }
+    }
 
-            await this.auth.signInUser(email, password)
-                .then((res) => {
-                    if (res.status === 200) {
-                        sessionStorage.setItem('user', JSON.stringify({
-                            username: res.username,
-                            accessToken: res.accessToken
-                        }));
-                        this.router.navigate(['/board']);
-                    } else {
-                        this.errMsg = '로그인 실패';
-                        console.log(this.errMsg);
-                        this.successLogin.update((value) => value = false);
-                    }
-                })
-                .catch((error) => {
-                    this.errMsg = error.message || '로그인 실패';
-                    console.log(error.message);
-                });
-        } else if (formId === "aws-sign-up-form") {
-            const { email, password } = this.loginForm.value;
+    private async handleLogin(): Promise<void> {
+        if (!this.loginForm.valid) {
+            this.markFormGroupTouched(this.loginForm);
+            return;
+        }
 
+        const { email, password } = this.loginForm.value;
+
+        try {
+            const res = await this.auth.signInUser(email, password);
+            
+            if (res.status === 200) {
+                sessionStorage.setItem('user', JSON.stringify({
+                    username: res.username,
+                    accessToken: res.accessToken
+                }));
+                
+                // 성공적인 로그인 후 리다이렉트
+                await this.router.navigate(['/board']);
+            } else {
+                this.errMsg = '로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.';
+                this.successLogin.update(() => false);
+            }
+        } catch (error: any) {
+            this.errMsg = error.message || '로그인 중 오류가 발생했습니다.';
+            this.successLogin.update(() => false);
+            throw error;
+        }
+    }
+
+    private async handleSignUp(): Promise<void> {
+        if (!this.loginForm.valid) {
+            this.markFormGroupTouched(this.loginForm);
+            return;
+        }
+
+        const { email, password } = this.loginForm.value;
+
+        try {
             const res = await this.auth.signUpUser(email, password, email);
-            console.log("SignUpResult: " + res);
-        } else {
-            const { email, _ } = this.loginForm.value;
-            const { verificationCode } = this.emailForm.value;
+            console.log("회원가입 결과:", res);
+            
+            // 회원가입 성공 시 인증 단계로 이동
+            this.signUpNextStep.update(() => true);
+        } catch (error: any) {
+            this.errMsg = error.message || '회원가입 중 오류가 발생했습니다.';
+            throw error;
+        }
+    }
 
+    private async handleVerification(): Promise<void> {
+        if (!this.emailForm.valid) {
+            this.markFormGroupTouched(this.emailForm);
+            return;
+        }
+
+        const { email } = this.loginForm.value;
+        const { verificationCode } = this.emailForm.value;
+
+        try {
             const res = await this.auth.confirmUser(email, verificationCode);
+            console.log("인증 완료:", res);
+            
+            // 인증 완료 후 로그인 탭으로 이동
+            this.toggle(true);
+            this.signUpNextStep.update(() => false);
+        } catch (error: any) {
+            this.errMsg = error.message || '인증 코드 확인 중 오류가 발생했습니다.';
+            throw error;
         }
     }
 
     async passwordReset(): Promise<void> {
-        const { email, _ } = this.loginForm.value;
+        const { email } = this.loginForm.value;
+        
+        if (!email) {
+            this.errMsg = '비밀번호 재설정을 위해 먼저 이메일을 입력해주세요.';
+            return;
+        }
+
         try {
+            this.isLoading.update(() => true);
             const result = await this.auth.requestPassswordReset(email);
-        } catch (e) {
-            console.log(e);
+            console.log("비밀번호 재설정 요청 완료:", result);
+            
+            // 사용자에게 이메일 확인 안내
+            alert('비밀번호 재설정 링크가 이메일로 전송되었습니다.');
+        } catch (error: any) {
+            console.error('비밀번호 재설정 오류:', error);
+            this.errMsg = '비밀번호 재설정 요청 중 오류가 발생했습니다.';
+        } finally {
+            this.isLoading.update(() => false);
+        }
+    }
+
+    private markFormGroupTouched(formGroup: FormGroup): void {
+        Object.keys(formGroup.controls).forEach(key => {
+            const control = formGroup.get(key);
+            control?.markAsTouched();
+        });
+    }
+
+    private handleError(error: any): void {
+        // 에러 타입에 따른 적절한 메시지 설정
+        if (error.name === 'UserNotFoundException') {
+            this.errMsg = '등록되지 않은 이메일입니다.';
+        } else if (error.name === 'NotAuthorizedException') {
+            this.errMsg = '이메일 또는 비밀번호가 올바르지 않습니다.';
+        } else if (error.name === 'UserNotConfirmedException') {
+            this.errMsg = '이메일 인증이 필요합니다.';
+        } else {
+            this.errMsg = error.message || '알 수 없는 오류가 발생했습니다.';
+        }
+        
+        this.successLogin.update(() => false);
+    }
+
+    // 폼 유효성 검사를 위한 헬퍼 메서드들
+    get emailControl() {
+        return this.loginForm.get('email');
+    }
+
+    get passwordControl() {
+        return this.loginForm.get('password');
+    }
+
+    get verificationCodeControl() {
+        return this.emailForm.get('verificationCode');
+    }
+
+    // 접근성을 위한 키보드 이벤트 핸들러
+    onKeyPress(event: KeyboardEvent, callback: () => void): void {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            callback();
         }
     }
 }

@@ -1,7 +1,138 @@
 <div class="content">
-  <h2># general</h2>
-  <div class="messages">
-    <p>User1: Hello!</p>
-    <p>User2: Hi there!</p>
+  <!-- 채널 헤더 -->
+  <div class="channel-header">
+    <div class="channel-info">
+      <div>
+        <h1 class="channel-title">{{ currentChannel() }}</h1>
+        <p class="channel-description">{{ getChannelDescription() }}</p>
+      </div>
+      <div class="member-count">
+        <mat-icon>person</mat-icon>
+        <span>{{ memberCount() }}</span>
+      </div>
+    </div>
+    <div class="channel-actions">
+      <button class="channel-action-btn" title="채널 정보" (click)="showChannelInfo()">
+        <mat-icon>info</mat-icon>
+      </button>
+      <button class="channel-action-btn" title="멤버 보기" (click)="showMembers()">
+        <mat-icon>group</mat-icon>
+      </button>
+      <button class="channel-action-btn" title="검색" (click)="searchInChannel()">
+        <mat-icon>search</mat-icon>
+      </button>
+      <button class="channel-action-btn" title="더보기" (click)="showMoreOptions()">
+        <mat-icon>more_vert</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <!-- 메시지 영역 -->
+  <div class="messages-container" #messagesContainer>
+    @if (messages().length > 0) {
+      <div class="messages">
+        <!-- 채널 시작 메시지 -->
+        <div class="system-message">
+          <strong>#{{ currentChannel() }}</strong> 채널의 시작입니다
+        </div>
+
+        <!-- 날짜 구분선 -->
+        <div class="date-divider">
+          <span>오늘</span>
+        </div>
+
+        <!-- 메시지 목록 -->
+        @for (message of messages(); track message.id; let i = $index) {
+          <div class="message-item" 
+               [class.compact]="isCompactMessage(message, i)"
+               (mouseenter)="showMessageActions(message.id)"
+               (mouseleave)="hideMessageActions()">
+            
+            @if (!isCompactMessage(message, i)) {
+              <div class="message-avatar">
+                {{ getAvatarInitials(message.author) }}
+              </div>
+            } @else {
+              <div class="message-avatar"></div>
+            }
+            
+            <div class="message-content">
+              @if (!isCompactMessage(message, i)) {
+                <div class="message-header">
+                  <span class="message-author">{{ message.author }}</span>
+                  <span class="message-timestamp">{{ formatTimestamp(message.timestamp) }}</span>
+                </div>
+              }
+              
+              <p class="message-text">{{ message.text }}</p>
+              
+              <!-- 메시지 액션 (호버 시 표시) -->
+              @if (hoveredMessageId() === message.id) {
+                <div class="message-actions">
+                  <button class="message-action" title="이모지 추가" (click)="addReaction(message.id)">
+                    😊
+                  </button>
+                  <button class="message-action" title="답글" (click)="replyToMessage(message.id)">
+                    💬
+                  </button>
+                  <button class="message-action" title="공유" (click)="shareMessage(message.id)">
+                    📤
+                  </button>
+                  <button class="message-action" title="더보기" (click)="showMessageOptions(message.id)">
+                    ⋯
+                  </button>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    } @else {
+      <!-- 빈 상태 -->
+      <div class="empty-state">
+        <mat-icon class="empty-state-icon">chat_bubble_outline</mat-icon>
+        <h3>#{{ currentChannel || 'general' }}에 오신 것을 환영합니다!</h3>
+        <p>이 채널의 첫 번째 메시지를 작성해 보세요.</p>
+      </div>
+    }
+  </div>
+
+  <!-- 메시지 입력 영역 -->
+  <div class="message-input-container">
+    <div class="message-input-box">
+      <textarea 
+        class="message-input"
+        placeholder="#{{ currentChannel() }}에 메시지 보내기"
+        [value]="newMessage()"
+        (input)="onMessageInput($event)"
+        (keydown)="handleKeyDown($event)"
+        #messageInput
+        rows="1"></textarea>
+      
+      <div class="message-input-actions">
+        <div class="input-actions-left">
+          <button class="input-action-btn" title="파일 첨부" (click)="attachFile()">
+            <mat-icon>attach_file</mat-icon>
+          </button>
+          <button class="input-action-btn" title="이모지" (click)="showEmojiPicker()">
+            <mat-icon>mood</mat-icon>
+          </button>
+          <button class="input-action-btn" title="멘션" (click)="showMentions()">
+            <mat-icon>alternate_email</mat-icon>
+          </button>
+          <button class="input-action-btn" title="서식" (click)="showFormatting()">
+            <mat-icon>format_bold</mat-icon>
+          </button>
+        </div>
+        
+        <button 
+          class="send-button" 
+          [disabled]="!newMessage().trim()"
+          (click)="sendMessage()">
+          <mat-icon>send</mat-icon>
+          전송
+        </button>
+      </div>
+    </div>
   </div>
 </div>
