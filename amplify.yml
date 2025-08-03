@@ -3,8 +3,6 @@ frontend:
   phases:
     preBuild:
       commands:
-        - npm cache clean --force
-        - rm -rf node_modules
         - npm install --no-audit --prefer-offline
         - npx ng version
         - |
