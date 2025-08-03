@@ -9,7 +9,7 @@ import { UserJoinList } from "../../Models/user";
 
 @Component({
     selector: 'app-sidebar',
-    templateUrl: './Sidebar.html',
+    templateUrl: './SideBar.html',
     styleUrl: './SideBar.css',
     imports: [MatIconModule, CommonModule],
     standalone: true
