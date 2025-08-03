@@ -119,7 +119,10 @@ applications:
             - echo "Checking build output..."
             - ls -la dist/
             - |
-              if [ -d "dist/frontend" ]; then
+              if [ -d "dist/frontend/browser" ]; then
+                echo "✅ Build output found in dist/frontend/browser"
+                ls -la dist/frontend/browser/
+              elif [ -d "dist/frontend" ]; then
                 echo "✅ Build output found in dist/frontend"
                 ls -la dist/frontend/
               elif [ -d "dist" ] && [ "$(ls -A dist)" ]; then
@@ -131,7 +134,7 @@ applications:
               fi
             # Security headers 추가를 위한 설정 파일 생성
             - |
-              cat <<EOF > dist/frontend/_headers
+              cat <<EOF > dist/frontend/browser/_headers
               /*
                 X-Frame-Options: DENY
                 X-Content-Type-Options: nosniff
@@ -141,7 +144,7 @@ applications:
                 Cache-Control: public, max-age=31536000, immutable
               EOF
       artifacts:
-        baseDirectory: dist/frontend
+        baseDirectory: dist/frontend/browser
         files:
           - '**/*'
       cache:
