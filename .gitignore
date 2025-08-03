@@ -48,3 +48,7 @@ Thumbs.db
 /src/environemnts/environment.product.ts
 
 proxy.conf.json
+
+node_modules/
+npm-debug.log*
+.npm
