@@ -57,7 +57,6 @@ applications:
                 redirectSignOut: ''
               };
               EOF
-            # AWS exports 파일 생성 (최소 설정)
             - |
               cat <<EOF > src/aws-exports.ts
               const awsconfig = {
