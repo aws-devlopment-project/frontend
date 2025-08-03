@@ -89,6 +89,7 @@ applications:
                   }
                 }
               };
+              
               export default awsconfig;
               EOF
         build:
@@ -99,15 +100,9 @@ applications:
             - echo "Angular build completed successfully"
         postBuild:
           commands:
-            - echo "Custom S3 Deployment"
-            - echo "Framework Angular Node.js"
-            - echo "Build output ready"
-            - ls -la dist/frontend/browser/
-            - echo "Starting deployment to S3"
-            - aws s3 sync dist/frontend/browser/ s3://project-s3-static/ --delete
-            - echo "Invalidating CloudFront"
-            - aws cloudfront create-invalidation --distribution-id E22CPWL5EUIR76 --paths "/*"
-            - echo "Deployment completed"
+            - echo "Starting custom deployment"
+            - chmod +x deploy.sh
+            - ./deploy.sh
             - mkdir -p /tmp/empty-artifacts
             - echo "deployed" > /tmp/empty-artifacts/status.txt
       artifacts:
