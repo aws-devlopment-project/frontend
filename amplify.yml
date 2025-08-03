@@ -19,7 +19,6 @@ applications:
             - npx ng version
             - echo "=== Environment Setup ==="
             - echo "Creating minimal environment files..."
-            # 최소한의 환경 파일 생성 (빌드 에러 방지)
             - |
               cat <<EOF > src/environments/environment.prod.ts
               export const environment = {
@@ -39,7 +38,6 @@ applications:
                 redirectSignOut: ''
               };
               EOF
-            # 개발 환경 파일도 생성
             - |
               cat <<EOF > src/environments/environment.ts
               export const environment = {
@@ -103,23 +101,15 @@ applications:
             - echo "Angular build completed successfully"
         postBuild:
           commands:
-            - echo "=== Custom S3 Deployment ==="
-            - echo "Framework: Angular (Node.js based)"
-            - echo "Build output: dist/frontend/browser"
-            - ls -la dist/frontend/browser/
-            - echo "Generated environment files (empty values for now):"
-            - cat src/environments/environment.prod.ts
-            - echo "=== Deploying to existing S3 bucket ==="
-            - echo "Target bucket: project-s3-static"
-            - echo "Syncing files with optimized caching..."
-            # 정적 자산들 (1년 캐싱)
-            - aws s3 sync dist/frontend/browser/ s3://project-s3-static/ --exclude="*.html" --cache-control "public,max-age=31536000,immutable" --delete
-            # HTML 파일들 (짧은 캐싱)
-            - aws s3 sync dist/frontend/browser/ s3://project-s3-static/ --exclude="*" --include="*.html" --cache-control "public,max-age=0,must-revalidate"
-            - echo "Invalidating CloudFront cache..."
-            - aws cloudfront create-invalidation --distribution-id E22CPWL5EUIR76 --paths "/*"
-            - echo "✅ Deployment to project-s3-static completed!"
-      # artifacts 섹션 제거 (수동 S3 배포 사용)
+            - echo "Starting custom deployment"
+            - chmod +x deploy.sh
+            - ./deploy.sh
+            - mkdir -p /tmp/empty-artifacts
+            - echo "deployed" > /tmp/empty-artifacts/status.txt
+      artifacts:
+        baseDirectory: /tmp/empty-artifacts
+        files:
+          - '*.txt'
       cache:
         paths:
           - node_modules/**/*
