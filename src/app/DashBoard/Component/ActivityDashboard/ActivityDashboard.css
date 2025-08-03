@@ -1,0 +1,554 @@
+.activity-dashboard {
+  padding: 24px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* 로딩 상태 */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 500px;
+}
+
+.loading-spinner {
+  text-align: center;
+  color: #4ecdc4;
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #e2e8f0;
+  border-top: 4px solid #4ecdc4;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 대시보드 헤더 */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  padding: 24px;
+  background: linear-gradient(135deg, #4ecdc4 0%, #3cb8b3 100%);
+  border-radius: 20px;
+  color: white;
+  box-shadow: 0 8px 24px rgba(78, 205, 196, 0.3);
+}
+
+.header-content h1 {
+  font-size: 28px;
+  font-weight: 800;
+  margin: 0 0 8px 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.page-description {
+  font-size: 16px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.period-selector {
+  display: flex;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 4px;
+}
+
+.period-btn {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.period-btn.active {
+  background: white;
+  color: #4ecdc4;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.refresh-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 8px;
+  padding: 8px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.refresh-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* 통계 섹션 */
+.stats-section {
+  margin-bottom: 32px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.stat-icon mat-icon {
+  font-size: 24px;
+}
+
+.stat-content {
+  flex: 1;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 800;
+  color: #2d3748;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #718096;
+  font-weight: 500;
+}
+
+/* 섹션 카드 */
+.section-card {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  padding: 32px;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  animation: slideInUp 0.6s ease-out;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.section-header h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #2d3748;
+  margin: 0;
+}
+
+.completion-rate {
+  text-align: right;
+}
+
+.rate-number {
+  font-size: 24px;
+  font-weight: 800;
+  color: #4ecdc4;
+}
+
+.rate-label {
+  font-size: 12px;
+  color: #718096;
+  margin-left: 4px;
+}
+
+/* 일일 퀘스트 차트 */
+.daily-quest-chart {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  height: 200px;
+  padding: 20px 0;
+  margin: 20px 0;
+}
+
+.day-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  max-width: 80px;
+}
+
+.day-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #718096;
+  margin-bottom: 12px;
+}
+
+.day-bars {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  width: 100%;
+}
+
+.quest-bar-container {
+  position: relative;
+  width: 32px;
+  height: 120px;
+  background: #f7fafc;
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.quest-bar {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  border-radius: 16px;
+  transition: all 0.8s ease-out;
+}
+
+.quest-bar.completed {
+  background: linear-gradient(180deg, #4ecdc4, #3cb8b3);
+  box-shadow: 0 4px 12px rgba(78, 205, 196, 0.4);
+}
+
+.quest-bar.total {
+  background: transparent;
+  border: 2px dashed #e2e8f0;
+  height: 100%;
+}
+
+.day-numbers {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.completed {
+  color: #4ecdc4;
+}
+
+.separator {
+  color: #cbd5e0;
+  margin: 0 2px;
+}
+
+.total {
+  color: #a0aec0;
+}
+
+/* 활동 패턴 */
+.pattern-insights {
+  display: flex;
+  gap: 24px;
+  font-size: 14px;
+}
+
+.insight-item {
+  color: #4a5568;
+}
+
+.insight-item strong {
+  color: #2d3748;
+}
+
+.weekly-pattern {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.pattern-day {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.pattern-day-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4a5568;
+  min-width: 20px;
+}
+
+.pattern-bar {
+  flex: 1;
+  height: 8px;
+  background: #f7fafc;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.pattern-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: all 0.8s ease-out;
+}
+
+.pattern-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: #718096;
+  min-width: 20px;
+  text-align: right;
+}
+
+/* 활동 타임라인 */
+.activity-summary {
+  font-size: 14px;
+  color: #718096;
+}
+
+.activity-timeline {
+  position: relative;
+  margin: 20px 0;
+}
+
+.activity-timeline::before {
+  content: '';
+  position: absolute;
+  left: 24px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, #4ecdc4, #e2e8f0);
+}
+
+.timeline-item {
+  display: flex;
+  margin-bottom: 24px;
+  position: relative;
+}
+
+.timeline-marker {
+  position: relative;
+  z-index: 1;
+  margin-right: 16px;
+}
+
+.activity-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 3px solid #4ecdc4;
+}
+
+.timeline-content {
+  flex: 1;
+  background: #f7fafc;
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 8px;
+}
+
+.activity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.activity-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2d3748;
+  margin: 0;
+}
+
+.activity-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.activity-badge {
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: white;
+  font-weight: 500;
+}
+
+.activity-points {
+  color: #f7b731;
+  font-weight: 600;
+}
+
+.activity-time {
+  color: #a0aec0;
+}
+
+.activity-description {
+  font-size: 14px;
+  color: #4a5568;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.timeline-footer {
+  text-align: center;
+  padding-top: 16px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.btn-secondary {
+  background: white;
+  color: #4ecdc4;
+  border: 2px solid #4ecdc4;
+}
+
+.btn-secondary:hover {
+  background: #4ecdc4;
+  color: white;
+  transform: translateY(-2px);
+}
+
+/* 애니메이션 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .activity-dashboard {
+    padding: 16px;
+  }
+  
+  .dashboard-header {
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+  }
+  
+  .header-actions {
+    justify-content: center;
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .pattern-insights {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .activity-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .activity-meta {
+    flex-wrap: wrap;
+  }
+  
+  .timeline-item {
+    margin-bottom: 20px;
+  }
+  
+  .activity-timeline::before {
+    left: 20px;
+  }
+  
+  .activity-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+}

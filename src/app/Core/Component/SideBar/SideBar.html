@@ -1,35 +1,97 @@
 <div class="MenuWrapper">
     <aside class="menuBar">
-        <div class="menuBarIcon" (click)="toggle()">
-            <mat-icon aria-hidden="false" aria-label="home icon" fontIcon="house"></mat-icon>
-            <p>home</p>
+        <div class="menuBarIcon" 
+             (click)="setActiveTab('home')"
+             [class.active]="isActiveTab('home')"
+             title="홈">
+            <mat-icon>home</mat-icon>
+            <p>홈</p>
         </div>
-        <div class="menuBarIcon" (click)="toggle()">
-            <mat-icon aria-hidden="false" aria-label="group icon" fontIcon="group"></mat-icon>
-            <p>dm</p>
+        <div class="menuBarIcon" 
+             (click)="toggle(); setActiveTab('group')"
+             [class.active]="isActiveTab('group')"
+             title="그룹">
+            <mat-icon>group</mat-icon>
+            <p>그룹</p>
+        </div>
+        <div class="menuBarIcon"
+            (click)="setActiveTab('activity')"
+            [class.active]="isActiveTab('activity')"
+            title="Activity">
+            <mat-icon>analytics</mat-icon>
+            <p>통계</p>
+        </div>
+        <div class="menuBarIcon"
+             (click)="setActiveTab('member')"
+             [class.active]="isActiveTab('member')"
+             title="회원관리">
+            <mat-icon>admin_panel_settings</mat-icon>
+            <p>관리</p>
         </div>
     </aside>
-    <aside class="groupBar" [class.collapsed]="!isShown()">
-        <div class="toggleBarContainer">
-            <div class="toggleBar">
-                <mat-icon aria-hidden="false" aria-label="arrow_right icon" fontIcon="arrow_right"></mat-icon>
-                <p>0원 챌린지</p>
+    
+    <aside class="groupBar" [class.collapsed]="!isSidebarShown()">
+        <div class="workspace-header">
+            <h2 class="workspace-name">워크스페이스</h2>
+            <div class="workspace-status">
+                <span class="status-indicator"></span>
+                온라인
             </div>
         </div>
-        <div class="toggleBarContainer">
-            <div class="toggleBar">
-                <mat-icon aria-hidden="false" aria-label="arrow_right icon" fontIcon="arrow_right"></mat-icon>
-                <p>J처럼 살기</p>
+
+        <!-- Dynamic Group Containers -->
+        @if (userJoinList?.joinList) {
+            @for (group of userJoinList?.joinList; track group.groupname) {
+                <div class="toggleBarContainer">
+                    <div class="toggleBar" 
+                         (click)="toggleSection(group.groupname)"
+                         [class.expanded]="isSectionExpanded(group.groupname)"
+                         [class.active]="isActiveGroup(group.groupname)">
+                        <mat-icon>keyboard_arrow_right</mat-icon>
+                        <p>{{ group.groupname }}</p>
+                    </div>
+                    @if (isSectionExpanded(group.groupname)) {
+                        <div class="channel-list">
+                            @for (channel of group.clubList; track channel) {
+                                <div class="clubBar" 
+                                     [class.active]="isActiveChannel(channel)"
+                                     (click)="selectChannel(channel)">
+                                    {{ channel }}
+                                    <!-- 읽지 않은 메시지 수가 있다면 표시 (선택사항) -->
+                                    <!-- <span class="unread-indicator">3</span> -->
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        }
+
+        <!-- 데이터가 로딩 중이거나 없을 때 표시할 내용 -->
+        @if (!userJoinList) {
+            <div class="toggleBarContainer">
+                <div class="toggleBar">
+                    <mat-icon>hourglass_empty</mat-icon>
+                    <p>로딩 중...</p>
+                </div>
             </div>
-            <div class="clubBar"># ENTJ 모여라!</div>
-            <div class="clubBar"># ESTP 모여라!</div>
-            <div class="clubBar"># 삼양 모여라!</div>
-        </div>
-        <div class="toggleBarContainer">
-            <div class="toggleBar">
-                <mat-icon aria-hidden="false" aria-label="arrow_right icon" fontIcon="arrow_right"></mat-icon>
-                <p>작심삼일</p>
+        }
+
+        <!-- 가입한 그룹이 없을 때 -->
+        @if (userJoinList?.joinList && userJoinList?.joinList?.length === 0) {
+            <div class="toggleBarContainer">
+                <div class="toggleBar">
+                    <mat-icon>info</mat-icon>
+                    <p>가입한 그룹이 없습니다</p>
+                </div>
             </div>
+        }
+
+        <div class="sidebar-actions">
+            <button class="action-button" (click)="browseChannels()">
+                <mat-icon>explore</mat-icon>
+                그룹 둘러보기
+            </button>
         </div>
     </aside>
 </div>

@@ -1,0 +1,144 @@
+<div class="activity-dashboard">
+  <!-- 로딩 상태 -->
+  @if (isLoading()) {
+    <div class="loading-container">
+      <div class="loading-spinner">
+        <div class="spinner"></div>
+        <p>활동 데이터를 불러오는 중...</p>
+      </div>
+    </div>
+  }
+  
+  <!-- 대시보드 내용 -->
+  @else {
+    <!-- 헤더 -->
+    <div class="dashboard-header">
+      <div class="header-content">
+        <h1>나의 활동 현황</h1>
+        <p>개인 활동 기록과 성장 패턴을 확인해보세요</p>
+      </div>
+      <div class="header-actions">
+        <button class="refresh-btn" (click)="refreshData()">
+          <mat-icon>refresh</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <!-- 주요 통계 카드 -->
+    <div class="stats-section">
+      <div class="stats-grid">
+        @for (stat of weeklyStats(); track stat.label) {
+          <div class="stat-card">
+            <div class="stat-icon" [style.background-color]="stat.color">
+              <mat-icon>{{ stat.icon }}</mat-icon>
+            </div>
+            <div class="stat-content">
+              <div class="stat-value">{{ stat.value }}{{ stat.unit }}</div>
+              <div class="stat-label">{{ stat.label }}</div>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- 주간 퀘스트 현황 -->
+    @if (activityData(); as data) {
+      <div class="section-card">
+        <div class="section-header">
+          <h2>이번 주 퀘스트 현황</h2>
+          <div class="completion-rate">
+            <span class="rate-number">{{ getCompletionRate() }}%</span>
+            <span class="rate-label">완료율</span>
+          </div>
+        </div>
+        
+        <div class="daily-quest-chart">
+          @for (day of data.dailyQuests; track day.date) {
+            <div class="day-column">
+              <div class="day-label">{{ day.date }}</div>
+              <div class="day-bars">
+                <div class="quest-bar-container">
+                  <div class="quest-bar completed" 
+                       [style.height.%]="(day.completed / day.target) * 100">
+                  </div>
+                  <div class="quest-bar total"></div>
+                </div>
+                <div class="day-numbers">
+                  <span class="completed">{{ day.completed }}</span>
+                  <span class="separator">/</span>
+                  <span class="total">{{ day.target }}</span>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- 활동 패턴 분석 -->
+      <div class="section-card">
+        <div class="section-header">
+          <h2>활동 패턴 분석</h2>
+          <div class="pattern-insights">
+            <span class="insight-item">
+              <strong>가장 활발한 요일:</strong> {{ getBestPerformanceDay() }}
+            </span>
+            <span class="insight-item">
+              <strong>선호 활동:</strong> {{ data.favoriteQuestType }}
+            </span>
+          </div>
+        </div>
+        
+        <div class="weekly-pattern">
+          @for (dayData of data.weeklyPattern; track dayData.day) {
+            <div class="pattern-day">
+              <div class="pattern-day-label">{{ dayData.day }}</div>
+              <div class="pattern-bar">
+                <div class="pattern-fill" 
+                     [style.width.%]="(dayData.totalActivities / 5) * 100"
+                     [style.background-color]="dayData.totalActivities > 3 ? '#4ecdc4' : '#e0e6ed'">
+                </div>
+              </div>
+              <div class="pattern-count">{{ dayData.totalActivities }}</div>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- 최근 활동 타임라인 -->
+    <div class="section-card">
+      <div class="section-header">
+        <h2>최근 활동</h2>
+        <div class="activity-summary">
+          총 {{ recentActivities().length }}개 활동
+        </div>
+      </div>
+      
+      <div class="activity-timeline">
+        @for (activity of recentActivities(); track activity.id) {
+          <div class="timeline-item">
+            <div class="timeline-marker">
+              <div class="activity-icon">{{ activity.icon }}</div>
+            </div>
+            <div class="timeline-content">
+              <div class="activity-header">
+                <h4 class="activity-title">{{ activity.title }}</h4>
+                <div class="activity-meta">
+                  <span class="activity-badge" 
+                        [style.background-color]="getActivityTypeColor(activity.type)">
+                    {{ getActivityTypeBadge(activity.type) }}
+                  </span>
+                  @if (activity.points) {
+                    <span class="activity-points">+{{ activity.points }}pt</span>
+                  }
+                  <span class="activity-time">{{ getTimeAgo(activity.timestamp) }}</span>
+                </div>
+              </div>
+              <p class="activity-description">{{ activity.description }}</p>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+</div>

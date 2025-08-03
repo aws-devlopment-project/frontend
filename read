@@ -1,0 +1,181 @@
+// Service 패턴 사용법 및 가이드
+
+/*
+=== 📋 적용된 Service 패턴 구조 ===
+
+1. SharedStateService (Core/Service/SharedState.service.ts)
+   - 모든 애플리케이션 상태를 중앙 관리
+   - Signal 기반 반응형 상태 관리
+   - Computed properties로 파생 상태 자동 계산
+   - 읽기 전용 signals로 캡슐화
+
+2. 컴포넌트별 역할 분담:
+   - Main: 전체 레이아웃 및 라우팅 관리
+   - SideBar: 네비게이션 및 그룹/채널 선택
+   - HeaderBar: 상단 바 및 현재 페이지 정보 표시
+   - MainContainer: 채팅 인터페이스
+
+=== 🔄 상태 흐름 ===
+
+1. 사용자 액션 (클릭, 입력 등)
+   ↓
+2. 컴포넌트 이벤트 핸들러
+   ↓
+3. SharedStateService 메서드 호출
+   ↓
+4. Signal 업데이트
+   ↓
+5. Computed signals 자동 재계산
+   ↓
+6. 모든 구독 컴포넌트 자동 업데이트
+
+=== 💡 주요 장점 ===
+
+✅ 단일 진실 공급원 (Single Source of Truth)
+✅ 타입 안정성
+✅ 반응형 프로그래밍
+✅ 캡슐화된 상태 관리
+✅ 디버깅 용이성
+✅ 테스트 가능성
+
+=== 📖 사용 예시 ===
+*/
+
+// 1. 컴포넌트에서 Service 주입
+@Component({})
+export class ExampleComponent {
+  constructor(public sharedState: SharedStateService) {}
+  
+  // 상태 읽기
+  getCurrentTab() {
+    return this.sharedState.activeTab();
+  }
+  
+  // 상태 변경
+  changeTab(newTab: string) {
+    this.sharedState.setActiveTab(newTab);
+  }
+  
+  // Computed 사용
+  isChannelView = computed(() => 
+    this.sharedState.isChannelSelected()
+  );
+}
+
+// 2. 템플릿에서 Service 사용
+/*
+<div class="component">
+  @if (sharedState.isChannelSelected()) {
+    <app-chat></app-chat>
+  }
+  
+  <button (click)="sharedState.setActiveTab('home')">
+    홈으로 가기
+  </button>
+  
+  <p>현재 페이지: {{ sharedState.currentPageTitle() }}</p>
+</div>
+*/
+
+// 3. Effect로 상태 변화 감지
+/*
+export class ReactiveComponent {
+  constructor(private sharedState: SharedStateService) {
+    effect(() => {
+      const selectedGroup = this.sharedState.selectedGroup();
+      if (selectedGroup) {
+        console.log('그룹 변경됨:', selectedGroup);
+        this.onGroupChanged(selectedGroup);
+      }
+    });
+  }
+  
+  private onGroupChanged(groupId: string) {
+    // 그룹 변경에 따른 로직
+  }
+}
+*/
+
+/*
+=== ⚠️ 주의사항 ===
+
+1. Service는 providedIn: 'root'로 설정되어 싱글톤
+   - 모든 컴포넌트에서 동일한 인스턴스 공유
+
+2. 직접 Signal 수정 금지
+   - private _signal 사용, readonly로 노출
+   - 전용 메서드를 통해서만 상태 변경
+
+3. 메모리 누수 방지
+   - effect() 사용 시 적절한 정리 필요
+   - OnDestroy에서 구독 해제 (필요시)
+
+4. 타입 안정성 유지
+   - interface 정의하여 타입 안정성 확보
+   - 컴파일 타임 에러 방지
+
+=== 🛠️ 확장 방법 ===
+
+1. 새로운 상태 추가:
+   - private _newState = signal(초기값);
+   - readonly newState = this._newState.asReadonly();
+   - setNewState(value) 메서드 추가
+
+2. 새로운 Computed 추가:
+   - readonly derivedState = computed(() => 
+       계산 로직
+     );
+
+3. 새로운 액션 추가:
+   - 비즈니스 로직 포함한 메서드 구현
+   - 여러 state 동시 업데이트 가능
+
+=== 🔍 디버깅 팁 ===
+
+1. 콘솔 로그 활용:
+   - Service 메서드에 로그 추가됨
+   - 상태 변화 추적 가능
+
+2. Angular DevTools:
+   - Signal 상태 실시간 모니터링
+   - 컴포넌트 트리에서 Service 확인
+
+3. 상태 덤프:
+*/
+
+// Service에 디버깅 메서드 추가 가능
+export class SharedStateService {
+  // ... 기존 코드 ...
+  
+  // 디버깅용 메서드
+  dumpState() {
+    return {
+      activeTab: this.activeTab(),
+      selectedGroup: this.selectedGroup(),
+      selectedChannel: this.selectedChannel(),
+      currentUser: this.currentUser(),
+      messagesCount: this.messages().length,
+      sidebarExpanded: this.sidebarExpanded(),
+      expandedSections: this.expandedSections()
+    };
+  }
+  
+  // 브라우저 콘솔에서 호출 가능
+  // (window as any).debugState = () => this.dumpState();
+}
+
+/*
+=== 🚀 성능 최적화 ===
+
+1. Signal의 변경 감지는 매우 효율적
+2. Computed는 의존성이 변경될 때만 재계산
+3. OnPush 전략과 완벽 호환
+4. 불필요한 렌더링 최소화
+
+=== 📚 추가 학습 자료 ===
+
+- Angular Signals 공식 문서
+- Reactive Programming 패턴
+- State Management Best Practices
+- Angular Architecture Guidelines
+*/

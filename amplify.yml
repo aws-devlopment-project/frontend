@@ -1,0 +1,175 @@
+version: 1
+applications:
+  - frontend:
+      phases:
+        preBuild:
+          commands:
+            - echo "Installing dependencies..."
+            - npm ci
+            - echo "Node.js version:"
+            - node --version
+            - echo "NPM version:"
+            - npm --version
+            - echo "Creating environment files..."
+            - mkdir -p src/environments
+            # Environment 파일 생성 (개선된 버전)
+            - |
+              cat <<EOF > src/environments/environment.prod.ts
+              export const environment = {
+                production: true,
+                apiUrl: "${API_URL}",
+                clientId: "${CLIENT_ID}",
+                region: "${AWS_REGION}",
+                userPoolId: "${USER_POOL_ID}",
+                userPoolClientId: "${USER_POOL_CLIENT_ID}",
+                googleClientId: "${GOOGLE_CLIENT_ID}",
+                identityPoolId: "${IDENTITY_POOL_ID}"
+              };
+              EOF
+            - |
+              cat <<EOF > src/environments/environment.ts
+              export const environment = {
+                production: false,
+                apiUrl: "${DEV_API_URL:-$API_URL}",
+                clientId: "${DEV_CLIENT_ID:-$CLIENT_ID}",
+                region: "${AWS_REGION}",
+                userPoolId: "${DEV_USER_POOL_ID:-$USER_POOL_ID}",
+                userPoolClientId: "${DEV_USER_POOL_CLIENT_ID:-$USER_POOL_CLIENT_ID}",
+                googleClientId: "${DEV_GOOGLE_CLIENT_ID:-$GOOGLE_CLIENT_ID}",
+                identityPoolId: "${DEV_IDENTITY_POOL_ID:-$IDENTITY_POOL_ID}"
+              };
+              EOF
+            # 개선된 aws-exports.ts 파일 생성
+            - |
+              cat <<EOF > src/aws-exports.ts
+              const awsconfig = {
+                aws_project_region: "${AWS_REGION}",
+                aws_cognito_region: "${AWS_REGION}",
+                aws_user_pools_id: "${USER_POOL_ID}",
+                aws_user_pools_web_client_id: "${USER_POOL_CLIENT_ID}",
+                aws_cognito_identity_pool_id: "${IDENTITY_POOL_ID}",
+                oauth: {
+                  domain: "${COGNITO_DOMAIN}",
+                  scope: ["email", "openid", "profile"],
+                  redirectSignIn: "${REDIRECT_SIGN_IN}",
+                  redirectSignOut: "${REDIRECT_SIGN_OUT}",
+                  responseType: "code"
+                },
+                aws_cognito_username_attributes: ["EMAIL"],
+                aws_cognito_social_providers: ["GOOGLE"],
+                aws_cognito_signup_attributes: ["EMAIL"],
+                aws_cognito_mfa_configuration: "OFF",
+                aws_cognito_mfa_types: ["SMS"],
+                aws_cognito_password_protection_settings: {
+                  passwordPolicyMinLength: 8,
+                  passwordPolicyCharacters: []
+                },
+                aws_cognito_verification_mechanisms: ["EMAIL"],
+                Auth: {
+                  Cognito: {
+                    userPoolId: "${USER_POOL_ID}",
+                    userPoolClientId: "${USER_POOL_CLIENT_ID}",
+                    identityPoolId: "${IDENTITY_POOL_ID}",
+                    signUpVerificationMethod: 'code' as const,
+                    loginWith: {
+                      username: false,
+                      email: true,
+                      phone: false
+                    }
+                  }
+                }
+              };
+              
+              export default awsconfig;
+              EOF
+            # 빌드 전 환경 변수 검증
+            - |
+              echo "Validating environment variables..."
+              if [ -z "$USER_POOL_ID" ]; then
+                echo "ERROR: USER_POOL_ID is not set"
+                exit 1
+              fi
+              if [ -z "$USER_POOL_CLIENT_ID" ]; then
+                echo "ERROR: USER_POOL_CLIENT_ID is not set"
+                exit 1
+              fi
+              if [ -z "$AWS_REGION" ]; then
+                echo "ERROR: AWS_REGION is not set"
+                exit 1
+              fi
+              echo "Environment variables validated successfully"
+        build:
+          commands:
+            - echo "Building Angular application..."
+            - echo "Current branch: ${AWS_BRANCH}"
+            - |
+              if [ "${AWS_BRANCH}" = "main" ] || [ "${AWS_BRANCH}" = "master" ]; then
+                echo "Building for production..."
+                npm run build -- --configuration production --optimization --build-optimizer
+              elif [ "${AWS_BRANCH}" = "develop" ]; then
+                echo "Building for development..."
+                npm run build -- --configuration development
+              else
+                echo "Building for preview..."
+                npm run build -- --configuration development
+              fi
+        postBuild:
+          commands:
+            - echo "Build completed successfully!"
+            - echo "Checking build output..."
+            - ls -la dist/
+            - |
+              if [ -d "dist/frontend" ]; then
+                echo "✅ Build output found in dist/frontend"
+                ls -la dist/frontend/
+              elif [ -d "dist" ] && [ "$(ls -A dist)" ]; then
+                echo "✅ Build output found in dist/"
+                ls -la dist/
+              else
+                echo "❌ Build output not found!"
+                exit 1
+              fi
+            # Security headers 추가를 위한 설정 파일 생성
+            - |
+              cat <<EOF > dist/frontend/_headers
+              /*
+                X-Frame-Options: DENY
+                X-Content-Type-Options: nosniff
+                Referrer-Policy: strict-origin-when-cross-origin
+                X-XSS-Protection: 1; mode=block
+              /static/*
+                Cache-Control: public, max-age=31536000, immutable
+              EOF
+      artifacts:
+        baseDirectory: dist/frontend
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - node_modules/**/*
+          - .angular/cache/**/*
+          - ~/.npm/**/*
+  # 테스트 단계 개선
+  - test:
+      phases:
+        preTest:
+          commands:
+            - echo "Installing test dependencies..."
+            - npm ci
+            - echo "Setting up test environment..."
+        test:
+          commands:
+            - echo "Running unit tests..."
+            - npm run test:ci
+            - echo "Running linting..."
+            - npm run lint
+            - echo "Running build test..."
+            - npm run build -- --configuration development
+        postTest:
+          commands:
+            - echo "Tests completed!"
+            - echo "Uploading coverage reports..."
+      artifacts:
+        baseDirectory: coverage
+        files:
+          - '**/*'

@@ -1,0 +1,159 @@
+<div class="home-container">
+  <!-- 환영 섹션 -->
+  <div class="welcome-section">
+    <div class="welcome-content">
+      <h1 class="welcome-title">
+        {{ getGreeting() }} 👋
+      </h1>
+      <p class="welcome-subtitle">
+        {{ getFormattedTime() }}
+      </p>
+      <p class="welcome-message">
+        오늘도 목표를 향해 한 걸음씩 나아가는 멋진 하루 보내세요!
+      </p>
+    </div>
+    <div class="welcome-illustration">
+      <div class="illustration-icon">🎯</div>
+    </div>
+  </div>
+
+  <!-- 빠른 통계 -->
+  <div class="quick-stats-section">
+    <h2 class="section-title">
+      <mat-icon>insights</mat-icon>
+      오늘의 현황
+    </h2>
+    <div class="stats-grid">
+      @for (stat of quickStats(); track stat.id) {
+        <div class="stat-card" [style.border-left-color]="stat.color">
+          <div class="stat-icon" [style.background-color]="stat.color">
+            <mat-icon>{{ stat.icon }}</mat-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-value">{{ stat.value }}</div>
+            <div class="stat-title">{{ stat.title }}</div>
+            <div class="stat-change" [style.color]="stat.color">
+              <mat-icon class="change-icon">{{ stat.trend === 'up' ? 'trending_up' : 'trending_down' }}</mat-icon>
+              {{ stat.change }}
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- 빠른 액션 -->
+  <div class="quick-actions-section">
+    <h2 class="section-title">
+      <mat-icon>flash_on</mat-icon>
+      빠른 액션
+    </h2>
+    <div class="actions-grid">
+      @for (action of quickActions(); track action.id) {
+        <div class="action-card" (click)="onQuickAction(action)">
+          <div class="action-icon" [style.background-color]="action.color">
+            <mat-icon>{{ action.icon }}</mat-icon>
+          </div>
+          <div class="action-content">
+            <h3 class="action-title">{{ action.title }}</h3>
+            <p class="action-description">{{ action.description }}</p>
+          </div>
+          <div class="action-arrow">
+            <mat-icon>arrow_forward_ios</mat-icon>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- 오늘의 하이라이트 -->
+  <div class="highlights-section">
+    <div class="section-header">
+      <h2 class="section-title">
+        <mat-icon>star</mat-icon>
+        오늘의 하이라이트
+      </h2>
+      <button class="view-all-btn" (click)="onViewAllHighlights()">
+        전체 보기
+        <mat-icon>arrow_forward</mat-icon>
+      </button>
+    </div>
+    
+    <div class="highlights-list">
+      @for (highlight of highlights(); track highlight.id) {
+        <div class="highlight-item" [attr.data-type]="highlight.type">
+          <div class="highlight-icon">
+            @if (highlight.avatar) {
+              <span class="highlight-avatar">{{ highlight.avatar }}</span>
+            } @else {
+              <mat-icon>{{ highlight.type === 'achievement' ? 'emoji_events' : highlight.type === 'member' ? 'person' : 'campaign' }}</mat-icon>
+            }
+          </div>
+          <div class="highlight-content">
+            <div class="highlight-header">
+              <h4 class="highlight-title">{{ highlight.title }}</h4>
+              @if (highlight.badge) {
+                <span class="highlight-badge" [class]="highlight.badge.toLowerCase()">
+                  {{ highlight.badge }}
+                </span>
+              }
+            </div>
+            <p class="highlight-description">{{ highlight.description }}</p>
+            @if (highlight.time) {
+              <span class="highlight-time">{{ highlight.time }}</span>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- 추천 챌린지 -->
+  <div class="recommendations-section">
+    <div class="section-header">
+      <h2 class="section-title">
+        <mat-icon>recommend</mat-icon>
+        추천 퀘스트
+      </h2>
+      <!-- <button class="view-all-btn" (click)="onViewAllChallenges()">
+        전체 보기
+        <mat-icon>arrow_forward</mat-icon>
+      </button> -->
+    </div>
+    
+    <div class="recommendations-grid">
+      @for (challenge of recommendedChallenges(); track challenge.id) {
+        <div class="recommendation-card">
+          <div class="card-header">
+            <div class="challenge-image">{{ challenge.image }}</div>
+            <div class="challenge-meta">
+              <span class="challenge-category">{{ challenge.category }}</span>
+              <span class="challenge-difficulty" [style.color]="getDifficultyColor(challenge.difficulty)">
+                {{ getDifficultyText(challenge.difficulty) }}
+              </span>
+            </div>
+          </div>
+          
+          <div class="card-content">
+            <h3 class="challenge-title">{{ challenge.title }}</h3>
+            <p class="challenge-description">{{ challenge.description }}</p>
+            
+            <div class="challenge-stats">
+              <div class="participants">
+                <mat-icon>group</mat-icon>
+                <span>{{ challenge.participants | number }}명 수행</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="card-actions">
+            <button class="join-btn" (click)="onJoinChallenge(challenge)">
+              <mat-icon>arrow_forward_ios</mat-icon>
+              참여하기
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+</div>

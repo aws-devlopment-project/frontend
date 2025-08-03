@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
-import { HomeComponent } from './Home/Home';
+import { MainComponent } from './Main/Main';
 import { LoginComponent } from './Auth/Component/Login/Login';
+import { GroupJoinComponent } from './DashBoard/Component/GroupJoin/GroupJoin';
 
 export const routes: Routes = [
     {
@@ -9,17 +10,10 @@ export const routes: Routes = [
     },
     {
         path: 'board',
-        component: HomeComponent,
+        component: MainComponent,
     },
-    // {
-    //     path: '/personal',
-    //     component: PersonalComponent,
-    // },
-    // {
-    //     path: '/group/:id',
-    //     component: GroupComponent,
-    // },
-    // {
-    //     path: '/group/'
-    // }
+    {
+        path: 'group/join',
+        component: GroupJoinComponent
+    }
 ];

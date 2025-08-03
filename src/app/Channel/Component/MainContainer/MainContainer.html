@@ -1,0 +1,165 @@
+<div class="chat-container">
+      <!-- 채팅 헤더 -->
+      <div class="chat-header">
+        <div class="channel-info">
+          <h3># {{ channelInfo()?.name || '채널' }}</h3>
+          <div class="channel-status">
+            <p>{{ channelInfo()?.description || '채널 설명' }}</p>
+            <div class="connection-status" [class]="getConnectionStatusClass()">
+              <mat-icon class="status-icon">{{ connectionStatus() === 'connected' ? 'wifi' : 'wifi_off' }}</mat-icon>
+              <span>{{ getConnectionStatusText() }}</span>
+              @if (connectionStatus() === 'connected') {
+                <span class="online-count">• {{ onlineUsers().length }}명 온라인</span>
+              }
+            </div>
+          </div>
+        </div>
+        <div class="chat-actions">
+          <button class="header-btn" title="온라인 사용자" [disabled]="connectionStatus() !== 'connected'">
+            <mat-icon>people</mat-icon>
+            @if (onlineUsers().length > 0) {
+              <span class="user-count-badge">{{ onlineUsers().length }}</span>
+            }
+          </button>
+          <button class="header-btn" title="검색">
+            <mat-icon>search</mat-icon>
+          </button>
+          @if (connectionStatus() === 'disconnected') {
+            <button class="header-btn reconnect-btn" title="다시 연결" (click)="reconnect()">
+              <mat-icon>refresh</mat-icon>
+            </button>
+          }
+          <button class="header-btn" title="설정">
+            <mat-icon>settings</mat-icon>
+          </button>
+        </div>
+      </div>
+
+      <!-- 채팅 메시지 영역 -->
+      <div class="chat-messages" #messagesContainer>
+        @if (messages().length === 0) {
+          <div class="welcome-message">
+            <div class="welcome-content">
+              <h4>🎉 {{ getWelcomeTitle() }}</h4>
+              <p>{{ getWelcomeMessage() }}</p>
+              
+              @if (connectionStatus() === 'connected') {
+                <div class="conversation-starters">
+                  <h5>대화 시작하기</h5>
+                  <div class="starter-buttons">
+                    @for (starter of getConversationStarters(); track starter) {
+                      <button class="starter-btn" (click)="sendMessage(starter)">
+                        {{ starter }}
+                      </button>
+                    }
+                  </div>
+                </div>
+              } @else {
+                <div class="connection-waiting">
+                  <mat-icon class="loading-icon">hourglass_empty</mat-icon>
+                  <p>서버에 연결 중입니다...</p>
+                </div>
+              }
+            </div>
+          </div>
+        } @else {
+          @for (message of messages(); track message.id) {
+            <div class="message-group" 
+                 [class.own-message]="message.userId === currentUserId()"
+                 [class.system-message]="message.userId === 'system'">
+              
+              @if (message.userId !== 'system') {
+                <div class="message-avatar">
+                  @if (message.avatar) {
+                    <img [src]="message.avatar" [alt]="message.username">
+                  } @else {
+                    <div class="avatar-placeholder" [class.online]="isUserOnline(message.userId)">
+                      {{ message.username.charAt(0).toUpperCase() }}
+                      @if (isUserOnline(message.userId)) {
+                        <div class="online-indicator"></div>
+                      }
+                    </div>
+                  }
+                </div>
+                
+                <div class="message-content">
+                  <div class="message-header">
+                    <span class="username">{{ message.username }}</span>
+                    @if (isUserOnline(message.userId)) {
+                      <span class="online-badge">온라인</span>
+                    }
+                    <span class="timestamp">{{ formatTime(message.timestamp) }}</span>
+                  </div>
+                  <div class="message-text">{{ message.content }}</div>
+                </div>
+              } @else {
+                <!-- 시스템 메시지 -->
+                <div class="system-message-content">
+                  <mat-icon class="system-icon">info</mat-icon>
+                  <span class="system-text">{{ message.content }}</span>
+                  <span class="system-time">{{ formatTime(message.timestamp) }}</span>
+                </div>
+              }
+            </div>
+          }
+        }
+        
+        <!-- 타이핑 표시기 -->
+        @if (typingUsersText()) {
+          <div class="typing-indicator">
+            <div class="typing-content">
+              <div class="typing-dots">
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+              </div>
+              <span class="typing-text">{{ typingUsersText() }}</span>
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- 메시지 입력 영역 -->
+      <div class="chat-input-area">
+        <div class="input-container" [class.disabled]="connectionStatus() !== 'connected'">
+          <input type="file" #fileInput (change)="onFileSelect($event)" style="display: none;" accept="image/*,video/*,.pdf,.doc,.docx">
+          <button class="input-btn" title="파일 첨부" 
+                  [disabled]="connectionStatus() !== 'connected'"
+                  (click)="fileInput.click()">
+            <mat-icon>attach_file</mat-icon>
+          </button>
+          
+          <textarea
+            class="message-input"
+            [(ngModel)]="newMessage"
+            [placeholder]="getInputPlaceholder()"
+            [disabled]="connectionStatus() !== 'connected'"
+            (keydown)="onKeyDown($event)"
+            (input)="onMessageInput()"
+            rows="1"
+            #messageInput>
+          </textarea>
+          
+          <button class="input-btn" title="이모티콘"
+                  [disabled]="connectionStatus() !== 'connected'">
+            <mat-icon>emoji_emotions</mat-icon>
+          </button>
+          
+          <button 
+            class="send-btn" 
+            [disabled]="!newMessage().trim() || connectionStatus() !== 'connected'"
+            (click)="sendCurrentMessage()"
+            title="메시지 전송">
+            <mat-icon>send</mat-icon>
+          </button>
+        </div>
+        
+        <div class="input-hints">
+          @if (connectionStatus() === 'connected') {
+            <span><strong>Enter</strong>로 전송, <strong>Shift + Enter</strong>로 줄바꿈</span>
+          } @else {
+            <span class="connection-hint">{{ getConnectionStatusText() }} - 메시지를 보낼 수 없습니다</span>
+          }
+        </div>
+      </div>
+    </div>

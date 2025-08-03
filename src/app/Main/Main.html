@@ -1,0 +1,47 @@
+<div class="app-container">
+  <!-- 사이드바 -->
+  <app-sidebar 
+    (navigationChange)="onNavigationChange($event)"
+    (groupSelect)="onGroupSelect($event)"
+    (channelSelect)="onChannelSelect($event)">
+  </app-sidebar>
+
+  <!-- 메인 콘텐츠 영역 -->
+  <div class="main-area">
+    <!-- 헤더 -->
+    <app-header
+      [showSearch]="true"
+      [currentPage]="sharedState.currentPageTitle()"
+      (searchQuery)="onSearchQuery($event)"
+      (notificationClick)="onNotificationClick()"
+      (helpClick)="onHelpClick()"
+      (profileClick)="onProfileClick()">
+    </app-header>
+
+    <!-- 콘텐츠 영역 -->
+    <main class="content-area">
+      @switch (sharedState.activeTab()) {
+        @case ('home') {
+          <app-home-dashboard></app-home-dashboard>
+        }
+        @case ('group') {
+          @if (sharedState.isChannelSelected()) {
+            <app-main-container></app-main-container>
+          }
+          @else {
+            <app-group-dashboard></app-group-dashboard>
+          }
+        }
+        @case ('activity') {
+          <app-activity-dashboard></app-activity-dashboard>
+        }
+        @case ('member') {
+          <app-member-dashboard></app-member-dashboard>
+        }
+        @default {
+          <app-home-dashboard></app-home-dashboard>
+        }
+      }
+    </main>
+  </div>
+</div>
