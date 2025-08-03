@@ -86,7 +86,7 @@ frontend:
         - chmod +x deploy.sh
         - ./deploy.sh
   artifacts:
-    baseDirectory: dist/forntend/browser/
+    baseDirectory: dist/frontend/browser/
     files:
       - '**/*'
   cache:
