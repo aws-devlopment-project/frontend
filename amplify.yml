@@ -19,7 +19,6 @@ applications:
             - npx ng version
             - echo "=== Environment Setup ==="
             - echo "Creating minimal environment files..."
-            # 최소한의 환경 파일 생성 (빌드 에러 방지)
             - |
               cat <<EOF > src/environments/environment.prod.ts
               export const environment = {
@@ -39,7 +38,6 @@ applications:
                 redirectSignOut: ''
               };
               EOF
-            # 개발 환경 파일도 생성
             - |
               cat <<EOF > src/environments/environment.ts
               export const environment = {
@@ -59,7 +57,6 @@ applications:
                 redirectSignOut: ''
               };
               EOF
-            # AWS exports 파일 생성 (최소 설정)
             - |
               cat <<EOF > src/aws-exports.ts
               const awsconfig = {
@@ -92,7 +89,6 @@ applications:
                   }
                 }
               };
-              
               export default awsconfig;
               EOF
         build:
@@ -104,23 +100,16 @@ applications:
         postBuild:
           commands:
             - echo "Custom S3 Deployment"
-            - echo "Framework Angular Node.js based"
-            - echo "Build output dist/frontend/browser"
+            - echo "Framework Angular Node.js"
+            - echo "Build output ready"
             - ls -la dist/frontend/browser/
-            - echo "Generated environment files empty values for now"
-            - cat src/environments/environment.prod.ts
-            - echo "Deploying to existing S3 bucket ONLY"
-            - echo "Target bucket project-s3-static"
-            - echo "Starting deployment..."
+            - echo "Starting deployment to S3"
             - aws s3 sync dist/frontend/browser/ s3://project-s3-static/ --delete
-            - echo "Invalidating CloudFront cache..."
+            - echo "Invalidating CloudFront"
             - aws cloudfront create-invalidation --distribution-id E22CPWL5EUIR76 --paths "/*"
             - echo "Deployment completed"
-            - echo "Available at your domain"
-            - echo "Creating empty artifacts to satisfy Amplify"
             - mkdir -p /tmp/empty-artifacts
             - echo "deployed" > /tmp/empty-artifacts/status.txt
-      # 더미 artifacts (Amplify 요구사항 충족하되 실제 배포는 안됨)
       artifacts:
         baseDirectory: /tmp/empty-artifacts
         files:
