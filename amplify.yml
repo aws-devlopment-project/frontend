@@ -85,11 +85,10 @@ frontend:
       commands:
         - chmod +x deploy.sh
         - ./deploy.sh
-        - mkdir -p /tmp/empty-artifacts
   artifacts:
-    baseDirectory: /tmp/empty-artifacts
+    baseDirectory: dist/forntend/browser/
     files:
-      - '*.txt'
+      - '**/*'
   cache:
     paths:
       - node_modules/**/*
