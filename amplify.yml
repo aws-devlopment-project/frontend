@@ -4,15 +4,6 @@ applications:
       phases:
         preBuild:
           commands:
-            - echo "=== Node.js Environment for Angular ==="
-            - echo "Target: Angular 20 SPA"
-            - echo "Runtime: Node.js $(node --version)"
-            - echo "Package Manager: npm $(npm --version)"
-            - echo "=== Installing Dependencies ==="
-            - echo "Clearing npm cache..."
-            - npm cache clean --force
-            - echo "Removing any existing node_modules..."
-            - rm -rf node_modules
             - echo "Installing dependencies with npm install (instead of ci)..."
             - npm install --no-audit --prefer-offline
             - echo "=== Angular CLI Check ==="
@@ -104,31 +95,27 @@ applications:
         postBuild:
           commands:
             - echo "=== Custom S3 Deployment ==="
-            - echo "Framework Angular (Node.js based)"
+            - echo "Framework Angular Node.js based"
             - echo "Build output dist/frontend/browser"
             - ls -la dist/frontend/browser/
-            - echo "Generated environment files (empty values for now)"
+            - echo "Generated environment files empty values for now"
             - cat src/environments/environment.prod.ts
             - echo "=== Deploying to existing S3 bucket ONLY ==="
             - echo "Target bucket project-s3-static"
-            - echo "Syncing files with optimized caching..."
+            - echo "Creating deployment script..."
             - |
-              aws s3 sync dist/frontend/browser/ s3://project-s3-static/ \
-                --exclude="*.html" \
-                --cache-control "public,max-age=31536000,immutable" \
-                --delete
-            - |
-              aws s3 sync dist/frontend/browser/ s3://project-s3-static/ \
-                --exclude="*" \
-                --include="*.html" \
-                --cache-control "public,max-age=0,must-revalidate"
-            - echo "Invalidating CloudFront cache..."
-            - |
-              aws cloudfront create-invalidation \
-                --distribution-id E22CPWL5EUIR76 \
-                --paths "/*"
-            - echo "Deployment to project-s3-static completed!"
-            - echo "Available at https://your-domain.com"
+              cat > deploy.sh << 'EOF'
+              #!/bin/bash
+              echo "Syncing files with optimized caching..."
+              aws s3 sync dist/frontend/browser/ s3://project-s3-static/ --exclude="*.html" --cache-control "public,max-age=31536000,immutable" --delete
+              aws s3 sync dist/frontend/browser/ s3://project-s3-static/ --exclude="*" --include="*.html" --cache-control "public,max-age=0,must-revalidate"
+              echo "Invalidating CloudFront cache..."
+              aws cloudfront create-invalidation --distribution-id E22CPWL5EUIR76 --paths "/*"
+              echo "Deployment completed successfully"
+              EOF
+            - chmod +x deploy.sh
+            - ./deploy.sh
+            - echo "Available at your domain"
             - echo "=== Creating empty artifacts to satisfy Amplify ==="
             - mkdir -p /tmp/empty-artifacts
             - echo "This build deployed to existing S3 bucket only" > /tmp/empty-artifacts/deployment-info.txt
