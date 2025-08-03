@@ -2,6 +2,8 @@ import { Component, OnInit, signal } from "@angular/core";
 import { FormBuilder, Validators, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router } from "@angular/router";
 import { LoginService } from "../../Service/LoginService";
+import { DataCacheService } from "../../../Core/Service/DataCacheService";
+import { UserCredentials, UserStatus } from "../../../Core/Models/user";
 
 @Component({
     selector: 'app-auth-login',
@@ -23,11 +25,13 @@ export class LoginComponent implements OnInit {
     constructor(
         private fb: FormBuilder, 
         private auth: LoginService, 
-        private router: Router
+        private router: Router,
+        private cacheService: DataCacheService
     ) {}
 
     ngOnInit(): void {
         this.initializeForms();
+        this.handleAuthCallback();
     }
 
     private initializeForms(): void {
@@ -41,9 +45,52 @@ export class LoginComponent implements OnInit {
         });
     }
 
+    async onGoogleLogin(): Promise<void> {
+        try {
+            this.isLoading.update(() => true);
+            await this.auth.signInWithGoogle();
+        } catch (error) {
+            console.error('Google 로그인 오류:', error);
+            this.handleError(error);
+        } finally {
+            this.isLoading.update(() => false);
+        }
+    }
+
+    private async handleAuthCallback(): Promise<void> {
+        try {
+            const isAuthenticated = await this.auth.checkAuthState();
+            
+            if (isAuthenticated) {
+            const userInfo = await this.auth.getCurrentUserInfo();
+            
+            // UserCredentials 생성
+            const user: UserCredentials = {
+                id: userInfo.user.userId,
+                name: userInfo.user.signInDetails?.loginId || 'Google User',
+                accessToken: userInfo.accessToken,
+            };
+
+            const userStatus: UserStatus = {
+                id: userInfo.user.userId,
+                name: userInfo.user.signInDetails?.loginId || 'Google User',
+                status: 'online',
+                joinDate: new Date(),
+                lastSeen: new Date()
+            };
+
+            this.cacheService.setCache('user', user);
+            this.cacheService.setCache('userStatus', userStatus);
+            
+            await this.router.navigate(['/board']);
+            }
+        } catch (error) {
+            console.error('인증 상태 확인 오류:', error);
+        }
+    }
+
     toggle(flag: boolean): void {
         this.clickLogin.update(() => flag);
-        // 탭 전환 시 에러 상태 리셋
         this.successLogin.update(() => true);
         this.signUpNextStep.update(() => false);
     }
@@ -53,8 +100,7 @@ export class LoginComponent implements OnInit {
         
         const formElement = event.target as HTMLFormElement;
         const formId = formElement.id;
-        
-        // 로딩 상태 시작
+
         this.isLoading.update(() => true);
         
         try {
@@ -75,7 +121,6 @@ export class LoginComponent implements OnInit {
             console.error('Form submission error:', error);
             this.handleError(error);
         } finally {
-            // 로딩 상태 종료
             this.isLoading.update(() => false);
         }
     }
@@ -92,12 +137,20 @@ export class LoginComponent implements OnInit {
             const res = await this.auth.signInUser(email, password);
             
             if (res.status === 200) {
-                sessionStorage.setItem('user', JSON.stringify({
-                    username: res.username,
-                    accessToken: res.accessToken
-                }));
-                
-                // 성공적인 로그인 후 리다이렉트
+                const user : UserCredentials = {
+                    id: email,
+                    name: res.username,
+                    accessToken: res.accessToken,
+                };
+                const userStatus : UserStatus = {
+                    id: email,
+                    name: res.username,
+                    status: 'online',
+                    joinDate: new Date(),
+                    lastSeen: new Date()
+                }
+                this.cacheService.setCache('user', user);
+                this.cacheService.setCache('userStatus', userStatus);
                 await this.router.navigate(['/board']);
             } else {
                 this.errMsg = '로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.';
@@ -120,9 +173,6 @@ export class LoginComponent implements OnInit {
 
         try {
             const res = await this.auth.signUpUser(email, password, email);
-            console.log("회원가입 결과:", res);
-            
-            // 회원가입 성공 시 인증 단계로 이동
             this.signUpNextStep.update(() => true);
         } catch (error: any) {
             this.errMsg = error.message || '회원가입 중 오류가 발생했습니다.';
@@ -141,9 +191,6 @@ export class LoginComponent implements OnInit {
 
         try {
             const res = await this.auth.confirmUser(email, verificationCode);
-            console.log("인증 완료:", res);
-            
-            // 인증 완료 후 로그인 탭으로 이동
             this.toggle(true);
             this.signUpNextStep.update(() => false);
         } catch (error: any) {
@@ -210,7 +257,6 @@ export class LoginComponent implements OnInit {
         return this.emailForm.get('verificationCode');
     }
 
-    // 접근성을 위한 키보드 이벤트 핸들러
     onKeyPress(event: KeyboardEvent, callback: () => void): void {
         if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();

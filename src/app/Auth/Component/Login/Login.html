@@ -74,14 +74,16 @@
                 form="aws-login-form" 
                 [disabled]="loginForm.invalid"
                 aria-label="AWS로 로그인">
-            AWS로 로그인
+            로그인
         </button>
         
         <div class="btn btn-google" 
-             tabindex="0" 
-             role="button"
-             aria-label="Google로 로그인">
-            Google로 로그인
+            (click)="onGoogleLogin()"
+            [class.disabled]="isLoading()"
+            tabindex="0" 
+            role="button"
+            aria-label="Google로 로그인">
+            {{ isLoading() ? '로그인 중...' : 'Google로 로그인' }}
         </div>
     }
 
@@ -129,7 +131,7 @@
                 form="aws-sign-up-form" 
                 [disabled]="loginForm.invalid"
                 aria-label="AWS로 회원가입">
-            AWS로 계정 만들기
+            계정 만들기
         </button>
     }
 

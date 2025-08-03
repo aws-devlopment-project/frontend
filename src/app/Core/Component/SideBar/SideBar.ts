@@ -1,7 +1,11 @@
 // SideBar.ts
-import { Component, signal, input, output } from "@angular/core";
+import { Component, OnInit, output } from "@angular/core";
 import { MatIconModule } from "@angular/material/icon";
 import { CommonModule } from "@angular/common";
+import { SharedStateService } from "../../Service/SharedService";
+import { Router } from "@angular/router";
+import { UserService } from "../../Service/UserService";
+import { UserJoinList } from "../../Models/user";
 
 @Component({
     selector: 'app-sidebar',
@@ -10,58 +14,123 @@ import { CommonModule } from "@angular/common";
     imports: [MatIconModule, CommonModule],
     standalone: true
 })
-export class SideBarComponent {
-    // 입력 프로퍼티
-    activeTab = input<string>('challenge');
-    
-    // 출력 이벤트
+export class SideBarComponent implements OnInit {
     navigationChange = output<string>();
-    
-    // 내부 상태
-    isShown = signal(false);
-    expandedSections = signal<string[]>(['challenge']); // 기본적으로 0원 챌린지 섹션 열림
-    selectedChannel = signal('general');
+    groupSelect = output<string>();
+    channelSelect = output<{ groupId: string, channelId: string }>();
+    userJoinList: UserJoinList | undefined;
 
-    toggle(): void {
-        this.isShown.update((isShown) => !isShown);
+    constructor(
+        public sharedState: SharedStateService, 
+        private userService: UserService, 
+        private router: Router
+    ) {
+        console.log('SideBarComponent initialized with SharedStateService');
     }
 
-    setActiveTab(tab: string): void {
-        // 부모 컴포넌트에 변경사항 전달
-        this.navigationChange.emit(tab);
-        
-        if (tab === 'challenge') {
-            this.isShown.set(true);
-        } else {
-            this.isShown.set(false);
+    async ngOnInit(): Promise<void> {
+        try {
+            // 컴포넌트 초기화 시 사용자 가입 목록 로드
+            this.userJoinList = await this.userService.getUserJoinList();
+            console.log('User join list loaded:', this.userJoinList);
+        } catch (error) {
+            console.error('Error loading user join list:', error);
         }
     }
 
+    // === Tab Actions ===
+    setActiveTab(tab: string): void {
+        this.navigationChange.emit(tab); // 부모에게 알림
+        
+        if (tab === 'group') {
+            this.sharedState.setSidebarExpanded(true);
+        } else {
+            this.sharedState.setSidebarExpanded(false);
+        }
+    }
+
+    // === Sidebar Toggle ===
+    toggle(): void {
+        this.sharedState.toggleSidebar();
+    }
+
+    // === Section Toggle ===
     toggleSection(sectionId: string): void {
-        this.expandedSections.update(sections => {
-            if (sections.includes(sectionId)) {
-                return sections.filter(id => id !== sectionId);
-            } else {
-                return [...sections, sectionId];
+        this.sharedState.toggleSection(sectionId);
+        
+        // 부모에게 그룹 선택 알림
+        if (this.sharedState.selectedGroup() === sectionId) {
+            this.groupSelect.emit(sectionId);
+        }
+    }
+
+    // === Channel Selection ===
+    async selectChannel(channelId: string): Promise<void> {
+        // 현재 선택된 그룹 찾기
+        const currentGroup = await this.getCurrentGroupForChannel(channelId);
+        if (currentGroup) {
+            // 부모에게 채널 선택 알림
+            this.channelSelect.emit({ 
+                groupId: currentGroup, 
+                channelId: channelId 
+            });
+        }
+    }
+
+    private async getCurrentGroupForChannel(channelId: string): Promise<string | null> {
+        // 이미 로드된 userJoinList가 없다면 다시 로드
+        if (!this.userJoinList) {
+            this.userJoinList = await this.userService.getUserJoinList();
+        }
+
+        // UserJoinList 인터페이스에 맞게 수정
+        if (!this.userJoinList) return null;
+
+        // 채널 ID를 기반으로 어느 그룹에 속하는지 판단
+        for (const join of this.userJoinList.joinList) {
+            if (join.clubList.includes(channelId)) {
+                return join.groupname;
             }
-        });
+        }
+        
+        console.log('Channel not found in any group:', channelId);
+        return null;
     }
 
-    selectChannel(channelId: string): void {
-        this.selectedChannel.set(channelId);
-        console.log('Selected channel:', channelId);
-    }
-
-    addChannel(): void {
-        console.log('Adding new channel...');
-    }
-
+    // === Utility Actions ===
     browseChannels(): void {
         console.log('Browsing channels...');
+        this.router.navigate(['group/join']);
     }
 
-    // 활성 탭 확인 헬퍼 메서드
+    // === Data Refresh ===
+    async refreshUserJoinList(): Promise<void> {
+        try {
+            this.userJoinList = await this.userService.getUserJoinList();
+            console.log('User join list refreshed:', this.userJoinList);
+        } catch (error) {
+            console.error('Error refreshing user join list:', error);
+        }
+    }
+
+    // === State Helpers (Service 기반) ===
     isActiveTab(tab: string): boolean {
-        return this.activeTab() === tab;
+        return this.sharedState.isActiveTab(tab);
+    }
+
+    isActiveGroup(groupId: string): boolean {
+        return this.sharedState.isActiveGroup(groupId);
+    }
+
+    isActiveChannel(channelId: string): boolean {
+        return this.sharedState.isActiveChannel(channelId);
+    }
+
+    isSidebarShown(): boolean {
+        return this.sharedState.sidebarExpanded();
+    }
+
+    isSectionExpanded(sectionId: string): boolean {
+        return this.sharedState.isSectionExpanded(sectionId);
     }
 }

@@ -8,18 +8,18 @@
             <p>홈</p>
         </div>
         <div class="menuBarIcon" 
-             (click)="toggle(); setActiveTab('challenge')"
-             [class.active]="isActiveTab('challenge')"
-             title="챌린지">
+             (click)="toggle(); setActiveTab('group')"
+             [class.active]="isActiveTab('group')"
+             title="그룹">
             <mat-icon>group</mat-icon>
             <p>그룹</p>
         </div>
         <div class="menuBarIcon"
-             (click)="setActiveTab('dashboard')"
-             [class.active]="isActiveTab('dashboard')"
-             title="대시보드">
+            (click)="setActiveTab('activity')"
+            [class.active]="isActiveTab('activity')"
+            title="Activity">
             <mat-icon>analytics</mat-icon>
-            <p>활동내역</p>
+            <p>통계</p>
         </div>
         <div class="menuBarIcon"
              (click)="setActiveTab('member')"
@@ -30,96 +30,62 @@
         </div>
     </aside>
     
-    <aside class="groupBar" [class.collapsed]="!isShown()">
+    <aside class="groupBar" [class.collapsed]="!isSidebarShown()">
         <div class="workspace-header">
-            <h2 class="workspace-name">Nameless</h2>
+            <h2 class="workspace-name">워크스페이스</h2>
             <div class="workspace-status">
                 <span class="status-indicator"></span>
-                <span>온라인</span>
+                온라인
             </div>
         </div>
 
-        <div class="toggleBarContainer">
-            <div class="toggleBar" 
-                 (click)="toggleSection('challenge')"
-                 [class.expanded]="expandedSections().includes('challenge')">
-                <mat-icon>keyboard_arrow_right</mat-icon>
-                <p>0원 챌린지</p>
-            </div>
-            @if (expandedSections().includes('challenge')) {
-                <div class="channel-list">
-                    <div class="clubBar" 
-                         [class.active]="selectedChannel() === 'general'"
-                         (click)="selectChannel('general')">
-                        일반
+        <!-- Dynamic Group Containers -->
+        @if (userJoinList?.joinList) {
+            @for (group of userJoinList?.joinList; track group.groupname) {
+                <div class="toggleBarContainer">
+                    <div class="toggleBar" 
+                         (click)="toggleSection(group.groupname)"
+                         [class.expanded]="isSectionExpanded(group.groupname)"
+                         [class.active]="isActiveGroup(group.groupname)">
+                        <mat-icon>keyboard_arrow_right</mat-icon>
+                        <p>{{ group.groupname }}</p>
                     </div>
-                    <div class="clubBar" 
-                         [class.active]="selectedChannel() === 'quest'"
-                         (click)="selectChannel('quest')">
-                        일일 퀘스트
-                        <span class="unread-indicator">3</span>
-                    </div>
-                    <div class="clubBar" 
-                         [class.active]="selectedChannel() === 'tips'"
-                         (click)="selectChannel('tips')">
-                        팁 공유
-                    </div>
+                    @if (isSectionExpanded(group.groupname)) {
+                        <div class="channel-list">
+                            @for (channel of group.clubList; track channel) {
+                                <div class="clubBar" 
+                                     [class.active]="isActiveChannel(channel)"
+                                     (click)="selectChannel(channel)">
+                                    {{ channel }}
+                                    <!-- 읽지 않은 메시지 수가 있다면 표시 (선택사항) -->
+                                    <!-- <span class="unread-indicator">3</span> -->
+                                </div>
+                            }
+                        </div>
+                    }
                 </div>
             }
-        </div>
+        }
 
-        <div class="toggleBarContainer">
-            <div class="toggleBar" 
-                 (click)="toggleSection('lifestyle')"
-                 [class.expanded]="expandedSections().includes('lifestyle')">
-                <mat-icon>keyboard_arrow_right</mat-icon>
-                <p>J처럼 살기</p>
-            </div>
-            @if (expandedSections().includes('lifestyle')) {
-                <div class="channel-list">
-                    <div class="clubBar" 
-                         [class.active]="selectedChannel() === 'entj'"
-                         (click)="selectChannel('entj')">
-                        ENTJ 모여라!
-                        <span class="unread-indicator">12</span>
-                    </div>
-                    <div class="clubBar" 
-                         [class.active]="selectedChannel() === 'estp'"
-                         (click)="selectChannel('estp')">
-                        ESTP 모여라!
-                    </div>
-                    <div class="clubBar" 
-                         [class.active]="selectedChannel() === 'samyang'"
-                         (click)="selectChannel('samyang')">
-                        삼양 모여라!
-                    </div>
+        <!-- 데이터가 로딩 중이거나 없을 때 표시할 내용 -->
+        @if (!userJoinList) {
+            <div class="toggleBarContainer">
+                <div class="toggleBar">
+                    <mat-icon>hourglass_empty</mat-icon>
+                    <p>로딩 중...</p>
                 </div>
-            }
-        </div>
+            </div>
+        }
 
-        <div class="toggleBarContainer">
-            <div class="toggleBar" 
-                 (click)="toggleSection('resolution')"
-                 [class.expanded]="expandedSections().includes('resolution')">
-                <mat-icon>keyboard_arrow_right</mat-icon>
-                <p>작심삼일</p>
-            </div>
-            @if (expandedSections().includes('resolution')) {
-                <div class="channel-list">
-                    <div class="clubBar" 
-                         [class.active]="selectedChannel() === 'workout'"
-                         (click)="selectChannel('workout')">
-                        운동하기
-                    </div>
-                    <div class="clubBar" 
-                         [class.active]="selectedChannel() === 'study'"
-                         (click)="selectChannel('study')">
-                        공부하기
-                        <span class="unread-indicator">7</span>
-                    </div>
+        <!-- 가입한 그룹이 없을 때 -->
+        @if (userJoinList?.joinList && userJoinList?.joinList?.length === 0) {
+            <div class="toggleBarContainer">
+                <div class="toggleBar">
+                    <mat-icon>info</mat-icon>
+                    <p>가입한 그룹이 없습니다</p>
                 </div>
-            }
-        </div>
+            </div>
+        }
 
         <div class="sidebar-actions">
             <button class="action-button" (click)="browseChannels()">

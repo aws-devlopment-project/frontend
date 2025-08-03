@@ -3,7 +3,7 @@
   <div class="welcome-section">
     <div class="welcome-content">
       <h1 class="welcome-title">
-        {{ getGreeting() }}, {{ userName() }}님! 👋
+        {{ getGreeting() }} 👋
       </h1>
       <p class="welcome-subtitle">
         {{ getFormattedTime() }}
@@ -113,12 +113,12 @@
     <div class="section-header">
       <h2 class="section-title">
         <mat-icon>recommend</mat-icon>
-        추천 챌린지
+        추천 퀘스트
       </h2>
-      <button class="view-all-btn" (click)="onViewAllChallenges()">
+      <!-- <button class="view-all-btn" (click)="onViewAllChallenges()">
         전체 보기
         <mat-icon>arrow_forward</mat-icon>
-      </button>
+      </button> -->
     </div>
     
     <div class="recommendations-grid">
@@ -141,14 +141,14 @@
             <div class="challenge-stats">
               <div class="participants">
                 <mat-icon>group</mat-icon>
-                <span>{{ challenge.participants | number }}명 참여</span>
+                <span>{{ challenge.participants | number }}명 수행</span>
               </div>
             </div>
           </div>
           
           <div class="card-actions">
             <button class="join-btn" (click)="onJoinChallenge(challenge)">
-              <mat-icon>add</mat-icon>
+              <mat-icon>arrow_forward_ios</mat-icon>
               참여하기
             </button>
           </div>

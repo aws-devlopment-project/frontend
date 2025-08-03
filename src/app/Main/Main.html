@@ -1,16 +1,17 @@
 <div class="app-container">
   <!-- 사이드바 -->
   <app-sidebar 
-    [activeTab]="activeTab()"
-    (navigationChange)="onNavigationChange($event)">
+    (navigationChange)="onNavigationChange($event)"
+    (groupSelect)="onGroupSelect($event)"
+    (channelSelect)="onChannelSelect($event)">
   </app-sidebar>
 
   <!-- 메인 콘텐츠 영역 -->
   <div class="main-area">
     <!-- 헤더 -->
-    <app-header>
-      [currentPage]="currentPage()"
+    <app-header
       [showSearch]="true"
+      [currentPage]="sharedState.currentPageTitle()"
       (searchQuery)="onSearchQuery($event)"
       (notificationClick)="onNotificationClick()"
       (helpClick)="onHelpClick()"
@@ -19,24 +20,23 @@
 
     <!-- 콘텐츠 영역 -->
     <main class="content-area">
-      @switch (activeTab()) {
+      @switch (sharedState.activeTab()) {
         @case ('home') {
           <app-home-dashboard></app-home-dashboard>
         }
-        @case ('challenge') {
-          <app-group-dashboard></app-group-dashboard>
+        @case ('group') {
+          @if (sharedState.isChannelSelected()) {
+            <app-main-container></app-main-container>
+          }
+          @else {
+            <app-group-dashboard></app-group-dashboard>
+          }
         }
-        @case ('dashboard') {
-          <div class="page-placeholder">
-            <h2>📊 대시보드</h2>
-            <p>분석 대시보드 컴포넌트가 여기에 표시됩니다.</p>
-          </div>
+        @case ('activity') {
+          <app-activity-dashboard></app-activity-dashboard>
         }
         @case ('member') {
-          <div class="page-placeholder">
-            <h2>👑 회원관리</h2>
-            <p>회원관리 컴포넌트가 여기에 표시됩니다.</p>
-          </div>
+          <app-member-dashboard></app-member-dashboard>
         }
         @default {
           <app-home-dashboard></app-home-dashboard>

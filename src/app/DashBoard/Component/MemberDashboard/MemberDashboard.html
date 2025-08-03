@@ -1,0 +1,241 @@
+<div class="member-options">
+  <div class="options-container">
+    <!-- 사이드바 메뉴 -->
+    <div class="options-sidebar">
+      <div class="user-summary">
+        <!-- <div class="user-avatar">{{ userProfile().avatar }}</div> -->
+        <div class="user-info">
+          <h3>{{ userProfile().username }}</h3>
+          <p>가입 {{ getJoinDuration() }} 차</p>
+        </div>
+      </div>
+      
+      <nav class="options-menu">
+        @for (item of menuItems; track item.id) {
+          <button class="menu-item" 
+                  [class.active]="activeSection() === item.id"
+                  (click)="setActiveSection(item.id)">
+            <mat-icon>{{ item.icon }}</mat-icon>
+            <div class="menu-content">
+              <span class="menu-label">{{ item.label }}</span>
+              <span class="menu-description">{{ item.description }}</span>
+            </div>
+          </button>
+        }
+      </nav>
+    </div>
+
+    <!-- 메인 콘텐츠 -->
+    <div class="options-content">
+      <!-- 프로필 관리 -->
+      @if (activeSection() === 'profile') {
+        <div class="section-content">
+          <div class="section-header">
+            <h2>프로필 관리</h2>
+            <p>개인 정보를 수정하고 프로필을 관리하세요</p>
+          </div>
+          
+          <div class="profile-section">
+            <!-- <div class="profile-avatar-section">
+              <div class="avatar-display">{{ userProfile().avatar }}</div>
+              <button class="btn btn-secondary">아바타 변경</button>
+            </div> -->
+            
+            <div class="profile-form">
+              <div class="form-group">
+                <label>사용자명</label>
+                <input type="text" 
+                       [(ngModel)]="userProfile().username"
+                       class="form-input">
+              </div>
+              
+              <div class="form-group">
+                <label>이메일</label>
+                <p class="form-input">{{userProfile().email}}</p>
+              </div>
+              
+              <!-- <div class="profile-stats">
+                <div class="stat-item">
+                  <div class="stat-value">{{ userProfile().totalQuests }}</div>
+                  <div class="stat-label">총 퀘스트</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-value">{{ userProfile().completedQuests }}</div>
+                  <div class="stat-label">완료된 퀘스트</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-value">{{ userProfile().currentStreak }}</div>
+                  <div class="stat-label">연속 참여일</div>
+                </div>
+              </div> -->
+              
+              <!-- <div class="user-badges">
+                <h4>획득한 배지</h4>
+                <div class="badges-list">
+                  @for (badge of userProfile().badges; track badge) {
+                    <span class="badge-item">{{ badge }}</span>
+                  }
+                </div>
+              </div> -->
+            </div>
+          </div>
+          
+          <div class="section-actions">
+            <button class="btn btn-primary" 
+                    [disabled]="isLoading()"
+                    (click)="updateProfile()">
+              @if (isLoading()) {
+                <div class="btn-spinner"></div>
+                저장 중...
+              } @else {
+                저장하기
+              }
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- 그룹 관리 -->
+      @if (activeSection() === 'groups') {
+        <div class="section-content">
+          <div class="section-header">
+            <h2>그룹 관리</h2>
+            <p>참여 중인 그룹을 관리하세요</p>
+          </div>
+          
+          <!-- 로딩 상태 표시 -->
+          @if (groupsLoading()) {
+            <div class="empty-state">
+              <p>그룹 정보를 불러오는 중...</p>
+            </div>
+          } @else {
+            <div class="groups-list">
+              @for (group of joinedGroups(); track group?.groupname) {
+                <div class="group-item">
+                  <div class="group-info">
+                    <h4>{{ group?.groupname }}</h4>
+                    <div class="group-channels">
+                      참여 채널: 
+                      @for (channel of group?.clubList; track channel; let last = $last) {
+                        <span>{{ channel }}{{ !last ? ', ' : '' }}</span>
+                      }
+                    </div>
+                  </div>
+                  <div class="group-actions">
+                    <button class="btn btn-danger btn-sm" 
+                            (click)="leaveGroup(group?.groupname || '')">
+                      탈퇴
+                    </button>
+                  </div>
+                </div>
+              } @empty {
+                <div class="empty-state">
+                  <p>참여 중인 그룹이 없습니다.</p>
+                  <button [routerLink]="['/group/join']" class="btn btn-primary">새 그룹 찾기</button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      <!-- 고객 지원 -->
+      @if (activeSection() === 'support') {
+        <div class="section-content">
+          <div class="section-header">
+            <h2>고객 지원</h2>
+            <p>도움이 필요하시면 언제든 문의해 주세요</p>
+          </div>
+          
+          <div class="support-options">
+            <div class="support-option" (click)="contactSupport()">
+              <mat-icon>email</mat-icon>
+              <div class="support-info">
+                <h4>이메일 문의</h4>
+                <p>support.com</p>
+              </div>
+            </div>
+            
+            <div class="support-option" (click)="openHelpCenter()">
+              <mat-icon>help_center</mat-icon>
+              <div class="support-info">
+                <h4>도움말 센터</h4>
+                <p>자주 묻는 질문과 가이드</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- 계정 관리 -->
+      @if (activeSection() === 'account') {
+        <div class="section-content">
+          <div class="section-header">
+            <h2>계정 관리</h2>
+            <p>비밀번호 변경 및 계정 탈퇴를 진행할 수 있습니다</p>
+          </div>
+          
+          <div class="account-options">
+            <div class="account-option">
+              <div class="option-info">
+                <h4>비밀번호 변경</h4>
+                <p>보안을 위해 정기적으로 비밀번호를 변경해 주세요</p>
+              </div>
+              <button class="btn btn-primary" (click)="changePassword()">
+                <mat-icon>lock</mat-icon>
+                비밀번호 변경
+              </button>
+            </div>
+            
+            <div class="account-option danger-zone">
+              <div class="option-info">
+                <h4>계정 탈퇴</h4>
+                <p>계정을 탈퇴하면 모든 데이터가 삭제되며 복구할 수 없습니다</p>
+              </div>
+              @if (!showDeleteConfirm()) {
+                <button class="btn btn-danger" (click)="showDeleteAccountConfirm()">
+                  <mat-icon>person_remove</mat-icon>
+                  계정 탈퇴
+                </button>
+              } @else {
+                <div class="delete-confirm">
+                  <div class="confirm-message">
+                    <mat-icon>warning</mat-icon>
+                    <div>
+                      <h5>정말로 계정을 탈퇴하시겠습니까?</h5>
+                      <p>이 작업은 되돌릴 수 없으며, 모든 데이터가 영구적으로 삭제됩니다.</p>
+                      <ul class="delete-consequences">
+                        <li>프로필 및 개인 정보</li>
+                        <li>퀘스트 완료 기록 ({{ userProfile().completedQuests }}개)</li>
+                        <li>획득한 배지 ({{ userProfile().badges.length }}개)</li>
+                        <li>참여 중인 그룹 ({{ joinedGroups()?.length || 0 }}개)</li>
+                        <li>{{ userProfile().currentStreak }}일 연속 기록</li>
+                      </ul>
+                    </div>
+                  </div>
+                  
+                  <div class="confirm-actions">
+                    <button class="btn btn-secondary" (click)="cancelDeleteAccount()">
+                      취소
+                    </button>
+                    <button class="btn btn-danger" 
+                            [disabled]="isLoading()"
+                            (click)="deleteAccount()">
+                      @if (isLoading()) {
+                        <div class="btn-spinner"></div>
+                        처리 중...
+                      } @else {
+                        <mat-icon>delete_forever</mat-icon>
+                        계정 탈퇴 확인
+                      }
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+</div>
