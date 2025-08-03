@@ -1,116 +1,99 @@
 version: 1
-applications:
-  - frontend:
-      phases:
-        preBuild:
-          commands:
-            - echo "=== Node.js Environment for Angular ==="
-            - echo "Target: Angular 20 SPA"
-            - echo "Runtime: Node.js $(node --version)"
-            - echo "Package Manager: npm $(npm --version)"
-            - echo "=== Installing Dependencies ==="
-            - echo "Clearing npm cache..."
-            - npm cache clean --force
-            - echo "Removing any existing node_modules..."
-            - rm -rf node_modules
-            - echo "Installing dependencies with npm install (instead of ci)..."
-            - npm install --no-audit --prefer-offline
-            - echo "=== Angular CLI Check ==="
-            - npx ng version
-            - echo "=== Environment Setup ==="
-            - echo "Creating minimal environment files..."
-            - |
-              cat <<EOF > src/environments/environment.prod.ts
-              export const environment = {
-                production: true,
-                framework: 'Angular',
-                version: '20.1.0',
-                buildTool: 'esbuild',
-                runtime: 'Node.js',
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm cache clean --force
+        - rm -rf node_modules
+        - npm install --no-audit --prefer-offline
+        - npx ng version
+        - |
+          cat <<EOF > src/environments/environment.prod.ts
+          export const environment = {
+            production: true,
+            framework: 'Angular',
+            version: '20.1.0',
+            buildTool: 'esbuild',
+            runtime: 'Node.js',
+            userPoolId: '',
+            userPoolClientId: '',
+            identityPoolId: '',
+            region: 'ap-northeast-2',
+            googleClientId: '',
+            apiUrl: '',
+            cognitoDomain: '',
+            redirectSignIn: '',
+            redirectSignOut: ''
+          };
+          EOF
+        - |
+          cat <<EOF > src/environments/environment.ts
+          export const environment = {
+            production: false,
+            framework: 'Angular',
+            version: '20.1.0',
+            buildTool: 'esbuild',
+            runtime: 'Node.js',
+            userPoolId: '',
+            userPoolClientId: '',
+            identityPoolId: '',
+            region: 'ap-northeast-2',
+            googleClientId: '',
+            apiUrl: '',
+            cognitoDomain: '',
+            redirectSignIn: '',
+            redirectSignOut: ''
+          };
+          EOF
+        - |
+          cat <<EOF > src/aws-exports.ts
+          const awsconfig = {
+            aws_project_region: 'ap-northeast-2',
+            aws_cognito_region: 'ap-northeast-2',
+            aws_user_pools_id: '',
+            aws_user_pools_web_client_id: '',
+            aws_cognito_identity_pool_id: '',
+            oauth: {},
+            aws_cognito_username_attributes: [],
+            aws_cognito_social_providers: [],
+            aws_cognito_signup_attributes: [],
+            aws_cognito_mfa_configuration: 'OFF',
+            aws_cognito_password_protection_settings: {
+              passwordPolicyMinLength: 8,
+              passwordPolicyCharacters: []
+            },
+            aws_cognito_verification_mechanisms: [],
+            Auth: {
+              Cognito: {
                 userPoolId: '',
                 userPoolClientId: '',
                 identityPoolId: '',
-                region: 'ap-northeast-2',
-                googleClientId: '',
-                apiUrl: '',
-                cognitoDomain: '',
-                redirectSignIn: '',
-                redirectSignOut: ''
-              };
-              EOF
-            - |
-              cat <<EOF > src/environments/environment.ts
-              export const environment = {
-                production: false,
-                framework: 'Angular',
-                version: '20.1.0',
-                buildTool: 'esbuild',
-                runtime: 'Node.js',
-                userPoolId: '',
-                userPoolClientId: '',
-                identityPoolId: '',
-                region: 'ap-northeast-2',
-                googleClientId: '',
-                apiUrl: '',
-                cognitoDomain: '',
-                redirectSignIn: '',
-                redirectSignOut: ''
-              };
-              EOF
-            - |
-              cat <<EOF > src/aws-exports.ts
-              const awsconfig = {
-                aws_project_region: 'ap-northeast-2',
-                aws_cognito_region: 'ap-northeast-2',
-                aws_user_pools_id: '',
-                aws_user_pools_web_client_id: '',
-                aws_cognito_identity_pool_id: '',
-                oauth: {},
-                aws_cognito_username_attributes: [],
-                aws_cognito_social_providers: [],
-                aws_cognito_signup_attributes: [],
-                aws_cognito_mfa_configuration: 'OFF',
-                aws_cognito_password_protection_settings: {
-                  passwordPolicyMinLength: 8,
-                  passwordPolicyCharacters: []
-                },
-                aws_cognito_verification_mechanisms: [],
-                Auth: {
-                  Cognito: {
-                    userPoolId: '',
-                    userPoolClientId: '',
-                    identityPoolId: '',
-                    signUpVerificationMethod: 'code' as const,
-                    loginWith: {
-                      username: false,
-                      email: false,
-                      phone: false
-                    }
-                  }
+                signUpVerificationMethod: 'code' as const,
+                loginWith: {
+                  username: false,
+                  email: false,
+                  phone: false
                 }
-              };
-              
-              export default awsconfig;
-              EOF
-        build:
-          commands:
-            - echo "=== Building Angular Application ==="
-            - echo "Using: Angular CLI + esbuild (Node.js)"
-            - npm run build -- --configuration production --verbose
-            - echo "Angular build completed successfully"
-        postBuild:
-          commands:
-            - echo "Starting custom deployment"
-            - chmod +x deploy.sh
-            - ./deploy.sh
-            - mkdir -p /tmp/empty-artifacts
-            - echo "deployed" > /tmp/empty-artifacts/status.txt
-      artifacts:
-        baseDirectory: /tmp/empty-artifacts
-        files:
-          - '*.txt'
-      cache:
-        paths:
-          - node_modules/**/*
-          - .angular/cache/**/*
-          - ~/.npm/**/*
+              }
+            }
+          };
+          
+          export default awsconfig;
+          EOF
+    build:
+      commands:
+        - npm run build -- --configuration production --verbose
+    postBuild:
+      commands:
+        - chmod +x deploy.sh
+        - ./deploy.sh
+        - mkdir -p /tmp/empty-artifacts
+  artifacts:
+    baseDirectory: /tmp/empty-artifacts
+    files:
+      - '*.txt'
+  cache:
+    paths:
+      - node_modules/**/*
+      - .angular/cache/**/*
+      - ~/.npm/**/*
