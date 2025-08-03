@@ -46,3 +46,5 @@ Thumbs.db
 /src/app/Auth/Configure/aws-export.ts
 /src/environments/environment.development.ts
 /src/environemnts/environment.product.ts
+
+proxy.conf.json
