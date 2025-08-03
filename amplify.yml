@@ -109,7 +109,7 @@ applications:
             - ls -la dist/frontend/browser/
             - echo "Generated environment files (empty values for now):"
             - cat src/environments/environment.prod.ts
-            - echo "=== Deploying to existing S3 bucket ==="
+            - echo "=== Deploying to existing S3 bucket ONLY ==="
             - echo "Target bucket: project-s3-static"
             - echo "Syncing files with optimized caching..."
             # 정적 자산들 (1년 캐싱)
@@ -119,7 +119,15 @@ applications:
             - echo "Invalidating CloudFront cache..."
             - aws cloudfront create-invalidation --distribution-id E22CPWL5EUIR76 --paths "/*"
             - echo "✅ Deployment to project-s3-static completed!"
-      # artifacts 섹션 제거 (수동 S3 배포 사용)
+            - echo "🌐 Available at: https://your-domain.com"
+            - echo "=== Creating empty artifacts to satisfy Amplify ==="
+            - mkdir -p /tmp/empty-artifacts
+            - echo "This build deployed to existing S3 bucket only" > /tmp/empty-artifacts/deployment-info.txt
+      # 더미 artifacts (Amplify 요구사항 충족하되 실제 배포는 안됨)
+      artifacts:
+        baseDirectory: /tmp/empty-artifacts
+        files:
+          - '*.txt'
       cache:
         paths:
           - node_modules/**/*
