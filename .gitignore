@@ -42,9 +42,6 @@ testem.log
 .DS_Store
 Thumbs.db
 
-# environment
-/src/app/Auth/Configure/aws-export.ts
-
 proxy.conf.json
 
 node_modules/
