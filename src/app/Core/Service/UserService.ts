@@ -1,7 +1,7 @@
 import { Injectable, inject } from "@angular/core";
 import { HttpService } from "./HttpService";
 import { HttpHeaders } from "@angular/common/http";
-import { environment } from "../../Environments/environment.development";
+import { environment } from "../../../environments/environment.prod";
 import { DataCacheService } from "./DataCacheService";
 import { UserCredentials, UserJoinList, UserStatus } from "../Models/user";
 import { UserQuestContinuous, UserQuestCur, UserQuestPrev, UserQuestWeekly } from "../Models/user";
