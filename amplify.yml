@@ -62,7 +62,7 @@ frontend:
           };
           EOF
         - |
-          cat <<EOF > src/aws-exports.ts
+          cat <<EOF > src/app/Auth/Configure/aws-export.ts
           const awsmobile = {
             aws_project_region: '$APP_REGION',
             aws_cognito_region: '$APP_REGION',
