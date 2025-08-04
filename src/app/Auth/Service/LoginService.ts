@@ -144,7 +144,6 @@ export class LoginService {
     async signUpUser(username: string, password: string, email: string) {
         try {
             // 비밀번호 복잡성 검증
-            console.log(password);
             if (!this.validatePassword(password)) {
                 throw new Error('비밀번호는 8자 이상이어야 하며, 대소문자, 숫자, 특수문자를 포함해야 합니다.');
             }
