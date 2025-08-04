@@ -144,6 +144,7 @@ export class LoginService {
     async signUpUser(username: string, password: string, email: string) {
         try {
             // 비밀번호 복잡성 검증
+            console.log(password);
             if (!this.validatePassword(password)) {
                 throw new Error('비밀번호는 8자 이상이어야 하며, 대소문자, 숫자, 특수문자를 포함해야 합니다.');
             }
@@ -329,7 +330,7 @@ export class LoginService {
     // 유틸리티 메서드들
     private validatePassword(password: string): boolean {
         // 최소 8자, 대소문자, 숫자, 특수문자 포함
-        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])[A-Za-z\d!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]{8,}$/;
         return passwordRegex.test(password);
     }
 
