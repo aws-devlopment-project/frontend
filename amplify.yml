@@ -3,8 +3,13 @@ frontend:
   phases:
     preBuild:
       commands:
-        - npm install --no-audit --prefer-offline
+        - npm ci --no-audit --prefer-offline
         - npx ng version
+        - |
+          if [ -z "$COGNITO_USER_POOL_ID" ] || [ -z "$COGNITO_CLIENT_ID" ]; then
+            echo "Error: Cognito environment variables are not set"
+            exit 1
+          fi
         - |
           cat <<EOF > src/environments/environment.prod.ts
           export const environment = {
@@ -13,15 +18,17 @@ frontend:
             version: '20.1.0',
             buildTool: 'esbuild',
             runtime: 'Node.js',
-            userPoolId: '',
-            userPoolClientId: '',
-            identityPoolId: '',
-            region: 'ap-northeast-2',
-            googleClientId: '',
-            apiUrl: '',
-            cognitoDomain: '',
-            redirectSignIn: '',
-            redirectSignOut: ''
+            userPoolId: '$COGNITO_USER_POOL_ID',
+            userPoolClientId: '$COGNITO_CLIENT_ID',
+            identityPoolId: '$COGNITO_IDENTITY_POOL_ID',
+            region: '$AWS_REGION',
+            googleClientId: '$GOOGLE_CLIENT_ID',
+            cognitoDomain: '$COGNITO_DOMAIN',
+            redirectSignIn: '$REDIRECT_SIGN_IN',
+            redirectSignOut: '$REDIRECT_SIGN_OUT',
+            apiUrl: '$API_URL',
+            environment: 'production',
+            logLevel: 'error'
           };
           EOF
         - |
@@ -32,63 +39,100 @@ frontend:
             version: '20.1.0',
             buildTool: 'esbuild',
             runtime: 'Node.js',
-            userPoolId: '',
-            userPoolClientId: '',
-            identityPoolId: '',
-            region: 'ap-northeast-2',
-            googleClientId: '',
-            apiUrl: '',
-            cognitoDomain: '',
-            redirectSignIn: '',
-            redirectSignOut: ''
+            userPoolId: '$COGNITO_USER_POOL_ID',
+            userPoolClientId: '$COGNITO_CLIENT_ID',
+            identityPoolId: '$COGNITO_IDENTITY_POOL_ID',
+            region: '$AWS_REGION',
+            googleClientId: '$GOOGLE_CLIENT_ID',
+            cognitoDomain: '$COGNITO_DOMAIN',
+            redirectSignIn: '$API_URL',
+            redirectSignOut: '$API_URL',
+            apiUrl: '$API_URL_DEV',
+            environment: 'development',
+            logLevel: 'debug'
           };
           EOF
         - |
           cat <<EOF > src/aws-exports.ts
           const awsconfig = {
-            aws_project_region: 'ap-northeast-2',
-            aws_cognito_region: 'ap-northeast-2',
-            aws_user_pools_id: '',
-            aws_user_pools_web_client_id: '',
-            aws_cognito_identity_pool_id: '',
-            oauth: {},
-            aws_cognito_username_attributes: [],
-            aws_cognito_social_providers: [],
-            aws_cognito_signup_attributes: [],
-            aws_cognito_mfa_configuration: 'OFF',
+            aws_project_region: '$AWS_REGION',
+            aws_cognito_region: '$AWS_REGION',
+            aws_user_pools_id: '$COGNITO_USER_POOL_ID',
+            aws_user_pools_web_client_id: '$COGNITO_CLIENT_ID',
+            aws_cognito_identity_pool_id: '$COGNITO_IDENTITY_POOL_ID',
+            oauth: {
+              domain: '$COGNITO_DOMAIN',
+              scope: ['phone', 'email', 'openid', 'profile', 'aws.cognito.signin.user.admin'],
+              redirectSignIn: '$REDIRECT_SIGN_IN',
+              redirectSignOut: '$REDIRECT_SIGN_OUT',
+              responseType: 'code'
+            },
+            aws_cognito_username_attributes: ['email'],
+            aws_cognito_social_providers: ['GOOGLE'],
+            aws_cognito_signup_attributes: ['EMAIL'],
+            aws_cognito_mfa_configuration: 'OPTIONAL',
             aws_cognito_password_protection_settings: {
               passwordPolicyMinLength: 8,
-              passwordPolicyCharacters: []
+              passwordPolicyCharacters: [
+                'REQUIRES_LOWERCASE',
+                'REQUIRES_UPPERCASE', 
+                'REQUIRES_NUMBERS',
+                'REQUIRES_SYMBOLS'
+              ]
             },
-            aws_cognito_verification_mechanisms: [],
+            aws_cognito_verification_mechanisms: ['EMAIL'],
+            API: {
+              endpoints: [
+                {
+                  name: 'api',
+                  endpoint: '$API_URL',
+                  region: '$AWS_REGION'
+                }
+              ]
+            },
             Auth: {
               Cognito: {
-                userPoolId: '',
-                userPoolClientId: '',
-                identityPoolId: '',
+                userPoolId: '$COGNITO_USER_POOL_ID',
+                userPoolClientId: '$COGNITO_CLIENT_ID',
+                identityPoolId: '$COGNITO_IDENTITY_POOL_ID',
                 signUpVerificationMethod: 'code' as const,
                 loginWith: {
                   username: false,
-                  email: false,
+                  email: true,
                   phone: false
                 }
               }
             }
           };
-          
           export default awsconfig;
           EOF
+        - echo "Pre-build configuration completed"
     build:
       commands:
-        - npm run build -- --configuration production --verbose
+        - echo "Building Angular application for production..."
+        - npm run build -- --configuration production --verbose --progress=false
+        - |
+          if [ ! -d "dist/frontend/browser" ]; then
+            echo "Error: Build output directory not found"
+            exit 1
+          fi
+        - du -sh dist/frontend/browser/
+        - echo "Build completed successfully"
+    
     postBuild:
       commands:
-        - chmod +x deploy.sh
-        - ./deploy.sh
+        - echo "Post-build tasks completed"
+        - |
+          if [ ! -z "$CUSTOM_DOMAIN" ]; then
+            echo "Custom domain configured: $CUSTOM_DOMAIN"
+          fi
+
   artifacts:
     baseDirectory: dist/frontend/browser/
     files:
       - '**/*'
+    name: frontend-build-artifacts
+  
   cache:
     paths:
       - node_modules/**/*

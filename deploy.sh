@@ -1,9 +1,12 @@
 #!/bin/bash
-set -e
+echo "Starting deployment process..."
 
-echo "Starting deployment to S3..."
-aws s3 rm s3://project-s3-static/ --recursive
-aws s3 sync dist/frontend/browser/ s3://project-s3-static/ --delete
-echo "S3 sync completed"
+# S3에 파일 업로드
+if [ ! -z "$S3_BUCKET_NAME" ]; then
+    echo "Uploading files to S3 bucket: $S3_BUCKET_NAME"
+    aws s3 sync dist/frontend/browser/ s3://$S3_BUCKET_NAME --delete
+else
+    echo "S3 bucket name not set"
+fi
 
-echo "Deployment completed successfully!"
+echo "Deployment process completed!"

@@ -2,7 +2,7 @@ import { Injectable } from "@angular/core";
 import { DataCacheService } from "./DataCacheService";
 import { HttpService } from "./HttpService";
 import { HttpHeaders } from "@angular/common/http";
-import { environment } from "../../Environments/environment.development";
+import { environment } from "../../../environments/environment.prod";
 import { Group } from "../Models/group";
 import { UserService } from "./UserService";
 
