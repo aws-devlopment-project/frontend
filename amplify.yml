@@ -63,7 +63,7 @@ frontend:
           EOF
         - |
           cat <<EOF > src/aws-exports.ts
-          const awsconfig = {
+          const awsmobile = {
             aws_project_region: '$APP_REGION',
             aws_cognito_region: '$APP_REGION',
             aws_user_pools_id: '$COGNITO_USER_POOL_ID',
@@ -114,7 +114,7 @@ frontend:
             }
           };
           
-          export default awsconfig;
+          export default awsmobile;
           EOF
 
         - echo "Pre-build configuration completed"
