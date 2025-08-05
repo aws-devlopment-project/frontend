@@ -1,4 +1,5 @@
 import { Injectable } from "@angular/core";
+
 import { 
   fetchAuthSession, 
   getCurrentUser, 
@@ -63,10 +64,12 @@ export class LoginService {
             // 현재 URL을 저장 (리다이렉트 후 복원용)
             sessionStorage.setItem('preAuthUrl', window.location.href);
             
-            await signInWithRedirect({ 
-                provider: 'Google'
+            console.log(window.location.origin);
+            return await signInWithRedirect({ 
+                provider: "Google"
             });
         } catch (error: any) {
+            console.log(window.location.origin);
             console.error('Google 로그인 오류:', error);
             
             // 사용자 친화적 에러 메시지
