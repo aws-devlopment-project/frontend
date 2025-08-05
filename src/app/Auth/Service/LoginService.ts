@@ -64,10 +64,7 @@ export class LoginService {
             sessionStorage.setItem('preAuthUrl', window.location.href);
             
             await signInWithRedirect({ 
-                provider: 'Google',
-                customState: JSON.stringify({
-                    returnUrl: window.location.pathname
-                })
+                provider: 'Google'
             });
         } catch (error: any) {
             console.error('Google 로그인 오류:', error);
