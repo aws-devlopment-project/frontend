@@ -1,5 +1,4 @@
 import { Injectable } from "@angular/core";
-import { DebugService } from "../../Debug/DebugService";
 
 export interface CacheItem<T = any> {
     data: T;
@@ -29,7 +28,7 @@ export class DataCacheService {
     // 캐시 크기 제한 (MB)
     private readonly MAX_CACHE_SIZE = 10; // 10MB
     
-    constructor(private debugService: DebugService) {
+    constructor() {
         this.initializeCache();
     }
 
@@ -49,7 +48,7 @@ export class DataCacheService {
     setCache<T>(key: string, data: T, ttl: number = this.DEFAULT_TTL): boolean {
         try {
             if (!this.isValidKey(key) || data === undefined || data === null) {
-                this.debugService.printConsole('Invalid cache parameters:', { key, data, ttl });
+                console.warn('Invalid cache parameters:', { key, data, ttl });
                 return false;
             }
 
@@ -67,18 +66,18 @@ export class DataCacheService {
             
             // 크기 체크
             if (!this.checkCacheSize(serializedItem)) {
-                this.debugService.printConsole('Cache size limit exceeded for key:', key);
+                console.warn('Cache size limit exceeded for key:', key);
                 return false;
             }
 
             const storage = this.getStorage(key);
             storage.setItem(this.getCacheKey(key), serializedItem);
             
-            this.debugService.printConsole(`Cache set: ${key} (TTL: ${ttl}ms)`);
+            console.debug(`Cache set: ${key} (TTL: ${ttl}ms)`);
             return true;
 
         } catch (error) {
-            this.debugService.printConsole('Error setting cache:', error, { key, ttl });
+            console.error('Error setting cache:', error, { key, ttl });
             return false;
         }
     }
@@ -103,23 +102,23 @@ export class DataCacheService {
 
             // 버전 체크
             if (parsedItem.version !== this.CACHE_VERSION) {
-                this.debugService.printConsole(`Cache version mismatch for ${key}, removing`);
+                console.debug(`Cache version mismatch for ${key}, removing`);
                 this.removeCache(key);
                 return null;
             }
 
             // 만료 체크
             if (Date.now() > parsedItem.expiry) {
-                this.debugService.printConsole(`Cache expired for ${key}, removing`);
+                console.debug(`Cache expired for ${key}, removing`);
                 this.removeCache(key);
                 return null;
             }
 
-            this.debugService.printConsole(`Cache hit: ${key}`);
+            console.debug(`Cache hit: ${key}`);
             return parsedItem.data;
 
         } catch (error) {
-            this.debugService.printConsole('Error getting cache:', error, { key });
+            console.error('Error getting cache:', error, { key });
             // 손상된 캐시 제거
             this.removeCache(key);
             return null;
@@ -140,13 +139,13 @@ export class DataCacheService {
             
             if (storage.getItem(cacheKey)) {
                 storage.removeItem(cacheKey);
-                this.debugService.printConsole(`Cache removed: ${key}`);
+                console.debug(`Cache removed: ${key}`);
                 return true;
             }
             
             return false;
         } catch (error) {
-            this.debugService.printConsole('Error removing cache:', error, { key });
+            console.error('Error removing cache:', error, { key });
             return false;
         }
     }
@@ -177,7 +176,7 @@ export class DataCacheService {
 
             return true;
         } catch (error) {
-            this.debugService.printConsole('Error checking cache:', error, { key });
+            console.error('Error checking cache:', error, { key });
             this.removeCache(key);
             return false;
         }
@@ -202,7 +201,7 @@ export class DataCacheService {
             const parsedItem: CacheItem = JSON.parse(item);
             return parsedItem.expiry;
         } catch (error) {
-            this.debugService.printConsole('Error getting cache expiry:', error, { key });
+            console.error('Error getting cache expiry:', error, { key });
             return null;
         }
     }
@@ -230,10 +229,10 @@ export class DataCacheService {
             parsedItem.expiry = Date.now() + additionalTTL;
             storage.setItem(this.getCacheKey(key), JSON.stringify(parsedItem));
             
-            this.debugService.printConsole(`Cache TTL extended: ${key} (+${additionalTTL}ms)`);
+            console.debug(`Cache TTL extended: ${key} (+${additionalTTL}ms)`);
             return true;
         } catch (error) {
-            this.debugService.printConsole('Error extending cache TTL:', error, { key, additionalTTL });
+            console.error('Error extending cache TTL:', error, { key, additionalTTL });
             return false;
         }
     }
@@ -250,9 +249,9 @@ export class DataCacheService {
                 this.removeCache(key);
             });
             
-            this.debugService.printConsole('All cache cleared');
+            console.debug('All cache cleared');
         } catch (error) {
-            this.debugService.printConsole('Error clearing all cache:', error);
+            console.error('Error clearing all cache:', error);
         }
     }
 
@@ -275,10 +274,10 @@ export class DataCacheService {
                 }
             });
             
-            this.debugService.printConsole(`Cache cleared by pattern: ${pattern} (${removedCount} items)`);
+            console.debug(`Cache cleared by pattern: ${pattern} (${removedCount} items)`);
             return removedCount;
         } catch (error) {
-            this.debugService.printConsole('Error clearing cache by pattern:', error, { pattern });
+            console.error('Error clearing cache by pattern:', error, { pattern });
             return 0;
         }
     }
@@ -300,12 +299,12 @@ export class DataCacheService {
             });
             
             if (cleanedCount > 0) {
-                this.debugService.printConsole(`Expired cache cleaned: ${cleanedCount} items`);
+                console.debug(`Expired cache cleaned: ${cleanedCount} items`);
             }
             
             return cleanedCount;
         } catch (error) {
-            this.debugService.printConsole('Error cleaning expired cache:', error);
+            console.error('Error cleaning expired cache:', error);
             return 0;
         }
     }
@@ -346,7 +345,7 @@ export class DataCacheService {
                 totalSize: Math.round(totalSize / 1024) // KB 단위
             };
         } catch (error) {
-            this.debugService.printConsole('Error getting cache stats:', error);
+            console.error('Error getting cache stats:', error);
             return {
                 totalItems: 0,
                 sessionItems: 0,
@@ -391,13 +390,13 @@ export class DataCacheService {
             const maxSizeBytes = this.MAX_CACHE_SIZE * 1024 * 1024; // MB를 bytes로 변환
             
             if (itemSize > maxSizeBytes) {
-                this.debugService.printConsole(`Item size (${Math.round(itemSize / 1024)}KB) exceeds limit`);
+                console.warn(`Item size (${Math.round(itemSize / 1024)}KB) exceeds limit`);
                 return false;
             }
             
             return true;
         } catch (error) {
-            this.debugService.printConsole('Error checking cache size:', error);
+            console.error('Error checking cache size:', error);
             return false;
         }
     }
@@ -408,18 +407,18 @@ export class DataCacheService {
      * 캐시 상태 로그 출력 (개발용)
      */
     logCacheStatus(): void {
-        this.debugService.printConsole('=== Cache Status ===');
+        console.group('=== Cache Status ===');
         
         const stats = this.getCacheStats();
-        this.debugService.printConsole('Stats:', stats);
+        console.log('Stats:', stats);
         
         const sessionKeys = this.getAllCacheKeys(sessionStorage);
         const localKeys = this.getAllCacheKeys(localStorage);
         
-        this.debugService.printConsole('Session Storage Keys:', sessionKeys);
-        this.debugService.printConsole('Local Storage Keys:', localKeys);
+        console.log('Session Storage Keys:', sessionKeys);
+        console.log('Local Storage Keys:', localKeys);
         
-        this.debugService.printConsole();
+        console.groupEnd();
     }
 
     /**
@@ -431,7 +430,7 @@ export class DataCacheService {
             const item = storage.getItem(this.getCacheKey(key));
             
             if (!item) {
-                this.debugService.printConsole(`Cache item not found: ${key}`);
+                console.log(`Cache item not found: ${key}`);
                 return;
             }
             
@@ -440,16 +439,16 @@ export class DataCacheService {
             const isExpired = now > parsedItem.expiry;
             const timeLeft = Math.max(0, parsedItem.expiry - now);
             
-            this.debugService.printConsole(`=== Cache Item: ${key} ===`);
-            this.debugService.printConsole('Data:', parsedItem.data);
-            this.debugService.printConsole('Created:', new Date(parsedItem.timestamp).toLocaleString());
-            this.debugService.printConsole('Expires:', new Date(parsedItem.expiry).toLocaleString());
-            this.debugService.printConsole('Time Left:', isExpired ? 'EXPIRED' : `${Math.round(timeLeft / 1000)}s`);
-            this.debugService.printConsole('Version:', parsedItem.version);
-            this.debugService.printConsole('Size:', `${Math.round(new Blob([item]).size / 1024)}KB`);
-            this.debugService.printConsole();
+            console.group(`=== Cache Item: ${key} ===`);
+            console.log('Data:', parsedItem.data);
+            console.log('Created:', new Date(parsedItem.timestamp).toLocaleString());
+            console.log('Expires:', new Date(parsedItem.expiry).toLocaleString());
+            console.log('Time Left:', isExpired ? 'EXPIRED' : `${Math.round(timeLeft / 1000)}s`);
+            console.log('Version:', parsedItem.version);
+            console.log('Size:', `${Math.round(new Blob([item]).size / 1024)}KB`);
+            console.groupEnd();
         } catch (error) {
-            this.debugService.printConsole('Error logging cache item:', error, { key });
+            console.error('Error logging cache item:', error, { key });
         }
     }
 }

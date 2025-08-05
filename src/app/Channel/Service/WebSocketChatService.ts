@@ -2,7 +2,6 @@ import { Injectable, signal, computed } from '@angular/core';
 import { BehaviorSubject, Subject, Observable } from 'rxjs';
 import { ChatMessage } from '../Models/chatMessage';
 import { UserStatus } from '../../Core/Models/user';
-import { DebugService } from '../../Debug/DebugService';
 
 export interface TypingUser {
   userId: string;
@@ -56,14 +55,14 @@ export class WebSocketChatService {
     return this.typingUsers().filter(user => user.channelId === currentChannel);
   });
 
-  constructor(private debugService: DebugService) {
-    this.debugService.printConsole('WebSocketChatService initialized');
+  constructor() {
+    console.log('WebSocketChatService initialized');
   }
 
   // === Connection Management ===
   connect(user: UserStatus, serverUrl: string = 'ws://localhost:8080/chat'): void {
     if (this.socket?.readyState === WebSocket.OPEN) {
-      this.debugService.printConsole('Already connected to WebSocket');
+      console.log('Already connected to WebSocket');
       return;
     }
 
@@ -74,7 +73,7 @@ export class WebSocketChatService {
       this.socket = new WebSocket(`${serverUrl}?userId=${user.id}&username=${encodeURIComponent(user.name)}`);
       this.setupEventListeners();
     } catch (error) {
-      this.debugService.printConsole('Failed to create WebSocket connection:', error);
+      console.error('Failed to create WebSocket connection:', error);
       this.connectionStatus.set('disconnected');
       this.errorSubject.next('WebSocket 연결 생성에 실패했습니다');
     }
@@ -98,7 +97,7 @@ export class WebSocketChatService {
     if (!this.socket) return;
 
     this.socket.onopen = (event) => {
-      this.debugService.printConsole('WebSocket connected:', event);
+      console.log('WebSocket connected:', event);
       this.connectionStatus.set('connected');
       this.reconnectAttempts = 0;
       this.startPingInterval();
@@ -112,13 +111,13 @@ export class WebSocketChatService {
         const data: WebSocketMessage = JSON.parse(event.data);
         this.handleMessage(data);
       } catch (error) {
-        this.debugService.printConsole('Failed to parse WebSocket message:', error);
+        console.error('Failed to parse WebSocket message:', error);
         this.errorSubject.next('메시지 파싱 오류');
       }
     };
 
     this.socket.onclose = (event) => {
-      this.debugService.printConsole('WebSocket disconnected:', event);
+      console.log('WebSocket disconnected:', event);
       this.connectionStatus.set('disconnected');
       this.clearPingInterval();
       
@@ -128,7 +127,7 @@ export class WebSocketChatService {
     };
 
     this.socket.onerror = (error) => {
-      this.debugService.printConsole('WebSocket error:', error);
+      console.error('WebSocket error:', error);
       this.errorSubject.next('WebSocket 연결 오류가 발생했습니다');
     };
   }
@@ -172,7 +171,7 @@ export class WebSocketChatService {
         break;
 
       default:
-        this.debugService.printConsole('Unknown message type:', data.type);
+        console.warn('Unknown message type:', data.type);
     }
   }
 
@@ -271,7 +270,7 @@ export class WebSocketChatService {
         timestamp: new Date()
       }));
     } else {
-      this.debugService.printConsole('WebSocket is not connected. Cannot send message:', message);
+      console.warn('WebSocket is not connected. Cannot send message:', message);
       this.errorSubject.next('연결이 끊어져 메시지를 보낼 수 없습니다');
     }
   }
@@ -369,7 +368,7 @@ export class WebSocketChatService {
     this.reconnectAttempts++;
     this.connectionStatus.set('reconnecting');
     
-    this.debugService.printConsole(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+    console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
     
     setTimeout(() => {
       if (this.currentUser()) {

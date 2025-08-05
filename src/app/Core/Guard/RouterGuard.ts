@@ -1,7 +1,6 @@
 import { Injectable } from '@angular/core';
 import { CanActivate, Router, ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
 import { SharedStateService } from '../Service/SharedService';
-import { DebugService } from '../../Debug/DebugService';
 
 @Injectable({
   providedIn: 'root'
@@ -10,8 +9,7 @@ export class GroupGuard implements CanActivate {
   
   constructor(
     private shared: SharedStateService,
-    private router: Router,
-    private debugService: DebugService
+    private router: Router
   ) {}
 
   canActivate(
@@ -21,7 +19,7 @@ export class GroupGuard implements CanActivate {
     const selectedGroup = this.shared.selectedGroup();
     const hasJoinedGroups = this.checkUserHasGroups();
 
-    this.debugService.printConsole('GroupGuard 체크:', {
+    console.log('GroupGuard 체크:', {
       selectedGroup,
       hasJoinedGroups,
       targetUrl: state.url
@@ -36,7 +34,7 @@ export class GroupGuard implements CanActivate {
     if (hasJoinedGroups) {
       const joinedGroups = this.getJoinedGroups();
       if (joinedGroups.length > 0) {
-        this.debugService.printConsole('자동 그룹 선택:', joinedGroups[0].groupId);
+        console.log('자동 그룹 선택:', joinedGroups[0].groupId);
         this.shared.setSelectedGroup(joinedGroups[0].groupId);
         
         // 첫 번째 채널도 자동 선택
@@ -49,7 +47,7 @@ export class GroupGuard implements CanActivate {
     }
 
     // 3. 참여한 그룹이 없으면 그룹 참여 페이지로 리다이렉트
-    this.debugService.printConsole('참여한 그룹이 없음. 그룹 참여 페이지로 리다이렉트');
+    console.log('참여한 그룹이 없음. 그룹 참여 페이지로 리다이렉트');
     this.router.navigate(['/group/join']);
     return false;
   }
@@ -62,7 +60,7 @@ export class GroupGuard implements CanActivate {
       }
       return false;
     } catch (error) {
-      this.debugService.printConsole('참여 그룹 확인 실패:', error);
+      console.error('참여 그룹 확인 실패:', error);
       return false;
     }
   }
@@ -72,7 +70,7 @@ export class GroupGuard implements CanActivate {
       const joinedGroups = localStorage.getItem('joinedGroups');
       return joinedGroups ? JSON.parse(joinedGroups) : [];
     } catch (error) {
-      this.debugService.printConsole('참여 그룹 조회 실패:', error);
+      console.error('참여 그룹 조회 실패:', error);
       return [];
     }
   }

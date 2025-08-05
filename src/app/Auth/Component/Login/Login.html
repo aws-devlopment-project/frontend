@@ -123,6 +123,20 @@
                         </small>
                     }
                 </div>
+                <div class="form-col">
+                    <label class="form-label" for="signup-username">별칭</label>
+                    <input class="form-control"
+                           id="signup-username"
+                           type="text"
+                           formControlName="username"
+                           placeholder="서비스에서 사용할 별칭을 입력해주세요"
+                           auto-complete="철수">
+                    @if (loginForm.get('username')?.invalid && loginForm.get('username')?.touched) {
+                        <small class="text-danger">
+                            별칭을 입력해주세요
+                        </small>
+                    }
+                </div>
             </div>
         </form>
         
