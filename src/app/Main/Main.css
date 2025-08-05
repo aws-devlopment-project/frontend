@@ -567,3 +567,241 @@
     transform: translateY(0);
   }
 }
+
+.loading-container, 
+.error-container, 
+.initialization-container {
+  max-width: 500px;
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e2e8f0;
+  border-top: 4px solid #3182ce;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-container {
+  color: #e53e3e;
+}
+
+.error-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.error-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+
+.error-details {
+  margin-top: 20px;
+  text-align: left;
+}
+
+.error-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #718096;
+  margin-bottom: 8px;
+}
+
+.error-details pre {
+  background: #f7fafc;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #2d3748;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.debug-info {
+  margin-top: 20px;
+  text-align: left;
+  font-size: 12px;
+}
+
+.debug-info summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #718096;
+  margin-bottom: 8px;
+}
+
+.debug-info pre {
+  background: #f7fafc;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  color: #2d3748;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.empty-state {
+  margin-top: 24px;
+  padding: 24px;
+  background: rgba(49, 130, 206, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(49, 130, 206, 0.1);
+}
+
+.empty-state p {
+  color: #718096;
+  margin-bottom: 16px;
+}
+
+.initialization-timeout {
+  margin-top: 20px;
+  padding: 16px;
+  background: #fef5e7;
+  border-radius: 8px;
+  border: 1px solid #f6ad55;
+}
+
+.initialization-timeout p {
+  color: #c05621;
+  margin-bottom: 12px;
+}
+
+/* 반응형 개선 */
+@media (max-width: 768px) {
+  .error-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .error-actions .primary-button,
+  .error-actions .secondary-button {
+    width: 100%;
+    max-width: 200px;
+  }
+  
+  .loading-container h2,
+  .error-container h2,
+  .initialization-container h2 {
+    font-size: 20px;
+  }
+  
+  .loading-container p,
+  .error-container p,
+  .initialization-container p {
+    font-size: 14px;
+  }
+}
+
+/* 다크 모드 지원 (선택사항) */
+@media (prefers-color-scheme: dark) {
+  .error-details pre,
+  .debug-info pre {
+    background: #2d3748;
+    color: #e2e8f0;
+  }
+  
+  .empty-state {
+    background: rgba(49, 130, 206, 0.1);
+    border-color: rgba(49, 130, 206, 0.2);
+  }
+  
+  .initialization-timeout {
+    background: #744210;
+    border-color: #d69e2e;
+  }
+  
+  .initialization-timeout p {
+    color: #fbd38d;
+  }
+}
+
+/* 로딩 애니메이션 개선 */
+.loading-spinner {
+  filter: drop-shadow(0 2px 4px rgba(49, 130, 206, 0.2));
+}
+
+/* 에러 아이콘 애니메이션 */
+.error-icon {
+  animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-10px);
+  }
+  60% {
+    transform: translateY(-5px);
+  }
+}
+
+/* 초기화 타임아웃 페이드인 */
+.initialization-timeout {
+  animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 버튼 호버 효과 개선 */
+.primary-button, .secondary-button {
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.primary-button:before,
+.secondary-button:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s;
+}
+
+.primary-button:hover:before,
+.secondary-button:hover:before {
+  left: 100%;
+}
+
+/* 스크롤바 스타일링 개선 */
+.debug-info pre::-webkit-scrollbar,
+.error-details pre::-webkit-scrollbar {
+  width: 6px;
+}
+
+.debug-info pre::-webkit-scrollbar-thumb,
+.error-details pre::-webkit-scrollbar-thumb {
+  background-color: rgba(49, 130, 206, 0.3);
+  border-radius: 3px;
+}
+
+.debug-info pre::-webkit-scrollbar-thumb:hover,
+.error-details pre::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(49, 130, 206, 0.5);
+}

@@ -4,25 +4,27 @@ import { MatIconModule } from "@angular/material/icon";
 import { Router } from "@angular/router";
 import { SharedStateService } from "../../../Core/Service/SharedService";
 import { GroupService } from "../../../Core/Service/GroupService";
+import { UserService } from "../../../Core/Service/UserService";
+import { matchingGroup } from "../../../../environments/environtment";
 
 interface GroupInfo {
   name: string;
   description: string;
   emoji: string;
   memberCount: number;
-  activeToday: number;
-  achievementRate: number;
-  rating: number;
+  activeToday?: number;
+  achievementRate?: number;
+  rating?: number;
   tags: string[];
 }
 
-interface ChannelInfo {
+interface ClubInfo {
   id: string;
   name: string;
   icon: string;
   description: string;
   members: number;
-  activity: string;
+  activity?: string;
 }
 
 @Component({
@@ -41,53 +43,53 @@ export class GroupJoinComponent implements OnInit {
 
   // 데이터
   availableGroups = signal<GroupInfo[]>([]);
-  availableChannels = signal<ChannelInfo[]>([]);
+  availableChannels = signal<ClubInfo[]>([]);
 
   constructor(
     private router: Router,
     private shared: SharedStateService,
-    private groupService: GroupService
+    private groupService: GroupService,
+    private userService: UserService
   ) {}
 
   ngOnInit(): void {
     this.loadAvailableGroups();
   }
 
-  private loadAvailableGroups(): void {
-    const groups = this.groupService.getGroupList();
-    const viewGroups: GroupInfo[] = [
-      {
-        name: '0원 챌린지',
-        description: '돈 쓰지 않고도 건강하고 의미있는 생활을 만들어가는 챌린지. 매일 새로운 무료 활동으로 갓생을 살아보세요!',
-        emoji: '💪',
-        memberCount: 124,
-        activeToday: 84,
-        achievementRate: 78,
-        rating: 4.8,
-        tags: ['절약', '건강', '생활습관', '무료활동']
-      },
-      {
-        name: 'J처럼 살기',
-        description: '계획적이고 체계적인 라이프스타일을 추구하는 사람들의 모임. MBTI J 성향이 강한 분들과 함께 효율적인 삶을 만들어요.',
-        emoji: '🌟',
-        memberCount: 67,
-        activeToday: 43,
-        achievementRate: 85,
-        rating: 4.9,
-        tags: ['계획', '체계', 'MBTI', '라이프스타일']
-      },
-      {
-        name: '작심삼일 탈출',
-        description: '작심삼일을 극복하고 꾸준한 자기계발을 실현하는 그룹. 습관 형성과 목표 달성을 함께 응원해요.',
-        emoji: '📚',
-        memberCount: 89,
-        activeToday: 56,
-        achievementRate: 72,
-        rating: 4.7,
-        tags: ['습관형성', '자기계발', '동기부여', '꾸준함']
-      }
-    ];
-
+  private async loadAvailableGroups(): Promise<void> {
+    const groups: string[] | null = await this.groupService.getGroupList();
+    let viewGroups: GroupInfo[] = [];
+    if (groups) {
+      groups.forEach(async (group: string, index: number) => {
+        let info = await this.groupService.getGroupInfo(group);
+        console.log(info);
+        if (info) {
+          viewGroups.push({
+            name: info.name,
+            description: info.description ? info.description : '',
+            emoji: info.icon? info.icon : '👥',
+            memberCount: info.memberNum,
+            tags: info.tag
+          });
+        } else {
+          viewGroups.push({
+            name: matchingGroup[index].name,
+            description: matchingGroup[index].description,
+            emoji: matchingGroup[index].emoji,
+            memberCount: matchingGroup[index].memberCount,
+            tags: matchingGroup[index].tags
+          });
+        }
+      })
+    } else {
+      viewGroups = matchingGroup.map((group: any) => ({
+        name: group.name,
+        description: group.description,
+        emoji: group.emoji,
+        memberCount: group.memberCount,
+        tags: group.tags
+      }));
+    }
     this.availableGroups.set(viewGroups);
   }
 
@@ -96,82 +98,33 @@ export class GroupJoinComponent implements OnInit {
     this.loadChannelsForGroup(group.name);
   }
 
-  private loadChannelsForGroup(groupId: string): void {
-    // 그룹별 채널 데이터
-    const channelData: { [key: string]: ChannelInfo[] } = {
-      challenge: [
-        {
-          id: 'general',
-          name: '일반',
-          icon: '💬',
-          description: '0원으로 갓생을 살아가는 모든 이야기를 나눠요',
-          members: 124,
-          activity: '매우 활발'
-        },
-        {
-          id: 'quest',
-          name: '일일 퀘스트',
-          icon: '🎯',
-          description: '매일 새로운 도전과 퀘스트를 함께해요',
-          members: 98,
+  private async loadChannelsForGroup(groupId: string): Promise<void> {
+    // 그룹별 모임 데이터
+    let groupInfo = await this.groupService.getGroupInfo(groupId);
+    let exampleGroupInfo = matchingGroup.filter((group) => group.name === groupId);
+    let clubData: ClubInfo[] = [];
+    if (groupInfo) {
+      clubData = groupInfo.clubList.map((club, index) => ({
+        id: index.toString(),
+        name: club.name,
+        icon: club.icon ? club.icon : exampleGroupInfo[0].emoji,
+        description: club.description ? club.description : exampleGroupInfo[0].description,
+        members: club.memberNum,
+        activity: '활발'
+      }))}
+    else {
+      if (exampleGroupInfo[0].clubList?.length) {
+        clubData = exampleGroupInfo[0].clubList.map((club, index) => ({
+          id: index.toString(),
+          name: club.name,
+          icon: exampleGroupInfo[0].emoji,
+          description: exampleGroupInfo[0].description,
+          members: club.members ?? 0,
           activity: '활발'
-        },
-        {
-          id: 'tips',
-          name: '팁 공유',
-          icon: '💡',
-          description: '돈 안 쓰고 살기 좋은 팁들을 공유해요',
-          members: 87,
-          activity: '보통'
-        }
-      ],
-      lifestyle: [
-        {
-          id: 'entj',
-          name: 'ENTJ 모여라!',
-          icon: '👑',
-          description: 'ENTJ들의 계획적이고 효율적인 라이프스타일 공유',
-          members: 23,
-          activity: '활발'
-        },
-        {
-          id: 'estp',
-          name: 'ESTP 모여라!',
-          icon: '⚡',
-          description: 'ESTP들의 활동적이고 역동적인 삶의 이야기',
-          members: 19,
-          activity: '보통'
-        },
-        {
-          id: 'samyang',
-          name: '삼양 모여라!',
-          icon: '🏢',
-          description: '삼양인들의 특별한 라이프스타일과 경험 공유',
-          members: 25,
-          activity: '활발'
-        }
-      ],
-      resolution: [
-        {
-          id: 'workout',
-          name: '운동하기',
-          icon: '💪',
-          description: '운동 습관을 만들고 꾸준히 이어가는 공간',
-          members: 54,
-          activity: '매우 활발'
-        },
-        {
-          id: 'study',
-          name: '공부하기',
-          icon: '📖',
-          description: '공부 루틴을 정착시키고 학습 동기를 유지하는 곳',
-          members: 43,
-          activity: '활발'
-        }
-      ]
-    };
+        }))} 
+    }
 
-    this.availableChannels.set(channelData[groupId] || []);
+    this.availableChannels.set(clubData);
   }
 
   goToChannelSelection(): void {
@@ -215,26 +168,13 @@ export class GroupJoinComponent implements OnInit {
 
     try {
       // 실제 구현에서는 API 호출로 그룹 참여 처리
-      // await this.groupService.joinGroup(group.id, Array.from(channels));
-      
-      // 임시: localStorage에 참여 정보 저장
-      const joinedGroups = JSON.parse(localStorage.getItem('joinedGroups') || '[]');
-      const groupData = {
-        groupName: group.name,
-        channels: Array.from(channels),
-        joinedAt: new Date().toISOString()
-      };
-      
-      if (!joinedGroups.find((g: any) => g.groupName === group.name)) {
-        joinedGroups.push(groupData);
-        localStorage.setItem('joinedGroups', JSON.stringify(joinedGroups));
-      }
+      await this.userService.joinGroup(this.shared.currentUser()?.id, group.name);
+      await this.userService.joinClub(this.shared.currentUser()?.id, group.name, Array.from(channels));
 
       // SharedService에 선택된 그룹과 첫 번째 채널 설정
       this.shared.setSelectedGroup(group.name);
       const firstChannel = Array.from(channels)[0];
       this.shared.setSelectedChannel(firstChannel, group.name);
-
       // 완료 단계로 이동
       this.updateStep(3);
 

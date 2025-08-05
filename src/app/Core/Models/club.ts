@@ -1,9 +1,10 @@
 export interface Club {
     name: string,
     description: string,
-    userNum: number,
-    clubQuest: [],
-    recentlyMessage: []
+    memberNum: number,
+    clubQuest?: [],
+    recentlyMessage?: [],
+    tag: string[]
 }
 
 export interface ClubChat {

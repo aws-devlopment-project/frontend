@@ -161,6 +161,66 @@
   box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
 }
 
+/* 아바타 선택기 스타일 */
+.avatar-selector {
+  width: 100%;
+  max-width: 300px;
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  margin-top: 16px;
+}
+
+.avatar-selector h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 16px 0;
+  text-align: center;
+}
+
+.avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.avatar-option {
+  width: 40px;
+  height: 40px;
+  border: 2px solid #e5e7eb;
+  border-radius: 50%;
+  background: white;
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar-option:hover {
+  border-color: #6366f1;
+  transform: scale(1.1);
+}
+
+.avatar-option.selected {
+  border-color: #6366f1;
+  background: #f0f9ff;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.avatar-option:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.avatar-selector-actions {
+  text-align: center;
+}
+
 .profile-form {
   display: flex;
   flex-direction: column;
@@ -415,6 +475,11 @@ input:checked + .toggle-slider:before {
   box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
 }
 
+.btn-warning:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.5);
+}
+
 .btn-sm {
   padding: 8px 16px;
   font-size: 12px;
@@ -439,11 +504,11 @@ input:checked + .toggle-slider:before {
   text-align: center;
 }
 
-/* 그룹 관리 */
+/* 그룹 관리 - 확장된 스타일 */
 .groups-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 24px;
 }
 
 .group-item {
@@ -456,17 +521,32 @@ input:checked + .toggle-slider:before {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+.group-item-expanded {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
 .group-info h4 {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: #374151;
   margin: 0 0 4px 0;
 }
 
 .group-info p {
-  font-size: 12px;
+  font-size: 14px;
   color: #6b7280;
-  margin: 0 0 8px 0;
+  margin: 0;
 }
 
 .group-channels {
@@ -477,6 +557,58 @@ input:checked + .toggle-slider:before {
 .group-actions {
   display: flex;
   gap: 8px;
+}
+
+/* 채널 목록 스타일 */
+.channels-list {
+  padding: 20px 24px;
+  background: #f9fafb;
+}
+
+.channels-list h5 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 16px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.channel-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: white;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.channel-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.channel-item:last-child {
+  margin-bottom: 0;
+}
+
+.channel-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #374151;
+}
+
+.channel-info mat-icon {
+  font-size: 16px;
+  color: #6b7280;
+}
+
+.channel-info span {
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .empty-state {
@@ -672,5 +804,21 @@ input:checked + .toggle-slider:before {
   
   .confirm-actions {
     flex-direction: column;
+  }
+  
+  .group-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .channel-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .avatar-grid {
+    grid-template-columns: repeat(4, 1fr);
   }
 }

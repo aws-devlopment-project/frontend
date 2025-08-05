@@ -54,6 +54,7 @@ export class MemberOptionsComponent implements OnInit {
   activeSection = signal<string>('profile');
   isLoading = signal<boolean>(false);
   showDeleteConfirm = signal<boolean>(false);
+  showAvatarSelector = signal<boolean>(false);
   
   // 사용자 데이터
   userProfile = signal<UserProfile>({
@@ -70,6 +71,9 @@ export class MemberOptionsComponent implements OnInit {
   // 그룹 데이터를 signal로 관리
   joinedGroups = signal<UserJoinList['joinList'] | undefined>(undefined);
   groupsLoading = signal<boolean>(false);
+
+  // 아바타 옵션
+  availableAvatars = ['👤', '😊', '😎', '🤖', '👨‍💻', '👩‍💻', '🧑‍🎓', '👨‍🏫', '👩‍🏫', '🧑‍💼', '👨‍⚕️', '👩‍⚕️', '🧑‍🎨', '👨‍🚀', '👩‍🚀', '🧙‍♂️', '🧙‍♀️', '🦸‍♂️', '🦸‍♀️', '🐱', '🐶', '🦊', '🐼', '🐯', '🦁'];
 
   // 설정 데이터
   notificationSettings = signal<NotificationSettings>({
@@ -136,6 +140,34 @@ export class MemberOptionsComponent implements OnInit {
     this.activeSection.set(sectionId);
   }
 
+  // 아바타 선택기 토글
+  toggleAvatarSelector(): void {
+    this.showAvatarSelector.update(show => !show);
+  }
+
+  // 아바타 변경
+  async changeAvatar(newAvatar: string): Promise<void> {
+    this.isLoading.set(true);
+    
+    try {
+      await this.managementDashboardService.setAvatar(newAvatar);
+      
+      // 프로필 업데이트
+      this.userProfile.update(profile => ({
+        ...profile,
+        avatar: newAvatar
+      }));
+      
+      this.showAvatarSelector.set(false);
+      this.showSuccessMessage('아바타가 성공적으로 변경되었습니다.');
+    } catch (error) {
+      console.error('아바타 변경 실패:', error);
+      this.showSuccessMessage('아바타 변경에 실패했습니다.');
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
+
   // 프로필 업데이트
   async updateProfile(): Promise<void> {
     this.isLoading.set(true);
@@ -158,7 +190,7 @@ export class MemberOptionsComponent implements OnInit {
 
   // 그룹 탈퇴
   async leaveGroup(groupId: string): Promise<void> {
-    if (confirm('정말로 이 그룹에서 탈퇴하시겠습니까?')) {
+    if (confirm('정말로 이 그룹에서 탈퇴하시겠습니까? 그룹 내 모든 채널에서도 탈퇴됩니다.')) {
       try {
         // 실제 탈퇴 로직 수행
         console.log('그룹 탈퇴:', groupId);
@@ -170,6 +202,22 @@ export class MemberOptionsComponent implements OnInit {
       } catch (error) {
         console.error('그룹 탈퇴 실패:', error);
         this.showSuccessMessage('그룹 탈퇴에 실패했습니다.');
+      }
+    }
+  }
+
+  // 채널 탈퇴
+  async leaveClub(groupId: string, channelId: string): Promise<void> {
+    if (confirm(`정말로 "${channelId}" 채널에서 탈퇴하시겠습니까?`)) {
+      try {
+        await this.managementDashboardService.leaveChannel(groupId, channelId);
+        
+        // 탈퇴 후 그룹 목록 새로고침
+        await this.loadJoinedGroups();
+        this.showSuccessMessage(`"${channelId}" 채널에서 탈퇴되었습니다.`);
+      } catch (error) {
+        console.error('채널 탈퇴 실패:', error);
+        this.showSuccessMessage('채널 탈퇴에 실패했습니다.');
       }
     }
   }

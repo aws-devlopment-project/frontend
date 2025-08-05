@@ -4,7 +4,7 @@
     background-color: #f8f8f8;
 }
 
-/* 메인 메뉴바 (좌측 아이콘) - 파란색 계열로 변경 */
+/* 메인 메뉴바 (좌측 아이콘) - 항상 표시 */
 .menuBar {
     display: flex;
     flex-direction: column;
@@ -16,6 +16,9 @@
     padding: 8px 0;
     flex-shrink: 0;
     box-shadow: 2px 0 8px rgba(66, 153, 225, 0.2);
+    /* 항상 표시되도록 고정 */
+    position: relative;
+    z-index: 1001;
 }
 
 .menuBarIcon {
@@ -80,7 +83,7 @@
     position: relative;
 }
 
-/* 그룹/채널 사이드바 - 파란색 계열로 변경 */
+/* 그룹/채널 사이드바 - 조건부 표시 */
 .groupBar {
     display: flex;
     flex-direction: column;
@@ -93,11 +96,18 @@
     overflow-y: auto;
     border-right: 1px solid rgba(0, 0, 0, 0.1);
     box-shadow: 2px 0 8px rgba(43, 108, 176, 0.2);
+    position: relative;
+    z-index: 1000;
 }
 
+/* 숨김 상태 - 완전히 숨기기 */
 .groupBar.collapsed {
     width: 0;
+    min-width: 0;
     overflow: hidden;
+    opacity: 0;
+    transform: translateX(-100%);
+    box-shadow: none;
 }
 
 /* 워크스페이스 헤더 */
@@ -311,7 +321,7 @@
     padding: 8px 16px;
     position: sticky;
     top: 0;
-    z-index: 1000;
+    z-index: 1002; /* 더 높은 z-index */
   }
   
   .menuBarIcon {
@@ -339,12 +349,15 @@
     overflow-y: auto;
     border-right: none;
     border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    transform: none; /* 모바일에서는 transform 제거 */
   }
   
   .groupBar.collapsed {
     height: 0;
-    overflow: hidden;
     min-height: 0;
+    transform: none;
+    opacity: 0;
+    overflow: hidden;
   }
   
   .workspace-header {

@@ -5,7 +5,6 @@ import { CommonModule } from "@angular/common";
 import { SharedStateService } from "../../Service/SharedService";
 import { Router } from "@angular/router";
 import { UserService } from "../../Service/UserService";
-import { UserJoinList } from "../../Models/user";
 
 @Component({
     selector: 'app-sidebar',
@@ -18,7 +17,7 @@ export class SideBarComponent implements OnInit {
     navigationChange = output<string>();
     groupSelect = output<string>();
     channelSelect = output<{ groupId: string, channelId: string }>();
-    userJoinList: UserJoinList | undefined;
+    userJoinList: any;
 
     constructor(
         public sharedState: SharedStateService, 
@@ -42,16 +41,21 @@ export class SideBarComponent implements OnInit {
     setActiveTab(tab: string): void {
         this.navigationChange.emit(tab); // 부모에게 알림
         
+        // 그룹 탭일 때만 그룹바를 표시
         if (tab === 'group') {
             this.sharedState.setSidebarExpanded(true);
         } else {
+            // 다른 탭일 때는 그룹바만 숨김 (메뉴바는 유지)
             this.sharedState.setSidebarExpanded(false);
         }
     }
 
-    // === Sidebar Toggle ===
+    // === Sidebar Toggle (그룹바만 토글) ===
     toggle(): void {
-        this.sharedState.toggleSidebar();
+        // 그룹 탭에서만 그룹바 토글 허용
+        if (this.sharedState.activeTab() === 'group') {
+            this.sharedState.toggleSidebar();
+        }
     }
 
     // === Section Toggle ===
@@ -126,11 +130,22 @@ export class SideBarComponent implements OnInit {
         return this.sharedState.isActiveChannel(channelId);
     }
 
-    isSidebarShown(): boolean {
-        return this.sharedState.sidebarExpanded();
+    // 그룹바만 표시 여부 (메뉴바는 항상 표시)
+    isGroupBarShown(): boolean {
+        return this.sharedState.sidebarExpanded() && this.sharedState.activeTab() === 'group';
+    }
+
+    // 메뉴바는 항상 표시
+    isMenuBarShown(): boolean {
+        return true; // 항상 true
     }
 
     isSectionExpanded(sectionId: string): boolean {
         return this.sharedState.isSectionExpanded(sectionId);
+    }
+
+    // === 그룹 탭 여부 확인 ===
+    isGroupTabActive(): boolean {
+        return this.sharedState.activeTab() === 'group';
     }
 }

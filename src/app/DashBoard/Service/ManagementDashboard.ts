@@ -1,9 +1,12 @@
 import { Injectable } from "@angular/core";
 import { UserService } from "../../Core/Service/UserService";
 import { SharedStateService } from "../../Core/Service/SharedService";
-import { GroupService } from "../../Core/Service/GroupService";
 import { LoginService } from "../../Auth/Service/LoginService";
 import { UserJoinList } from "../../Core/Models/user";
+import { HttpHeaders } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
+import { environment } from "../../../environments/environtment";
+import { HttpService } from "../../Core/Service/HttpService";
 
 interface UserProfile {
   username: string;
@@ -20,7 +23,12 @@ interface UserProfile {
     providedIn: 'platform'
 })
 export class ManagementDashboardService {
-    constructor(public shared: SharedStateService,private userService: UserService, private loginService: LoginService) {}
+    constructor(
+        public shared: SharedStateService,
+        private userService: UserService, 
+        private loginService: LoginService,
+        private httpService: HttpService
+    ) {}
 
     async getUserProfile() {
         let userProfile: UserProfile = {
@@ -39,12 +47,12 @@ export class ManagementDashboardService {
         if (user) {
             userProfile.username = user.name;
             userProfile.email = user.id;
-            userProfile.avatar = user.avatar ? user.avatar : '';
+            userProfile.avatar = user.avatar ? user.avatar : '👤';
             userProfile.joinDate = user.joinDate ? new Date(user.joinDate) : new Date();
         } else {
             userProfile.username = 'default';
             userProfile.email = 'default';
-            userProfile.avatar = '';
+            userProfile.avatar = '👤';
             userProfile.joinDate = new Date();
         }
         if (userQuestPrev) {
@@ -60,16 +68,42 @@ export class ManagementDashboardService {
         let user = this.shared.currentUser();
         if (user) {
             await this.userService.setUsername(user.id, username);
-            await this.userService.setUsername(user.id, username);
             user.name = username;
-            await this.shared.setCurrentUser(user);
+            this.shared.setCurrentUser(user);
         } else {
             await this.userService.setUsername("", username);
         }
     }
 
-    async getGroupList(): Promise<UserJoinList | undefined> {
-        const group: UserJoinList | undefined = await this.userService.getUserJoinList();
+    async setAvatar(avatar: string) {
+        try {
+            const user = this.shared.currentUser();
+            const userId = user ? user.id : "";
+            
+            // API 호출
+            await firstValueFrom(
+                this.httpService.post(environment.apiUrl + '/api/user/setAvatar', {
+                    user: userId,
+                    avatar: avatar
+                }, new HttpHeaders({
+                        'Content-Type': 'application/json'
+            })))
+
+            // 성공 시 로컬 상태 업데이트
+            if (user) {
+                user.avatar = avatar;
+                await this.shared.setCurrentUser(user);
+            }
+            
+            return { success: true };
+        } catch (error) {
+            console.error('아바타 설정 실패:', error);
+            throw error;
+        }
+    }
+
+    async getGroupList(): Promise<UserJoinList | null> {
+        const group: UserJoinList | null = await this.userService.getUserJoinList();
         return group;
     }
 
@@ -82,7 +116,26 @@ export class ManagementDashboardService {
         }
     }
 
-    async departUser(username:string = ""): Promise<void> {
+    async leaveChannel(groupId: string, channelId: string): Promise<void> {
+        try {
+            const user = this.shared.currentUser();
+            const userId = user ? user.id : "";
+            
+            // 채널 탈퇴 API 호출 (실제 API에 맞게 수정 필요)
+            this.httpService.post(environment.apiUrl + '/api/user/leaveClub', {
+                user: userId,
+                group: groupId,
+                cludList: [channelId]
+            }, new HttpHeaders({
+                'Content-Type': 'application/json'
+            }));
+        } catch (error) {
+            console.error('채널 탈퇴 실패:', error);
+            throw error;
+        }
+    }
+
+    async departUser(username: string = ""): Promise<void> {
         const user = this.shared.currentUser();
         if (user) {
             await this.loginService.deleteCurrentUser();

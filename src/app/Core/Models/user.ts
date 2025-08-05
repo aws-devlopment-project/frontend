@@ -18,6 +18,8 @@ export interface UserQuestCur {
     curQuestTotalList: {
         quest: string,
         group: string,
+        tag?: [],
+        descriptions?: string
         isSuccess: boolean
     }[]
 }

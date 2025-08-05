@@ -3,12 +3,14 @@ import { Injectable } from "@angular/core";
 import { Router } from "@angular/router";
 import { Observable, throwError } from "rxjs";
 import { catchError } from 'rxjs/operators';
+import { DataCacheService } from "./DataCacheService";
+import { UserCredentials } from "../Models/user";
 
 @Injectable({
   providedIn: 'root',
 })
 export class HttpService {
-  constructor(private http: HttpClient, private router: Router) {}
+  constructor(private http: HttpClient, private router: Router, private cacheService: DataCacheService) {}
 
   private handleError(error: HttpErrorResponse, originalUrl?: string): Observable<never> {
     console.error('HTTP Error:', error);
@@ -60,12 +62,12 @@ export class HttpService {
   }
 
   private getAuthHeaders(): HttpHeaders {
-    const userObject = sessionStorage.getItem('user');
+    const userObject: UserCredentials | null = this.cacheService.getCache('user');
     if (!userObject) {
       throw new Error('No authentication token found');
     }
 
-    const token = JSON.parse(userObject).accessToken;
+    const token = userObject.accessToken;
     return new HttpHeaders().set('Authorization', `Bearer ${token}`);
   }
 

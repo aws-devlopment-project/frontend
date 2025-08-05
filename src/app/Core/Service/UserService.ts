@@ -1,12 +1,13 @@
-import { Injectable, inject } from "@angular/core";
+import { Injectable } from "@angular/core";
 import { HttpService } from "./HttpService";
 import { HttpHeaders } from "@angular/common/http";
-import { environment } from "../../../environments/environment.prod";
+import { environment } from "../../../environments/environtment";
 import { DataCacheService } from "./DataCacheService";
 import { UserCredentials, UserJoinList, UserStatus } from "../Models/user";
 import { UserQuestContinuous, UserQuestCur, UserQuestPrev, UserQuestWeekly } from "../Models/user";
-import { SharedStateService } from "./SharedService";
 import { Router } from "@angular/router";
+import { firstValueFrom, Observable, throwError } from 'rxjs';
+import { catchError, tap } from 'rxjs/operators';
 
 @Injectable({
     providedIn: 'root'
@@ -18,332 +19,654 @@ export class UserService {
         private cacheService: DataCacheService,
         private router: Router
     ) {}
-    // UserQuest 관련 캐싱 테이블 구성을 위한 Get 요청들
-    // getUserQuestCur : 현재 진행하고 있는 퀘스트들 목록
-    async getUserQuestCur(id: string = ""): Promise<UserQuestCur | undefined> {
+
+    // === 개선된 사용자 인증 정보 조회 ===
+    async getUserCredentials(): Promise<UserCredentials | null> {
         try {
-            if (id === "") {
-                const user = await this.getUserCredentials();
-                if (user) {
-                    id = user.id;
-                }
-            }
-
-            const cache: UserQuestCur | null = await this.cacheService.getCache('userQuestCur');
-            if (cache) {
-                return cache;
-            } else {
-                this.cacheService.removeCache('userQuestCur');
-            }
-
-            const response = this.httpService.get(environment.apiUrl + `/api/user/getUserQuestCur?id=${id}`, new HttpHeaders());
-            if (response) {
-                response.subscribe((data: UserQuestCur) => {
-                    this.cacheService.setCache('userQuestCur', data);
-                    return data;
-                })
-            }
-        } catch (e) {
-            console.log('[API] getUserQuestCur: ', e);
-        }
-        return undefined;
-    }
-
-    // getUserQuestContinuous : 연속으로 성공하고 있는 퀘스트 수
-    async getUserQuestContinuous(id: string = ""): Promise<UserQuestContinuous | undefined> {
-        try {
-            if (id === "") {
-                const user = await this.getUserCredentials();
-                if (user) {
-                    id = user.id;
-                }
-            }
-
-            const cache: UserQuestContinuous | null = await this.cacheService.getCache('userQuestContinuous');
-            if (cache) {
-                return cache;
-            } else {
-                this.cacheService.removeCache('userQuestContinuous');
-            }
-
-            const response = this.httpService.get(environment.apiUrl + `/api/user/getUserQuestContinuous?id=${id}`, new HttpHeaders());
-            if (response) {
-                response.subscribe((data: UserQuestContinuous) => {
-                    this.cacheService.setCache('userQuestContinuous', data);
-                    return data;
-                })
-            }
-        } catch (e) {
-            console.log('[API] getUserQuestContinuous: ', e);
-        }
-        return undefined;
-    }
-
-    // getUserQuestPrev : 
-    async getUserQuestPrev(id: string = ""): Promise<UserQuestPrev | undefined> {
-        try {
-            if (id === "") {
-                const user = await this.getUserCredentials();
-                if (user) {
-                    id = user.id;
-                }
-            }
-
-            const cache: UserQuestPrev | null = await this.cacheService.getCache('userQuestPrev');
-            if (cache) {
-                return cache;
-            } else {
-                this.cacheService.removeCache('userQuestPrev');
-            }
-
-            const response = this.httpService.get(environment.apiUrl + `/api/user/getUserQuestPrev?id=${id}`, new HttpHeaders());
-            if (response) {
-                response.subscribe((data: UserQuestPrev) => {
-                    this.cacheService.setCache('userQuestPrev', data);
-                    return data;
-                })
-            }
-        } catch (e) {
-            console.log('[API] getUserQuestPrev: ', e);
-        }
-        return undefined;
-    }
-
-    async getUserQuestWeekly(id: string = ""): Promise<UserQuestWeekly | undefined> {
-        try {
-            if (id === "") {
-                const user = await this.getUserCredentials();
-                if (user) {
-                    id = user.id;
-                }
-            }
-
-            const cache: UserQuestWeekly | null = await this.cacheService.getCache('userQuestToday');
-            if (cache) {
-                return cache;
-            } else {
-                this.cacheService.removeCache('userQuestToday');
-            }
-
-            const response = this.httpService.get(environment.apiUrl + `/api/user/getUserQuestWeekly?id=${id}`, new HttpHeaders());
-            if (response) {
-                response.subscribe((data: UserQuestWeekly) => {
-                    this.cacheService.setCache('userQuestToday', data);
-                    return data;
-                })
-            }
-        } catch (e) {
-            console.log('[API] getUserQuestWeekly: ', e);
-        }
-        return undefined;
-    }
-
-    // 사용자가 가입한 그룹과 모임 목록을 불러온다
-    async getUserJoinList(id: string = ""): Promise<UserJoinList | undefined> {
-        try {
-            if (id === "") {
-                const user = await this.getUserCredentials();
-                if (user) {
-                    id = user.id;
-                }
-            }
-            const cache: UserJoinList | null = await this.cacheService.getCache('userJoinList');
-
+            const cache: UserCredentials | null = this.cacheService.getCache('user');
             if (cache) {
                 return cache;
             }
-
-            const response = this.httpService.get(environment.apiUrl + `/api/user/getUserJoinList?id=${id}`, new HttpHeaders());
-
-            if (response) {
-                response.subscribe((data: UserJoinList) => {
-                    this.cacheService.setCache('userJoinList', data);
-                })
-                return await this.cacheService.getCache('userJoinList');
-            }
-        } catch (e) {
-            console.log('[API] getUserJoinList: ', e);
+            
+            // 캐시가 없으면 인증 실패로 처리
+            this.handleAuthFailure();
+            return null;
+        } catch (error) {
+            console.error('Error getting user credentials:', error);
+            this.handleAuthFailure();
+            return null;
         }
-        return undefined;
     }
 
-    async getUserCredentials(): Promise<UserCredentials | undefined> {
-        const cache = await this.cacheService.getCache('user');
-        if (cache) {
-            return cache;
+    // === 개선된 사용자 상태 조회 ===
+    async getUserStatus(id: string = ""): Promise<UserStatus | null> {
+        try {
+            // ID 확인
+            if (!id) {
+                const user: UserCredentials | null = await this.getUserCredentials();
+                if (!user) {
+                    return null;
+                }
+                id = user.id;
+            }
+
+            // 캐시 확인
+            const cache: UserStatus | null = this.cacheService.getCache('userStatus');
+            if (cache && cache.id === id) {
+                return cache;
+            }
+
+            // API 호출
+            const url = `${environment.apiUrl}/api/user/getUserStatus?email=${id}`;
+            const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+            
+            const response = await firstValueFrom(
+                this.httpService.get<UserStatus>(url, headers).pipe(
+                    tap(data => {
+                        this.cacheService.setCache('userStatus', data);
+                    }),
+                    catchError(error => {
+                        console.error('[API] getUserStatus error:', error);
+                        this.cacheService.removeCache('userStatus');
+                        return throwError(error);
+                    })
+                )
+            );
+
+            return response;
+        } catch (error) {
+            console.error('[API] getUserStatus failed:', error);
+            return null;
         }
+    }
+
+    // === 개선된 사용자 가입 목록 조회 ===
+    async getUserJoinList(id: string = ""): Promise<UserJoinList | null> {
+        try {
+            // ID 확인
+            if (!id) {
+                const user = await this.getUserCredentials();
+                if (!user) {
+                    return null;
+                }
+                id = user.id;
+            }
+
+            // 캐시 확인
+            const cache: UserJoinList | null = this.cacheService.getCache('userJoinList');
+            if (cache && cache.id === id) {
+                return cache;
+            }
+
+            // API 호출  
+            const url = `${environment.apiUrl}/api/user/getUserJoinList?email=${id}`;
+            const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+
+            const response = await firstValueFrom(
+                this.httpService.get<UserJoinList>(url, headers).pipe(
+                    tap(data => {
+                        // ID 정보 추가하여 캐시
+                        const dataWithId = { ...data, id };
+                        this.cacheService.setCache('userJoinList', dataWithId);
+                    }),
+                    catchError(error => {
+                        console.error('[API] getUserJoinList error:', error);
+                        this.cacheService.removeCache('userJoinList');
+                        return throwError(error);
+                    })
+                )
+            );
+
+            return response;
+        } catch (error) {
+            console.error('[API] getUserJoinList failed:', error);
+            return null;
+        }
+    }
+
+    // === 개선된 Quest 관련 메서드들 ===
+    async getUserQuestCur(id: string = ""): Promise<UserQuestCur | null> {
+        try {
+            if (!id) {
+                const user = await this.getUserCredentials();
+                if (!user) return null;
+                id = user.id;
+            }
+
+            const cache: UserQuestCur | null = this.cacheService.getCache('userQuestCur');
+            if (cache && cache.id === id) {
+                return cache;
+            }
+
+            const url = `${environment.apiUrl}/api/user/getUserQuestCur?email=${id}`;
+            const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+
+            const response = await firstValueFrom(
+                this.httpService.get<UserQuestCur>(url, headers).pipe(
+                    tap(data => {
+                        this.cacheService.setCache('userQuestCur', data);
+                    }),
+                    catchError(error => {
+                        console.error('[API] getUserQuestCur error:', error);
+                        return throwError(error);
+                    })
+                )
+            );
+
+            return response;
+        } catch (error) {
+            console.error('[API] getUserQuestCur failed:', error);
+            return null;
+        }
+    }
+
+    async getUserQuestContinuous(id: string = ""): Promise<UserQuestContinuous | null> {
+        try {
+            if (!id) {
+                const user: UserCredentials | null = await this.getUserCredentials();
+                if (!user) return null;
+                id = user.id;
+            }
+
+            const cache: UserQuestContinuous | null = this.cacheService.getCache('userQuestContinuous');
+            if (cache && cache.id === id) {
+                return cache;
+            }
+
+            const url = `${environment.apiUrl}/api/user/getUserQuestContinuous?email=${id}`;
+            const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+
+            const response = await firstValueFrom(
+                this.httpService.get<UserQuestContinuous>(url, headers).pipe(
+                    tap(data => {
+                        this.cacheService.setCache('userQuestContinuous', data);
+                    }),
+                    catchError(error => {
+                        console.error('[API] getUserQuestContinuous error:', error);
+                        return throwError(error);
+                    })
+                )
+            );
+
+            return response;
+        } catch (error) {
+            console.error('[API] getUserQuestContinuous failed:', error);
+            return null;
+        }
+    }
+
+    async getUserQuestPrev(id: string = ""): Promise<UserQuestPrev | null> {
+        try {
+            if (!id) {
+                const user = await this.getUserCredentials();
+                if (!user) return null;
+                id = user.id;
+            }
+
+            const cache: UserQuestPrev | null = this.cacheService.getCache('userQuestPrev');
+            if (cache && cache.id === id) {
+                return cache;
+            }
+
+            const url = `${environment.apiUrl}/api/user/getUserQuestPrev?email=${id}`;
+            const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+
+            const response = await firstValueFrom(
+                this.httpService.get<UserQuestPrev>(url, headers).pipe(
+                    tap(data => {
+                        this.cacheService.setCache('userQuestPrev', data);
+                    }),
+                    catchError(error => {
+                        console.error('[API] getUserQuestPrev error:', error);
+                        return throwError(error);
+                    })
+                )
+            );
+
+            return response;
+        } catch (error) {
+            console.error('[API] getUserQuestPrev failed:', error);
+            return null;
+        }
+    }
+
+    async getUserQuestWeekly(id: string = ""): Promise<UserQuestWeekly | null> {
+        try {
+            if (!id) {
+                const user = await this.getUserCredentials();
+                if (!user) return null;
+                id = user.id;
+            }
+
+            const cache: UserQuestWeekly | null = this.cacheService.getCache('userQuestWeekly');
+            if (cache && cache.id === id) {
+                return cache;
+            }
+
+            const url = `${environment.apiUrl}/api/user/getUserQuestWeekly?email=${id}`;
+            const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+
+            const response = await firstValueFrom(
+                this.httpService.get<UserQuestWeekly>(url, headers).pipe(
+                    tap(data => {
+                        this.cacheService.setCache('userQuestWeekly', data);
+                    }),
+                    catchError(error => {
+                        console.error('[API] getUserQuestWeekly error:', error);
+                        return throwError(error);
+                    })
+                )
+            );
+
+            return response;
+        } catch (error) {
+            console.error('[API] getUserQuestWeekly failed:', error);
+            return null;
+        }
+    }
+
+    // === 개선된 사용자 상태 업데이트 메서드들 ===
+    async setUserQuestRecord(id: string = "", group: string, userQuest: string[]): Promise<boolean> {
+        try {
+            if (!id) {
+                const user = await this.getUserCredentials();
+                if (!user) return false;
+                id = user.id;
+            }
+
+            let uq: UserQuestCur | null = this.cacheService.getCache('userQuestCur');
+
+            if (!uq || uq.id !== id) {
+                uq = await this.getUserQuestCur(id);
+                if (!uq) return false;
+            }
+
+            // 퀘스트 상태 업데이트
+            uq.curQuestTotalList = uq.curQuestTotalList.map(quest => ({
+                ...quest,
+                isSuccess: userQuest.includes(quest.quest) ? true : quest.isSuccess
+            }));
+
+            const url = `${environment.apiUrl}/api/user/setUserQuestRecord`;
+            const body = { user: id, quest: uq };
+            const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+
+            await firstValueFrom(
+                this.httpService.post(url, body, headers).pipe(
+                    tap(() => {
+                        this.cacheService.setCache('userQuestCur', uq);
+                    }),
+                    catchError(error => {
+                        console.error('[API] setUserQuestRecord error:', error);
+                        return throwError(error);
+                    })
+                )
+            );
+
+            return true;
+        } catch (error) {
+            console.error('[API] setUserQuestRecord failed:', error);
+            return false;
+        }
+    }
+
+    async setUserStatus(id: string = "", userStatus: UserStatus): Promise<boolean> {
+        try {
+            if (!id) {
+                const user = await this.getUserCredentials();
+                if (!user) return false;
+                id = user.id;
+            }
+
+            const url = `${environment.apiUrl}/api/user/setUserStatus`;
+            const body = { user: id, status: userStatus };
+            const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+
+            await firstValueFrom(
+                this.httpService.post(url, body, headers).pipe(
+                    tap(() => {
+                        this.cacheService.setCache('userStatus', userStatus);
+                    }),
+                    catchError(error => {
+                        console.error('[API] setUserStatus error:', error);
+                        return throwError(error);
+                    })
+                )
+            );
+
+            return true;
+        } catch (error) {
+            console.error('[API] setUserStatus failed:', error);
+            return false;
+        }
+    }
+
+    async setUsername(id: string = "", username: string): Promise<boolean> {
+        try {
+            if (!id) {
+                const user = await this.getUserCredentials();
+                if (!user) return false;
+                id = user.id;
+            }
+
+            const url = `${environment.apiUrl}/api/user/setUsername`;
+            const body = { user: id, username: username };
+            const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+
+            await firstValueFrom(
+                this.httpService.post(url, body, headers).pipe(
+                    catchError(error => {
+                        console.error('[API] setUsername error:', error);
+                        return throwError(error);
+                    })
+                )
+            );
+
+            // 캐시 업데이트
+            const cacheUserCredentials: UserCredentials | null = this.cacheService.getCache('user');
+            const cacheUserStatus: UserStatus | null = this.cacheService.getCache('userStatus');
+
+            if (cacheUserCredentials) {
+                cacheUserCredentials.name = username;
+                this.cacheService.setCache('user', cacheUserCredentials);
+            }
+            if (cacheUserStatus) {
+                cacheUserStatus.name = username;
+                this.cacheService.setCache('userStatus', cacheUserStatus);
+            }
+
+            return true;
+        } catch (error) {
+            console.error('[API] setUsername failed:', error);
+            return false;
+        }
+    }
+
+    // === 개선된 그룹/클럽 관리 메서드들 ===
+    async joinGroup(id: string = "", group: string): Promise<boolean> {
+        try {
+            if (!id) {
+                const user = await this.getUserCredentials();
+                if (!user) return false;
+                id = user.id;
+            }
+
+            const url = `${environment.apiUrl}/api/user/joinGroup`;
+            const body = { user: id, group: group };
+            const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+
+            await firstValueFrom(
+                this.httpService.post(url, body, headers).pipe(
+                    catchError(error => {
+                        console.error('[API] joinGroup error:', error);
+                        return throwError(error);
+                    })
+                )
+            );
+
+            // 캐시 업데이트
+            await this.updateJoinListCache(id, (joinList) => {
+                const groupExists = joinList.joinList.some(join => join.groupname === group);
+                if (!groupExists) {
+                    joinList.joinList.push({ groupname: group, clubList: [] });
+                }
+                return joinList;
+            });
+
+            return true;
+        } catch (error) {
+            console.error('[API] joinGroup failed:', error);
+            return false;
+        }
+    }
+
+    async leaveGroup(id: string = "", group: string): Promise<boolean> {
+        try {
+            if (!id) {
+                const user = await this.getUserCredentials();
+                if (!user) return false;
+                id = user.id;
+            }
+
+            const url = `${environment.apiUrl}/api/user/leaveGroup`;
+            const body = { user: id, group: group };
+            const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+
+            await firstValueFrom(
+                this.httpService.post(url, body, headers).pipe(
+                    catchError(error => {
+                        console.error('[API] leaveGroup error:', error);
+                        return throwError(error);
+                    })
+                )
+            );
+
+            // 캐시 업데이트
+            await this.updateJoinListCache(id, (joinList) => {
+                joinList.joinList = joinList.joinList.filter(join => join.groupname !== group);
+                return joinList;
+            });
+
+            return true;
+        } catch (error) {
+            console.error('[API] leaveGroup failed:', error);
+            return false;
+        }
+    }
+
+    async joinClub(id: string = "", group: string, clubList: string[]): Promise<boolean> {
+        try {
+            if (!id) {
+                const user = await this.getUserCredentials();
+                if (!user) return false;
+                id = user.id;
+            }
+
+            const url = `${environment.apiUrl}/api/user/joinClub`;
+            const body = { user: id, group: group, clubList: clubList };
+            const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+
+            await firstValueFrom(
+                this.httpService.post(url, body, headers).pipe(
+                    catchError(error => {
+                        console.error('[API] joinClub error:', error);
+                        return throwError(error);
+                    })
+                )
+            );
+
+            // 캐시 업데이트
+            await this.updateJoinListCache(id, (joinList) => {
+                const groupIndex = joinList.joinList.findIndex(join => join.groupname === group);
+                if (groupIndex !== -1) {
+                    // 중복 제거하여 추가
+                    const existingClubs = joinList.joinList[groupIndex].clubList;
+                    const newClubs = clubList.filter(club => !existingClubs.includes(club));
+                    joinList.joinList[groupIndex].clubList.push(...newClubs);
+                }
+                return joinList;
+            });
+
+            return true;
+        } catch (error) {
+            console.error('[API] joinClub failed:', error);
+            return false;
+        }
+    }
+
+    async leaveClub(id: string = "", group: string, club: string): Promise<boolean> {
+        try {
+            if (!id) {
+                const user = await this.getUserCredentials();
+                if (!user) return false;
+                id = user.id;
+            }
+
+            const url = `${environment.apiUrl}/api/user/leaveClub`;
+            const body = { user: id, group: group, club: club };
+            const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+
+            await firstValueFrom(
+                this.httpService.post(url, body, headers).pipe(
+                    catchError(error => {
+                        console.error('[API] leaveClub error:', error);
+                        return throwError(error);
+                    })
+                )
+            );
+
+            // 캐시 업데이트
+            await this.updateJoinListCache(id, (joinList) => {
+                const groupIndex = joinList.joinList.findIndex(join => join.groupname === group);
+                if (groupIndex !== -1) {
+                    joinList.joinList[groupIndex].clubList = 
+                        joinList.joinList[groupIndex].clubList.filter(clubName => clubName !== club);
+                }
+                return joinList;
+            });
+
+            return true;
+        } catch (error) {
+            console.error('[API] leaveClub failed:', error);
+            return false;
+        }
+    }
+
+    // === 헬퍼 메서드들 ===
+    private async updateJoinListCache(
+        id: string, 
+        updateFn: (joinList: UserJoinList) => UserJoinList
+    ): Promise<void> {
+        try {
+            let userJoinList: UserJoinList | null = this.cacheService.getCache('userJoinList');
+            
+            if (!userJoinList || userJoinList.id !== id) {
+                userJoinList = await this.getUserJoinList(id);
+            }
+
+            if (userJoinList) {
+                const updatedJoinList = updateFn(userJoinList);
+                this.cacheService.setCache('userJoinList', updatedJoinList);
+            }
+        } catch (error) {
+            console.error('Error updating join list cache:', error);
+            // 캐시 업데이트 실패 시 캐시 무효화
+            this.cacheService.removeCache('userJoinList');
+        }
+    }
+
+    private async setUserAvatar(id: string = "", avatar: string): Promise<boolean> {
+        try {
+            if (!id) {
+                const user = await this.getUserCredentials();
+                if (!user) return false;
+                id = user.id;
+            }
+
+            const url = `${environment.apiUrl}/api/user/setUsername`;
+            const body = { user: id, avatar: avatar };
+            const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+
+            await firstValueFrom(
+                this.httpService.post(url, body, headers).pipe(
+                    catchError(error => {
+                        console.error('[API] setUseravatar error:', error);
+                        return throwError(error);
+                    })
+                )
+            );
+
+            // 캐시 업데이트
+            const cacheUserStatus: UserStatus | null = this.cacheService.getCache('userStatus');
+            if (cacheUserStatus) {
+                cacheUserStatus.avatar = avatar;
+                this.cacheService.setCache('userStatus', cacheUserStatus);
+            }
+
+            return true;
+        } catch (error) {
+            console.error('[API] setUseravatar failed:', error);
+            return false;
+        }
+    }
+
+    private handleAuthFailure(): void {
+        console.warn('Authentication failed, clearing session and redirecting');
         this.cacheService.removeCache('user');
         this.cacheService.removeCache('userStatus');
-        this.httpService.get('');
-        return undefined;
+        this.cacheService.removeCache('userJoinList');
+        this.router.navigate(['/']);
     }
 
-    async getUserStatus(id: string = ""): Promise<UserStatus | undefined> {
+    // === 캐시 관리 메서드들 ===
+    clearUserCache(): void {
+        this.cacheService.removeCache('user');
+        this.cacheService.removeCache('userStatus');
+        this.cacheService.removeCache('userJoinList');
+        this.cacheService.removeCache('userQuestCur');
+        this.cacheService.removeCache('userQuestContinuous');
+        this.cacheService.removeCache('userQuestPrev');
+        this.cacheService.removeCache('userQuestWeekly');
+    }
+
+    async refreshAllUserData(id: string = ""): Promise<{
+        credentials: UserCredentials | null;
+        status: UserStatus | null;
+        joinList: UserJoinList | null;
+    }> {
         try {
-            if (id === "") {
+            if (!id) {
                 const user = await this.getUserCredentials();
-                if (user) {
-                    id = user.id;
+                if (!user) {
+                    return { credentials: null, status: null, joinList: null };
                 }
-            }
-            const cache = await this.cacheService.getCache('userStatus');
-
-            if (cache) {
-                return cache;
-            }
-
-            const response = this.httpService.get(environment.apiUrl + `/api/user/getUserStatus?id=${id}`, new HttpHeaders());
-            if (response) {
-                response.subscribe((data: UserStatus) => {
-                    this.cacheService.setCache('userStatus', data);
-                })
-                return await this.cacheService.getCache('userStatus');
-            }
-        } catch (e) {
-            console.log('[API] getUserStatus: ', e);
-        }
-        return undefined;
-    }
-
-
-
-
-    async setUserQuestRecord(id: string = "", group: string, userQuest: string[]): Promise<void> {
-        if (id === "") {
-            const user = await this.getUserCredentials();
-            if (user) {
                 id = user.id;
             }
-        }
-        let uq: UserQuestCur = await this.cacheService.getCache('userQuestCur');
 
-        if (!uq || uq?.id !== id) {
-            this.cacheService.removeCache('userQuestCur');
-            await this.getUserQuestCur(id);
-            return ;
-        }
+            // 모든 캐시 무효화
+            this.clearUserCache();
 
-        uq.curQuestTotalList = uq.curQuestTotalList.filter((quest) => {
-            if (userQuest.includes(quest.quest))
-                quest.isSuccess = true;
-        });
-        this.httpService.post(environment.apiUrl + `/api/user/setUserQuestRecord`, {user: id, quest: uq}, new HttpHeaders());
-        this.cacheService.setCache('userQuestCur', uq);
-    }
+            // 병렬로 데이터 새로고침
+            const [credentials, status, joinList] = await Promise.allSettled([
+                this.getUserCredentials(),
+                this.getUserStatus(id),
+                this.getUserJoinList(id)
+            ]);
 
-    async setUserStatus(id: string = "", userStatus: UserStatus): Promise<void> {
-        if (id === "") {
-            const user = await this.getUserCredentials();
-            if (user) {
-                id = user.id;
-            }
-        }
-        this.httpService.post(environment.apiUrl + `/api/user/setUserStatus`, {user: id, status: userStatus}, new HttpHeaders());
-        this.cacheService.setCache('userStatus', userStatus);
-    }
+            const result = {
+                credentials: credentials.status === 'fulfilled' ? credentials.value : null,
+                status: status.status === 'fulfilled' ? status.value : null,
+                joinList: joinList.status === 'fulfilled' ? joinList.value : null
+            };
 
-    async leaveGroup(id: string = "", group: string): Promise<void> {
-        this.httpService.post(environment.apiUrl + `/api/user/leaveGroup`, {user: id, group: group}, new HttpHeaders());
-        let userJoinList: UserJoinList | undefined = await this.cacheService.getCache('userJoinList');
-
-        if (!userJoinList)
-            userJoinList = await this.getUserJoinList(id);
-        if (userJoinList) {
-            userJoinList.joinList.forEach((join, index) => {
-                if (join.groupname === group) {
-                    userJoinList.joinList.splice(index, 1);
-                }
-            })
-        }
-        this.cacheService.setCache('userJoinList', userJoinList);
-    }
-
-    async leaveClub(id: string = "", group: string, club: string) {
-        if (id === "") {
-            const user = await this.getUserCredentials();
-            if (user) {
-                id = user.id;
-            }
-        }
-        let userJoinList: UserJoinList | undefined = await this.cacheService.getCache('userJoinList');
-        this.httpService.post(environment.apiUrl + `/api/user/leaveClub`, {user: id, group: group, club: club}, new HttpHeaders());
-
-        if (!userJoinList)
-            userJoinList = await this.getUserJoinList(id);
-        if (userJoinList) {
-            userJoinList.joinList.forEach((join) => {
-                if (join.groupname === group) {
-                    join.clubList = join.clubList.filter((clubName) => clubName !== club);
-                }
-            })
-        }
-        this.cacheService.setCache('userJoinList', userJoinList);
-    }
-
-    async joinGroup(id: string = "", group: string): Promise<void> {
-        if (id === "") {
-            const user = await this.getUserCredentials();
-            if (user) {
-                id = user.id;
-            }
-        }
-        this.httpService.post(environment.apiUrl + `/api/user/joinGroup`, {user: id, group: group}, new HttpHeaders());
-        let userJoinList: UserJoinList | undefined = await this.cacheService.getCache('userJoinList');
-
-        if (!userJoinList)
-            userJoinList = await this.getUserJoinList(id);
-        if (userJoinList) {
-            const groupExists = userJoinList.joinList.some(join => join.groupname === group);
-
-            if (!groupExists) {
-                userJoinList.joinList.push({ groupname: group, clubList: [] });
-            }
-        }
-        this.cacheService.setCache('userJoinList', userJoinList);
-    }
-
-    async joinClub(id: string = "", group: string, clubList: string[]) {
-        if (id === "") {
-            const user = await this.getUserCredentials();
-            if (user) {
-                id = user.id;
-            }
-        }
-        let userJoinList: UserJoinList | undefined = await this.cacheService.getCache('userJoinList');
-        this.httpService.post(environment.apiUrl + `/api/user/joinClub`, {user: id, group: group, clubList: clubList}, new HttpHeaders());
-
-        if (!userJoinList)
-            userJoinList = await this.getUserJoinList(id);
-        if (userJoinList) {
-            userJoinList.joinList.forEach((join) => {
-                if (join.groupname === group) {
-                    clubList.forEach((club) => join.clubList.push(club));
-                    join.clubList = [...new Set(join.clubList)];
-                }
-            })
-            this.cacheService.setCache('userJoinList', userJoinList);
+            console.log('All user data refreshed:', result);
+            return result;
+        } catch (error) {
+            console.error('Error refreshing all user data:', error);
+            return { credentials: null, status: null, joinList: null };
         }
     }
 
-    async setUsername(id:string = "", username: string) {
-        if (id === "") {
-            const user = await this.getUserCredentials();
-            if (user) {
-                id = user.id;
-            }
-        }
-        await this.httpService.post(environment.apiUrl + `/api/user/setUsername`, {user: id, username: username}, new HttpHeaders());
+    // === 유효성 검사 메서드들 ===
+    isValidUser(user: any): user is UserCredentials {
+        return user && 
+               typeof user.id === 'string' && 
+               typeof user.name === 'string' &&
+               typeof user.accessToken === 'string';
+    }
 
-        let cacheUserCredentials: UserCredentials = await this.cacheService.getCache('user');
-        let cacheUserStatus: UserStatus = await this.cacheService.getCache('userStatus');
+    isValidUserStatus(status: any): status is UserStatus {
+        return status && 
+               typeof status.id === 'string' && 
+               typeof status.name === 'string';
+    }
 
-        if (cacheUserCredentials) {
-            cacheUserCredentials.name = username;
-            this.cacheService.setCache('user', cacheUserCredentials);
-        }
-        if (cacheUserStatus) {
-            cacheUserStatus.name = username;
-            this.cacheService.setCache('userStatus', cacheUserStatus);
-        }
+    isValidUserJoinList(joinList: any): joinList is UserJoinList {
+        return joinList && 
+               Array.isArray(joinList.joinList) &&
+               joinList.joinList.every((item: any) => 
+                   typeof item.groupname === 'string' && 
+                   Array.isArray(item.clubList)
+               );
     }
 }
