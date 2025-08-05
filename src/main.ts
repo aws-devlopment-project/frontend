@@ -6,6 +6,5 @@ import awsmobile from './app/Auth/Configure/aws-export';
 
 Amplify.configure(awsmobile);
 
-console.log(awsmobile);
 bootstrapApplication(App, appConfig)
   .catch((err) => console.error(err));
