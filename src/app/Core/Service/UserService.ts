@@ -8,6 +8,7 @@ import { UserQuestContinuous, UserQuestCur, UserQuestPrev, UserQuestWeekly } fro
 import { Router } from "@angular/router";
 import { firstValueFrom, Observable, throwError } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
+import { DebugService } from "../../Debug/DebugService";
 
 @Injectable({
     providedIn: 'root'
@@ -17,7 +18,8 @@ export class UserService {
     constructor(
         private httpService: HttpService,
         private cacheService: DataCacheService,
-        private router: Router
+        private router: Router,
+        private debugService: DebugService
     ) {}
 
     // === 개선된 사용자 인증 정보 조회 ===
@@ -32,7 +34,7 @@ export class UserService {
             this.handleAuthFailure();
             return null;
         } catch (error) {
-            console.error('Error getting user credentials:', error);
+            this.debugService.printConsole('Error getting user credentials:', error);
             this.handleAuthFailure();
             return null;
         }
@@ -66,7 +68,7 @@ export class UserService {
                         this.cacheService.setCache('userStatus', data);
                     }),
                     catchError(error => {
-                        console.error('[API] getUserStatus error:', error);
+                        this.debugService.printConsole('[API] getUserStatus error:', error);
                         this.cacheService.removeCache('userStatus');
                         return throwError(error);
                     })
@@ -75,7 +77,7 @@ export class UserService {
 
             return response;
         } catch (error) {
-            console.error('[API] getUserStatus failed:', error);
+            this.debugService.printConsole('[API] getUserStatus failed:', error);
             return null;
         }
     }
@@ -110,7 +112,7 @@ export class UserService {
                         this.cacheService.setCache('userJoinList', dataWithId);
                     }),
                     catchError(error => {
-                        console.error('[API] getUserJoinList error:', error);
+                        this.debugService.printConsole('[API] getUserJoinList error:', error);
                         this.cacheService.removeCache('userJoinList');
                         return throwError(error);
                     })
@@ -119,7 +121,7 @@ export class UserService {
 
             return response;
         } catch (error) {
-            console.error('[API] getUserJoinList failed:', error);
+            this.debugService.printConsole('[API] getUserJoinList failed:', error);
             return null;
         }
     }
@@ -147,7 +149,7 @@ export class UserService {
                         this.cacheService.setCache('userQuestCur', data);
                     }),
                     catchError(error => {
-                        console.error('[API] getUserQuestCur error:', error);
+                        this.debugService.printConsole('[API] getUserQuestCur error:', error);
                         return throwError(error);
                     })
                 )
@@ -155,7 +157,7 @@ export class UserService {
 
             return response;
         } catch (error) {
-            console.error('[API] getUserQuestCur failed:', error);
+            this.debugService.printConsole('[API] getUserQuestCur failed:', error);
             return null;
         }
     }
@@ -182,7 +184,7 @@ export class UserService {
                         this.cacheService.setCache('userQuestContinuous', data);
                     }),
                     catchError(error => {
-                        console.error('[API] getUserQuestContinuous error:', error);
+                        this.debugService.printConsole('[API] getUserQuestContinuous error:', error);
                         return throwError(error);
                     })
                 )
@@ -190,7 +192,7 @@ export class UserService {
 
             return response;
         } catch (error) {
-            console.error('[API] getUserQuestContinuous failed:', error);
+            this.debugService.printConsole('[API] getUserQuestContinuous failed:', error);
             return null;
         }
     }
@@ -217,7 +219,7 @@ export class UserService {
                         this.cacheService.setCache('userQuestPrev', data);
                     }),
                     catchError(error => {
-                        console.error('[API] getUserQuestPrev error:', error);
+                        this.debugService.printConsole('[API] getUserQuestPrev error:', error);
                         return throwError(error);
                     })
                 )
@@ -225,7 +227,7 @@ export class UserService {
 
             return response;
         } catch (error) {
-            console.error('[API] getUserQuestPrev failed:', error);
+            this.debugService.printConsole('[API] getUserQuestPrev failed:', error);
             return null;
         }
     }
@@ -252,7 +254,7 @@ export class UserService {
                         this.cacheService.setCache('userQuestWeekly', data);
                     }),
                     catchError(error => {
-                        console.error('[API] getUserQuestWeekly error:', error);
+                        this.debugService.printConsole('[API] getUserQuestWeekly error:', error);
                         return throwError(error);
                     })
                 )
@@ -260,7 +262,7 @@ export class UserService {
 
             return response;
         } catch (error) {
-            console.error('[API] getUserQuestWeekly failed:', error);
+            this.debugService.printConsole('[API] getUserQuestWeekly failed:', error);
             return null;
         }
     }
@@ -297,7 +299,7 @@ export class UserService {
                         this.cacheService.setCache('userQuestCur', uq);
                     }),
                     catchError(error => {
-                        console.error('[API] setUserQuestRecord error:', error);
+                        this.debugService.printConsole('[API] setUserQuestRecord error:', error);
                         return throwError(error);
                     })
                 )
@@ -305,7 +307,7 @@ export class UserService {
 
             return true;
         } catch (error) {
-            console.error('[API] setUserQuestRecord failed:', error);
+            this.debugService.printConsole('[API] setUserQuestRecord failed:', error);
             return false;
         }
     }
@@ -328,7 +330,7 @@ export class UserService {
                         this.cacheService.setCache('userStatus', userStatus);
                     }),
                     catchError(error => {
-                        console.error('[API] setUserStatus error:', error);
+                        this.debugService.printConsole('[API] setUserStatus error:', error);
                         return throwError(error);
                     })
                 )
@@ -336,7 +338,7 @@ export class UserService {
 
             return true;
         } catch (error) {
-            console.error('[API] setUserStatus failed:', error);
+            this.debugService.printConsole('[API] setUserStatus failed:', error);
             return false;
         }
     }
@@ -356,7 +358,7 @@ export class UserService {
             await firstValueFrom(
                 this.httpService.post(url, body, headers).pipe(
                     catchError(error => {
-                        console.error('[API] setUsername error:', error);
+                        this.debugService.printConsole('[API] setUsername error:', error);
                         return throwError(error);
                     })
                 )
@@ -377,7 +379,7 @@ export class UserService {
 
             return true;
         } catch (error) {
-            console.error('[API] setUsername failed:', error);
+            this.debugService.printConsole('[API] setUsername failed:', error);
             return false;
         }
     }
@@ -398,7 +400,7 @@ export class UserService {
             await firstValueFrom(
                 this.httpService.post(url, body, headers).pipe(
                     catchError(error => {
-                        console.error('[API] joinGroup error:', error);
+                        this.debugService.printConsole('[API] joinGroup error:', error);
                         return throwError(error);
                     })
                 )
@@ -415,7 +417,7 @@ export class UserService {
 
             return true;
         } catch (error) {
-            console.error('[API] joinGroup failed:', error);
+            this.debugService.printConsole('[API] joinGroup failed:', error);
             return false;
         }
     }
@@ -435,7 +437,7 @@ export class UserService {
             await firstValueFrom(
                 this.httpService.post(url, body, headers).pipe(
                     catchError(error => {
-                        console.error('[API] leaveGroup error:', error);
+                        this.debugService.printConsole('[API] leaveGroup error:', error);
                         return throwError(error);
                     })
                 )
@@ -449,7 +451,7 @@ export class UserService {
 
             return true;
         } catch (error) {
-            console.error('[API] leaveGroup failed:', error);
+            this.debugService.printConsole('[API] leaveGroup failed:', error);
             return false;
         }
     }
@@ -469,7 +471,7 @@ export class UserService {
             await firstValueFrom(
                 this.httpService.post(url, body, headers).pipe(
                     catchError(error => {
-                        console.error('[API] joinClub error:', error);
+                        this.debugService.printConsole('[API] joinClub error:', error);
                         return throwError(error);
                     })
                 )
@@ -489,7 +491,7 @@ export class UserService {
 
             return true;
         } catch (error) {
-            console.error('[API] joinClub failed:', error);
+            this.debugService.printConsole('[API] joinClub failed:', error);
             return false;
         }
     }
@@ -509,7 +511,7 @@ export class UserService {
             await firstValueFrom(
                 this.httpService.post(url, body, headers).pipe(
                     catchError(error => {
-                        console.error('[API] leaveClub error:', error);
+                        this.debugService.printConsole('[API] leaveClub error:', error);
                         return throwError(error);
                     })
                 )
@@ -527,7 +529,7 @@ export class UserService {
 
             return true;
         } catch (error) {
-            console.error('[API] leaveClub failed:', error);
+            this.debugService.printConsole('[API] leaveClub failed:', error);
             return false;
         }
     }
@@ -549,7 +551,7 @@ export class UserService {
                 this.cacheService.setCache('userJoinList', updatedJoinList);
             }
         } catch (error) {
-            console.error('Error updating join list cache:', error);
+            this.debugService.printConsole('Error updating join list cache:', error);
             // 캐시 업데이트 실패 시 캐시 무효화
             this.cacheService.removeCache('userJoinList');
         }
@@ -570,7 +572,7 @@ export class UserService {
             await firstValueFrom(
                 this.httpService.post(url, body, headers).pipe(
                     catchError(error => {
-                        console.error('[API] setUseravatar error:', error);
+                        this.debugService.printConsole('[API] setUseravatar error:', error);
                         return throwError(error);
                     })
                 )
@@ -585,13 +587,13 @@ export class UserService {
 
             return true;
         } catch (error) {
-            console.error('[API] setUseravatar failed:', error);
+            this.debugService.printConsole('[API] setUseravatar failed:', error);
             return false;
         }
     }
 
     private handleAuthFailure(): void {
-        console.warn('Authentication failed, clearing session and redirecting');
+        this.debugService.printConsole('Authentication failed, clearing session and redirecting');
         this.cacheService.removeCache('user');
         this.cacheService.removeCache('userStatus');
         this.cacheService.removeCache('userJoinList');
@@ -639,10 +641,10 @@ export class UserService {
                 joinList: joinList.status === 'fulfilled' ? joinList.value : null
             };
 
-            console.log('All user data refreshed:', result);
+            this.debugService.printConsole('All user data refreshed:', result);
             return result;
         } catch (error) {
-            console.error('Error refreshing all user data:', error);
+            this.debugService.printConsole('Error refreshing all user data:', error);
             return { credentials: null, status: null, joinList: null };
         }
     }

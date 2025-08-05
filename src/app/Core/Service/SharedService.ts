@@ -3,6 +3,7 @@ import { UserStatus, UserJoinList } from '../Models/user';
 import { ChatMessage } from '../../Channel/Models/chatMessage';
 import { UserService } from './UserService';
 import { firstValueFrom } from 'rxjs';
+import { DebugService } from '../../Debug/DebugService';
 
 export interface LoadingState {
   user: boolean;
@@ -106,7 +107,7 @@ export class SharedStateService {
   });
 
   // === Constructor ===
-  constructor(private userService: UserService) {
+  constructor(private userService: UserService, private debugService: DebugService) {
     // 초기화 효과
     effect(() => {
       if (!this.initialized()) {
@@ -118,7 +119,7 @@ export class SharedStateService {
     effect(() => {
       const error = this.error();
       if (error) {
-        console.error('SharedStateService Error:', error);
+        this.debugService.printConsole('SharedStateService Error:', error);
       }
     });
   }
@@ -142,7 +143,7 @@ export class SharedStateService {
       if (user.status === 'fulfilled' && user.value) {
         this.setCurrentUser(user.value);
       } else if (user.status === 'rejected') {
-        console.error('Failed to load user status:', user.reason);
+        this.debugService.printConsole('Failed to load user status:', user.reason);
         this.setError('사용자 정보를 불러올 수 없습니다.');
       }
 
@@ -151,15 +152,15 @@ export class SharedStateService {
         this._userJoinList.set(joinList.value);
         this.initializeDefaultSelections(joinList.value);
       } else if (joinList.status === 'rejected') {
-        console.error('Failed to load user join list:', joinList.reason);
+        this.debugService.printConsole('Failed to load user join list:', joinList.reason);
         this.setError('가입 목록을 불러올 수 없습니다.');
       }
 
       this._initialized.set(true);
-      console.log('SharedStateService initialized successfully');
+      this.debugService.printConsole('SharedStateService initialized successfully');
 
     } catch (error) {
-      console.error('Error initializing SharedStateService:', error);
+      this.debugService.printConsole('Error initializing SharedStateService:', error);
       this.setError('초기화 중 오류가 발생했습니다.');
     } finally {
       this.setLoadingState('user', false);
@@ -171,7 +172,7 @@ export class SharedStateService {
     try {
       return await this.userService.getUserStatus() || null;
     } catch (error) {
-      console.error('Error loading user status:', error);
+      this.debugService.printConsole('Error loading user status:', error);
       throw error;
     }
   }
@@ -180,7 +181,7 @@ export class SharedStateService {
     try {
       return await this.userService.getUserJoinList() || null;
     } catch (error) {
-      console.error('Error loading user join list:', error);
+      this.debugService.printConsole('Error loading user join list:', error);
       throw error;
     }
   }
@@ -214,13 +215,13 @@ export class SharedStateService {
       const joinList = await this.loadUserJoinList();
       if (joinList) {
         this._userJoinList.set(joinList);
-        console.log('User join list refreshed successfully');
+        this.debugService.printConsole('User join list refreshed successfully');
         
         // 선택된 그룹/채널이 여전히 유효한지 확인
         this.validateCurrentSelections();
       }
     } catch (error) {
-      console.error('Error refreshing user join list:', error);
+      this.debugService.printConsole('Error refreshing user join list:', error);
       this.setError('가입 목록 새로고침에 실패했습니다.');
     } finally {
       this.setLoadingState('userJoinList', false);
@@ -236,10 +237,10 @@ export class SharedStateService {
       const user = await this.loadUserStatus();
       if (user) {
         this.setCurrentUser(user);
-        console.log('User status refreshed successfully');
+        this.debugService.printConsole('User status refreshed successfully');
       }
     } catch (error) {
-      console.error('Error refreshing user status:', error);
+      this.debugService.printConsole('Error refreshing user status:', error);
       this.setError('사용자 상태 새로고침에 실패했습니다.');
     } finally {
       this.setLoadingState('user', false);
@@ -258,7 +259,7 @@ export class SharedStateService {
     if (selectedGroup) {
       const group = joinList.joinList.find(g => g.groupname === selectedGroup);
       if (!group) {
-        console.log('Selected group no longer exists, clearing selection');
+        this.debugService.printConsole('Selected group no longer exists, clearing selection');
         this._selectedGroup.set(null);
         this._selectedChannel.set(null);
         return;
@@ -266,7 +267,7 @@ export class SharedStateService {
 
       // 선택된 채널이 여전히 유효한지 확인
       if (selectedChannel && !group.clubList.includes(selectedChannel)) {
-        console.log('Selected channel no longer exists, clearing channel selection');
+        this.debugService.printConsole('Selected channel no longer exists, clearing channel selection');
         this._selectedChannel.set(null);
       }
     }
@@ -296,7 +297,7 @@ export class SharedStateService {
       // 그룹/채널 선택은 유지 (다시 그룹 탭으로 돌아왔을 때 복원)
     }
     
-    console.log(`Tab changed: ${previousTab} → ${tab}`, {
+    this.debugService.printConsole(`Tab changed: ${previousTab} → ${tab}`, {
       selectedGroup: this._selectedGroup(),
       selectedChannel: this._selectedChannel(),
       sidebarExpanded: this._sidebarExpanded()
@@ -306,7 +307,7 @@ export class SharedStateService {
   // === 개선된 그룹 액션 ===
   setSelectedGroup(groupId: string | null): void {
     if (!this.isValidGroup(groupId)) {
-      console.warn('Invalid group ID:', groupId);
+      this.debugService.printConsole('Invalid group ID:', groupId);
       return;
     }
 
@@ -319,18 +320,18 @@ export class SharedStateService {
       this._expandedSections.update(sections => [...sections, groupId]);
     }
     
-    console.log(`Group changed: ${previousGroup} → ${groupId}`);
+    this.debugService.printConsole(`Group changed: ${previousGroup} → ${groupId}`);
   }
 
   // === 개선된 채널 액션 ===  
   setSelectedChannel(channelId: string | null, groupId?: string): void {
     if (groupId && !this.isValidGroup(groupId)) {
-      console.warn('Invalid group ID for channel:', groupId);
+      this.debugService.printConsole('Invalid group ID for channel:', groupId);
       return;
     }
 
     if (channelId && !this.isValidChannel(channelId, groupId || this._selectedGroup())) {
-      console.warn('Invalid channel ID:', channelId);
+      this.debugService.printConsole('Invalid channel ID:', channelId);
       return;
     }
 
@@ -346,7 +347,7 @@ export class SharedStateService {
       this.loadChannelMessages(channelId);
     }
     
-    console.log(`Channel changed: ${previousChannel} → ${channelId}`, { groupId });
+    this.debugService.printConsole(`Channel changed: ${previousChannel} → ${channelId}`, { groupId });
   }
 
   // === 유효성 검증 헬퍼 ===
@@ -549,6 +550,6 @@ export class SharedStateService {
     this._userJoinList.set(null);
     this._initialized.set(false);
     this._error.set(null);
-    console.log('SharedStateService reset completed');
+    this.debugService.printConsole('SharedStateService reset completed');
   }
 }

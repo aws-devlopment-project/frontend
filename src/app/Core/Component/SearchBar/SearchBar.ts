@@ -3,6 +3,7 @@ import { Component, output, signal, computed, ElementRef, HostListener, ViewChil
 import { MatIconModule } from "@angular/material/icon";
 import { CommonModule } from "@angular/common";
 import { SearchService } from "../../Service/SearchService";
+import { DebugService } from "../../../Debug/DebugService";
 
 interface SearchResult {
   id: string;
@@ -50,7 +51,7 @@ export class SearchBarComponent implements OnInit {
          (this.searchValue().trim().length > 0 && !this.isSearching() && !this.hasSearchResults()))
     );
 
-    constructor(private elementRef: ElementRef, private searchService: SearchService) {}
+    constructor(private elementRef: ElementRef, private searchService: SearchService, private debugService: DebugService) {}
 
     ngOnInit(): void {
         // 컴포넌트 초기화 시 SearchService 데이터 새로고침
@@ -157,9 +158,9 @@ export class SearchBarComponent implements OnInit {
             const uniqueResults = this.ensureUniqueIds(validResults);
             
             this.searchResults.set(uniqueResults);
-            console.log('Search results:', uniqueResults);
+            this.debugService.printConsole('Search results:', uniqueResults);
         } catch (error) {
-            console.error('Search error:', error);
+            this.debugService.printConsole('Search error:', error);
             this.searchResults.set([]);
         } finally {
             this.isSearching.set(false);
@@ -221,7 +222,7 @@ export class SearchBarComponent implements OnInit {
         this.clearSearchResults();
         this.searchInput.nativeElement.blur();
         
-        console.log('Selected search result:', result);
+        this.debugService.printConsole('Selected search result:', result);
     }
 
     getResultIcon(result: SearchResult): string {

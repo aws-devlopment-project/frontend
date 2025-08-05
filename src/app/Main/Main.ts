@@ -3,6 +3,7 @@ import { Component, OnInit, OnDestroy, effect, computed } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { Subject } from "rxjs";
 import { takeUntil } from "rxjs/operators";
+import { DebugService } from "../Debug/DebugService";
 
 import { SideBarComponent } from "../Core/Component/SideBar/SideBar";
 import { HeaderBarComponent } from "../Core/Component/HeaderBar/HeaderBar";
@@ -43,8 +44,8 @@ export class MainComponent implements OnInit, OnDestroy {
   readonly isInitialized = computed(() => this.sharedState.initialized());
   readonly hasValidData = computed(() => this.sharedState.hasValidData());
 
-  constructor(public sharedState: SharedStateService) {
-    console.log('MainComponent initialized with SharedStateService');
+  constructor(public sharedState: SharedStateService, private debugService: DebugService) {
+    this.debugService.printConsole('MainComponent initialized with SharedStateService');
     
     // 초기화 상태 모니터링
     effect(() => {
@@ -52,7 +53,7 @@ export class MainComponent implements OnInit, OnDestroy {
       const hasData = this.sharedState.hasValidData();
       const error = this.sharedState.error();
       
-      console.log('MainComponent state:', {
+      this.debugService.printConsole('MainComponent state:', {
         initialized,
         hasData,
         error,
@@ -66,7 +67,7 @@ export class MainComponent implements OnInit, OnDestroy {
     effect(() => {
       const error = this.sharedState.error();
       if (error) {
-        console.error('MainComponent detected error:', error);
+        this.debugService.printConsole('MainComponent detected error:', error);
         this.handleError(error);
       }
     });
@@ -74,12 +75,12 @@ export class MainComponent implements OnInit, OnDestroy {
     // 로딩 상태 모니터링
     effect(() => {
       const loading = this.sharedState.isLoading();
-      console.log('MainComponent loading state:', loading);
+      this.debugService.printConsole('MainComponent loading state:', loading);
     });
   }
 
   ngOnInit(): void {
-    console.log('MainComponent ngOnInit');
+    this.debugService.printConsole('MainComponent ngOnInit');
     
     // 컴포넌트가 완전히 초기화된 후 추가 설정
     setTimeout(() => {
@@ -88,7 +89,7 @@ export class MainComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    console.log('MainComponent ngOnDestroy');
+    this.debugService.printConsole('MainComponent ngOnDestroy');
     this.destroy$.next();
     this.destroy$.complete();
   }
@@ -96,23 +97,23 @@ export class MainComponent implements OnInit, OnDestroy {
   // === 초기화 상태 확인 ===
   private checkInitializationStatus(): void {
     if (!this.sharedState.initialized()) {
-      console.log('SharedState not initialized, waiting...');
+      this.debugService.printConsole('SharedState not initialized, waiting...');
       return;
     }
 
     if (!this.sharedState.hasValidData()) {
-      console.warn('SharedState initialized but missing valid data');
+      this.debugService.printConsole('SharedState initialized but missing valid data');
       this.handleMissingData();
       return;
     }
 
-    console.log('MainComponent fully initialized with valid data');
+    this.debugService.printConsole('MainComponent fully initialized with valid data');
   }
 
   // === 에러 처리 ===
   private handleError(error: string): void {
     // 사용자에게 에러 표시 (토스트, 모달 등)
-    console.error('Handling error in MainComponent:', error);
+    this.debugService.printConsole('Handling error in MainComponent:', error);
     
     // 필요에 따라 특정 에러에 대한 처리
     if (error.includes('사용자 정보')) {
@@ -125,27 +126,27 @@ export class MainComponent implements OnInit, OnDestroy {
   }
 
   private handleUserError(): void {
-    console.log('Handling user error - may redirect to profile setup');
+    this.debugService.printConsole('Handling user error - may redirect to profile setup');
     // 사용자 프로필 설정 페이지로 이동하거나 재시도 옵션 제공
   }
 
   private handleJoinListError(): void {
-    console.log('Handling join list error - may show join group options');
+    this.debugService.printConsole('Handling join list error - may show join group options');
     // 그룹 가입 페이지로 이동하거나 새로고침 옵션 제공
   }
 
   // === 데이터 부족 처리 ===
   private handleMissingData(): void {
-    console.log('Handling missing data situation');
+    this.debugService.printConsole('Handling missing data situation');
     
     if (!this.sharedState.currentUser()) {
-      console.log('Missing user data');
+      this.debugService.printConsole('Missing user data');
       // 사용자 정보 재로드 시도
       this.retryUserDataLoad();
     }
 
     if (!this.sharedState.userJoinList()) {
-      console.log('Missing join list data');
+      this.debugService.printConsole('Missing join list data');
       // 가입 목록 재로드 시도
       this.retryJoinListLoad();
     }
@@ -153,44 +154,44 @@ export class MainComponent implements OnInit, OnDestroy {
 
   private async retryUserDataLoad(): Promise<void> {
     try {
-      console.log('Retrying user data load...');
+      this.debugService.printConsole('Retrying user data load...');
       await this.sharedState.refreshUserStatus();
     } catch (error) {
-      console.error('Failed to retry user data load:', error);
+      this.debugService.printConsole('Failed to retry user data load:', error);
     }
   }
 
   private async retryJoinListLoad(): Promise<void> {
     try {
-      console.log('Retrying join list data load...');
+      this.debugService.printConsole('Retrying join list data load...');
       await this.sharedState.refreshUserJoinList();
     } catch (error) {
-      console.error('Failed to retry join list data load:', error);
+      this.debugService.printConsole('Failed to retry join list data load:', error);
     }
   }
 
   // === 이벤트 핸들러들 (개선됨) ===
   onNavigationChange(tab: string): void {
-    console.log('Navigation change requested:', tab);
+    this.debugService.printConsole('Navigation change requested:', tab);
     
     if (!this.sharedState.initialized()) {
-      console.warn('Cannot navigate - SharedState not initialized');
+      this.debugService.printConsole('Cannot navigate - SharedState not initialized');
       return;
     }
 
     try {
       this.sharedState.setActiveTab(tab);
-      console.log('Navigation successful:', tab);
+      this.debugService.printConsole('Navigation successful:', tab);
     } catch (error) {
-      console.error('Navigation failed:', error);
+      this.debugService.printConsole('Navigation failed:', error);
     }
   }
 
   onGroupSelect(groupId: string): void {
-    console.log('Group selection requested:', groupId);
+    this.debugService.printConsole('Group selection requested:', groupId);
     
     if (!this.sharedState.initialized()) {
-      console.warn('Cannot select group - SharedState not initialized');
+      this.debugService.printConsole('Cannot select group - SharedState not initialized');
       return;
     }
 
@@ -199,23 +200,23 @@ export class MainComponent implements OnInit, OnDestroy {
     const isValidGroup = availableGroups.some(group => group.groupname === groupId);
     
     if (!isValidGroup) {
-      console.warn('Invalid group selected:', groupId, 'Available:', availableGroups);
+      this.debugService.printConsole('Invalid group selected:', groupId, 'Available:', availableGroups);
       return;
     }
 
     try {
       this.sharedState.setSelectedGroup(groupId);
-      console.log('Group selection successful:', groupId);
+      this.debugService.printConsole('Group selection successful:', groupId);
     } catch (error) {
-      console.error('Group selection failed:', error);
+      this.debugService.printConsole('Group selection failed:', error);
     }
   }
 
   onChannelSelect(data: { groupId: string, channelId: string }): void {
-    console.log('Channel selection requested:', data);
+    this.debugService.printConsole('Channel selection requested:', data);
     
     if (!this.sharedState.initialized()) {
-      console.warn('Cannot select channel - SharedState not initialized');
+      this.debugService.printConsole('Cannot select channel - SharedState not initialized');
       return;
     }
 
@@ -224,20 +225,20 @@ export class MainComponent implements OnInit, OnDestroy {
     const isValidChannel = groupChannels.includes(data.channelId);
     
     if (!isValidChannel) {
-      console.warn('Invalid channel selected:', data, 'Available channels:', groupChannels);
+      this.debugService.printConsole('Invalid channel selected:', data, 'Available channels:', groupChannels);
       return;
     }
 
     try {
       this.sharedState.setSelectedChannel(data.channelId, data.groupId);
-      console.log('Channel selection successful:', data);
+      this.debugService.printConsole('Channel selection successful:', data);
     } catch (error) {
-      console.error('Channel selection failed:', error);
+      this.debugService.printConsole('Channel selection failed:', error);
     }
   }
 
   onSearchQuery(query: string): void {
-    console.log('Search query:', query);
+    this.debugService.printConsole('Search query:', query);
     
     if (!query.trim()) {
       return;
@@ -248,23 +249,23 @@ export class MainComponent implements OnInit, OnDestroy {
   }
 
   onNotificationClick(): void {
-    console.log('Notification clicked');
+    this.debugService.printConsole('Notification clicked');
     // 알림 패널 토글 또는 알림 페이지로 이동
   }
 
   onHelpClick(): void {
-    console.log('Help clicked');
+    this.debugService.printConsole('Help clicked');
     // 도움말 모달 표시 또는 도움말 페이지로 이동
   }
 
   onProfileClick(): void {
-    console.log('Profile clicked');
+    this.debugService.printConsole('Profile clicked');
     // 프로필 모달 표시 또는 프로필 페이지로 이동
   }
 
   // === 액션 메서드들 ===
   async refreshData(): Promise<void> {
-    console.log('Manual data refresh requested');
+    this.debugService.printConsole('Manual data refresh requested');
     
     try {
       this.sharedState.clearError();
@@ -272,9 +273,9 @@ export class MainComponent implements OnInit, OnDestroy {
         this.sharedState.refreshUserStatus(),
         this.sharedState.refreshUserJoinList()
       ]);
-      console.log('Data refresh completed');
+      this.debugService.printConsole('Data refresh completed');
     } catch (error) {
-      console.error('Data refresh failed:', error);
+      this.debugService.printConsole('Data refresh failed:', error);
     }
   }
 
@@ -310,16 +311,16 @@ export class MainComponent implements OnInit, OnDestroy {
 
   // === 디버깅 메서드들 (개발용) ===
   debugState(): void {
-    console.log('=== DEBUG STATE ===');
-    console.log('Initialized:', this.sharedState.initialized());
-    console.log('Has Valid Data:', this.sharedState.hasValidData());
-    console.log('Is Loading:', this.sharedState.isLoading());
-    console.log('Error:', this.sharedState.error());
-    console.log('Active Tab:', this.sharedState.activeTab());
-    console.log('Selected Group:', this.sharedState.selectedGroup());
-    console.log('Selected Channel:', this.sharedState.selectedChannel());
-    console.log('Available Groups:', this.sharedState.availableGroups());
-    console.log('Current User:', this.sharedState.currentUser());
-    console.log('=================');
+    this.debugService.printConsole('=== DEBUG STATE ===');
+    this.debugService.printConsole('Initialized:', this.sharedState.initialized());
+    this.debugService.printConsole('Has Valid Data:', this.sharedState.hasValidData());
+    this.debugService.printConsole('Is Loading:', this.sharedState.isLoading());
+    this.debugService.printConsole('Error:', this.sharedState.error());
+    this.debugService.printConsole('Active Tab:', this.sharedState.activeTab());
+    this.debugService.printConsole('Selected Group:', this.sharedState.selectedGroup());
+    this.debugService.printConsole('Selected Channel:', this.sharedState.selectedChannel());
+    this.debugService.printConsole('Available Groups:', this.sharedState.availableGroups());
+    this.debugService.printConsole('Current User:', this.sharedState.currentUser());
+    this.debugService.printConsole('=================');
   }
 }
