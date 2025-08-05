@@ -14,11 +14,12 @@ import {
   confirmResetPassword, 
   ConfirmResetPasswordInput, 
   deleteUser,
-  AuthError
+  AuthError,
+  fetchUserAttributes
 } from '@aws-amplify/auth';
 
 @Injectable({
-    providedIn: 'platform',
+    providedIn: 'root',
 })
 export class LoginService {
     
@@ -33,9 +34,15 @@ export class LoginService {
                     throw new Error('액세스 토큰을 가져올 수 없습니다.');
                 }
                 
+                // 사용자 속성 가져오기
+                const userAttributes = await fetchUserAttributes();
+                const displayName = userAttributes['custom:username'] || 
+                                  userAttributes.name || 
+                                  username;
+                
                 return {
                     status: 200, 
-                    username: username, 
+                    username: displayName, 
                     accessToken: session.tokens.accessToken.toString()
                 };
             } else {
@@ -69,8 +76,7 @@ export class LoginService {
             });
         } catch (error: any) {
             console.error('Google 로그인 오류:', error);
-            
-            // 사용자 친화적 에러 메시지
+
             if (error.name === 'OAuthError') {
                 throw new Error('Google 인증 중 오류가 발생했습니다. 다시 시도해주세요.');
             } else if (error.name === 'ConfigurationError') {
@@ -84,9 +90,10 @@ export class LoginService {
     // 개선된 사용자 정보 가져오기
     async getCurrentUserInfo(): Promise<any> {
         try {
-            const [user, session] = await Promise.all([
+            const [user, session, userAttributes] = await Promise.all([
                 getCurrentUser(),
-                fetchAuthSession()
+                fetchAuthSession(),
+                fetchUserAttributes()
             ]);
             
             // 토큰 유효성 검증
@@ -105,6 +112,7 @@ export class LoginService {
             
             return {
                 user,
+                userAttributes,
                 accessToken: accessToken.toString(),
                 idToken: session.tokens?.idToken?.toString(),
                 isAuthenticated: true,
@@ -139,7 +147,7 @@ export class LoginService {
         }
     }
 
-    async signUpUser(username: string, password: string, email: string) {
+    async signUpUser(username: string, password: string, email: string, customUsername?: string) {
         try {
             // 비밀번호 복잡성 검증
             if (!this.validatePassword(password)) {
@@ -152,6 +160,7 @@ export class LoginService {
                 options: {
                     userAttributes: {
                         email: email,
+                        'custom:username': customUsername || username, // custom:username 추가
                     },
                     autoSignIn: true,
                 },

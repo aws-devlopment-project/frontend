@@ -563,7 +563,7 @@ export class UserService {
                 id = user.id;
             }
 
-            const url = `${environment.apiUrl}/api/user/setUsername`;
+            const url = `${environment.apiUrl}/api/user/setUserAvatar`;
             const body = { user: id, avatar: avatar };
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
