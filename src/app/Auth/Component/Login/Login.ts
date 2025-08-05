@@ -4,6 +4,7 @@ import { Router } from "@angular/router";
 import { LoginService } from "../../Service/LoginService";
 import { DataCacheService } from "../../../Core/Service/DataCacheService";
 import { UserCredentials, UserStatus } from "../../../Core/Models/user";
+import { fetchUserAttributes } from '@aws-amplify/auth';
 
 @Component({
     selector: 'app-auth-login',
@@ -18,8 +19,21 @@ export class LoginComponent implements OnInit {
     successLogin = signal(true);
     signUpNextStep = signal(false);
     isLoading = signal(false);
+    showPassword = signal(false);
 
-    loginForm: FormGroup = new FormGroup({});
+    // 비밀번호 강도 관련 시그널
+    passwordStrength = signal<'weak' | 'medium' | 'strong'>('weak');
+    passwordRequirements = signal({
+        minLength: false,
+        hasLowercase: false,
+        hasUppercase: false,
+        hasNumber: false,
+        hasSpecialChar: false
+    });
+    showPasswordRequirements = signal(false);
+
+    signInForm: FormGroup = new FormGroup({});
+    signUpForm: FormGroup = new FormGroup({});
     emailForm: FormGroup = new FormGroup({});
     
     constructor(
@@ -35,14 +49,71 @@ export class LoginComponent implements OnInit {
     }
 
     private initializeForms(): void {
-        this.loginForm = this.fb.group({
+        this.signInForm = this.fb.group({
             email: ['', [Validators.required, Validators.email]],
             password: ['', [Validators.required, Validators.minLength(8)]],
+        });
+
+        this.signUpForm = this.fb.group({
+            email: ['', [Validators.required, Validators.email]],
+            password: ['', [Validators.required, Validators.minLength(8)]],
+            username: ['', [Validators.required, Validators.maxLength(20)]]
+        });
+
+        // 비밀번호 실시간 검증 추가
+        this.signUpForm.get('password')?.valueChanges.subscribe(password => {
+            if (password) {
+                this.validatePasswordStrength(password);
+                this.showPasswordRequirements.set(true);
+            } else {
+                this.showPasswordRequirements.set(false);
+            }
         });
         
         this.emailForm = this.fb.group({
             verificationCode: ['', [Validators.required, Validators.minLength(6), Validators.maxLength(6)]]
         });
+    }
+
+    // 비밀번호 강도 실시간 검증
+    private validatePasswordStrength(password: string): void {
+        const requirements = {
+            minLength: password.length >= 8,
+            hasLowercase: /[a-z]/.test(password),
+            hasUppercase: /[A-Z]/.test(password),
+            hasNumber: /\d/.test(password),
+            hasSpecialChar: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+        };
+
+        this.passwordRequirements.set(requirements);
+
+        // 강도 계산
+        const passedRequirements = Object.values(requirements).filter(Boolean).length;
+        
+        if (passedRequirements < 3) {
+            this.passwordStrength.set('weak');
+        } else if (passedRequirements < 5) {
+            this.passwordStrength.set('medium');
+        } else {
+            this.passwordStrength.set('strong');
+        }
+    }
+
+    // 비밀번호 요구사항 완성도 계산
+    get passwordCompletionPercentage(): number {
+        const requirements = this.passwordRequirements();
+        const completed = Object.values(requirements).filter(Boolean).length;
+        return Math.round((completed / 5) * 100);
+    }
+
+    // 비밀번호 보기/숨기기 토글
+    togglePasswordVisibility(): void {
+        this.showPassword.update(current => !current);
+    }
+
+    // HTML에서 사용할 동적 FormGroup getter
+    get loginForm(): FormGroup {
+        return this.clickLogin() ? this.signInForm : this.signUpForm;
     }
 
     async onGoogleLogin(): Promise<void> {
@@ -62,27 +133,32 @@ export class LoginComponent implements OnInit {
             const isAuthenticated = await this.auth.checkAuthState();
             
             if (isAuthenticated) {
-            const userInfo = await this.auth.getCurrentUserInfo();
-            
-            // UserCredentials 생성
-            const user: UserCredentials = {
-                id: userInfo.user.userId,
-                name: userInfo.user.signInDetails?.loginId || 'Google User',
-                accessToken: userInfo.accessToken,
-            };
+                const userInfo = await this.auth.getCurrentUserInfo();
+                
+                // userInfo에서 userAttributes 사용
+                const displayName = userInfo.userAttributes?.['custom:username'] || 
+                                  userInfo.userAttributes?.name || 
+                                  userInfo.userAttributes?.email || 
+                                  'User';
 
-            const userStatus: UserStatus = {
-                id: userInfo.user.userId,
-                name: userInfo.user.signInDetails?.loginId || 'Google User',
-                status: 'online',
-                joinDate: new Date(),
-                lastSeen: new Date()
-            };
+                const user: UserCredentials = {
+                    id: userInfo.user.userId,
+                    name: displayName,
+                    accessToken: userInfo.accessToken,
+                };
 
-            this.cacheService.setCache('user', user);
-            this.cacheService.setCache('userStatus', userStatus);
-            
-            await this.router.navigate(['/board']);
+                const userStatus: UserStatus = {
+                    id: userInfo.user.userId,
+                    name: displayName,
+                    status: 'online',
+                    joinDate: new Date(),
+                    lastSeen: new Date()
+                };
+
+                this.cacheService.setCache('user', user);
+                this.cacheService.setCache('userStatus', userStatus);
+                
+                await this.router.navigate(['/board']);
             }
         } catch (error) {
             console.error('인증 상태 확인 오류:', error);
@@ -126,29 +202,23 @@ export class LoginComponent implements OnInit {
     }
 
     private async handleLogin(): Promise<void> {
-        if (!this.loginForm.valid) {
-            this.markFormGroupTouched(this.loginForm);
+        if (!this.signInForm.valid) {
+            this.markFormGroupTouched(this.signInForm);
             return;
         }
 
-        const { email, password } = this.loginForm.value;
+        const { email, password } = this.signInForm.value;
 
         try {
             const res = await this.auth.signInUser(email, password);
-            // const res = {
-            //     status: 200,
-            //     id: email,
-            //     username: "철수",
-            //     accessToken: "1234"
-            // }
 
             if (res.status === 200) {
-                const user : UserCredentials = {
+                const user: UserCredentials = {
                     id: email,
                     name: res.username,
                     accessToken: res.accessToken,
                 };
-                const userStatus : UserStatus = {
+                const userStatus: UserStatus = {
                     id: email,
                     name: res.username,
                     status: 'online',
@@ -170,15 +240,15 @@ export class LoginComponent implements OnInit {
     }
 
     private async handleSignUp(): Promise<void> {
-        if (!this.loginForm.valid) {
-            this.markFormGroupTouched(this.loginForm);
+        if (!this.signUpForm.valid) {
+            this.markFormGroupTouched(this.signUpForm);
             return;
         }
 
-        const { email, password } = this.loginForm.value;
+        const { email, password, username } = this.signUpForm.value;
 
         try {
-            const res = await this.auth.signUpUser(email, password, email);
+            const res = await this.auth.signUpUser(email, password, email, username);
             this.signUpNextStep.update(() => true);
         } catch (error: any) {
             this.errMsg = error.message || '회원가입 중 오류가 발생했습니다.';
@@ -192,7 +262,7 @@ export class LoginComponent implements OnInit {
             return;
         }
 
-        const { email } = this.loginForm.value;
+        const { email } = this.signUpForm.value;
         const { verificationCode } = this.emailForm.value;
 
         try {
@@ -206,7 +276,7 @@ export class LoginComponent implements OnInit {
     }
 
     async passwordReset(): Promise<void> {
-        const { email } = this.loginForm.value;
+        const { email } = this.signInForm.value;
         
         if (!email) {
             this.errMsg = '비밀번호 재설정을 위해 먼저 이메일을 입력해주세요.';
@@ -218,7 +288,6 @@ export class LoginComponent implements OnInit {
             const result = await this.auth.requestPassswordReset(email);
             console.log("비밀번호 재설정 요청 완료:", result);
             
-            // 사용자에게 이메일 확인 안내
             alert('비밀번호 재설정 링크가 이메일로 전송되었습니다.');
         } catch (error: any) {
             console.error('비밀번호 재설정 오류:', error);
@@ -236,7 +305,6 @@ export class LoginComponent implements OnInit {
     }
 
     private handleError(error: any): void {
-        // 에러 타입에 따른 적절한 메시지 설정
         if (error.name === 'UserNotFoundException') {
             this.errMsg = '등록되지 않은 이메일입니다.';
         } else if (error.name === 'NotAuthorizedException') {
@@ -250,13 +318,16 @@ export class LoginComponent implements OnInit {
         this.successLogin.update(() => false);
     }
 
-    // 폼 유효성 검사를 위한 헬퍼 메서드들
     get emailControl() {
         return this.loginForm.get('email');
     }
 
     get passwordControl() {
         return this.loginForm.get('password');
+    }
+
+    get usernameControl() {
+        return this.signUpForm.get('username');
     }
 
     get verificationCodeControl() {

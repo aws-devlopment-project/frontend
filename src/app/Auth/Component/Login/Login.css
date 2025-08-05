@@ -1,4 +1,3 @@
-/* 전체 레이아웃 */
 .login-catchphrase {
     display: block;
     margin: 0 auto;
@@ -140,6 +139,149 @@ form .form-control:hover {
     border-color: #1d1c1d;
 }
 
+/* 비밀번호 입력 컨테이너 */
+.password-input-container {
+    position: relative;
+}
+
+.password-input-wrapper {
+    position: relative;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    color: #616061;
+    padding: 4px;
+    border-radius: 4px;
+    transition: color 0.2s ease;
+}
+
+.password-toggle:hover {
+    color: #1264a3;
+}
+
+.password-toggle:focus {
+    outline: 2px solid #1264a3;
+    outline-offset: 2px;
+}
+
+/* 비밀번호 강도 표시기 */
+.password-strength-container {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.password-strength-bar {
+    flex: 1;
+    height: 4px;
+    background-color: #e8e8e8;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.strength-indicator {
+    height: 100%;
+    transition: width 0.3s ease, background-color 0.3s ease;
+    border-radius: 2px;
+}
+
+.strength-indicator.strength-weak {
+    background-color: #e01e5a;
+}
+
+.strength-indicator.strength-medium {
+    background-color: #f2c744;
+}
+
+.strength-indicator.strength-strong {
+    background-color: #007a5a;
+}
+
+.strength-text {
+    font-size: 12px;
+    font-weight: 600;
+    min-width: 60px;
+    color: #616061;
+}
+
+/* 비밀번호 요구사항 체크리스트 */
+.password-requirements {
+    margin-top: 12px;
+    padding: 12px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e8e8e8;
+    animation: slideDown 0.3s ease-out;
+}
+
+.requirement-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    margin-bottom: 6px;
+    color: #616061;
+    transition: color 0.2s ease;
+}
+
+.requirement-item:last-child {
+    margin-bottom: 0;
+}
+
+.requirement-item.completed {
+    color: #007a5a;
+    font-weight: 500;
+    animation: checkmark 0.3s ease-out;
+}
+
+.requirement-icon {
+    font-size: 14px;
+    font-weight: 700;
+    width: 16px;
+    text-align: center;
+}
+
+.requirement-item.completed .requirement-icon {
+    color: #007a5a;
+}
+
+.requirement-item:not(.completed) .requirement-icon {
+    color: #e8e8e8;
+}
+
+/* 애니메이션 효과 */
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes checkmark {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
 /* 오류 메시지 */
 .failureLogin {
     padding: 0 32px;
@@ -243,6 +385,7 @@ form .form-control:hover {
     background-color: #1264a3;
     color: #ffffff;
     margin-bottom: 32px;
+    position: relative;
 }
 
 .btn-sign-up-aws:hover:not(:disabled) {
@@ -257,6 +400,17 @@ form .form-control:hover {
     cursor: not-allowed;
     transform: none;
     box-shadow: none;
+}
+
+.btn-sign-up-aws:disabled::after {
+    content: '비밀번호 요구사항을 만족해주세요';
+    position: absolute;
+    bottom: -24px;
+    left: 0;
+    right: 0;
+    font-size: 12px;
+    color: #e01e5a;
+    text-align: center;
 }
 
 /* 에러 텍스트 */
@@ -296,6 +450,30 @@ small {
     
     .failureLogin {
         padding: 0 24px;
+    }
+
+    .password-strength-container {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+    }
+    
+    .strength-text {
+        text-align: center;
+        min-width: auto;
+    }
+    
+    .password-requirements {
+        padding: 10px;
+    }
+    
+    .requirement-item {
+        font-size: 12px;
+    }
+    
+    .btn-sign-up-aws:disabled::after {
+        bottom: -30px;
+        font-size: 11px;
     }
 }
 
