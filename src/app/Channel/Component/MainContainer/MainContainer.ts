@@ -8,6 +8,7 @@ import { SharedStateService } from "../../../Core/Service/SharedService";
 import { WebSocketChatService } from "../../Service/WebSocketChatService";
 import { UserStatus } from "../../../Core/Models/user";
 import { ChatMessage } from "../../Models/chatMessage";
+import { DebugService } from "../../../Debug/DebugService";
 
 @Component({
   selector: 'app-main-container',
@@ -40,9 +41,10 @@ export class MainContainerComponent implements OnInit, OnDestroy {
 
   constructor(
     public sharedState: SharedStateService,
-    private webSocketService: WebSocketChatService
+    private webSocketService: WebSocketChatService,
+    private debugService: DebugService
   ) {
-    console.log('MainContainerComponent initialized with WebSocket support');
+    this.debugService.printConsole('MainContainerComponent initialized with WebSocket support');
     
     // 메시지가 업데이트되면 스크롤을 맨 아래로
     effect(() => {
@@ -63,7 +65,7 @@ export class MainContainerComponent implements OnInit, OnDestroy {
     // 연결 상태 변경 감지
     effect(() => {
       const status = this.connectionStatus();
-      console.log('WebSocket connection status:', status);
+      this.debugService.printConsole('WebSocket connection status:', status);
       
       if (status === 'connected') {
         this.loadChannelMessages(this.currentChannel());
@@ -129,7 +131,7 @@ export class MainContainerComponent implements OnInit, OnDestroy {
 
     // 오류 처리
     const errorsSub = this.webSocketService.errors$.subscribe(error => {
-      console.error('WebSocket error:', error);
+      this.debugService.printConsole('WebSocket error:', error);
       this.addSystemMessage(`오류: ${error}`, 'error');
     });
 
@@ -399,14 +401,14 @@ export class MainContainerComponent implements OnInit, OnDestroy {
 
   private uploadFile(file: File): void {
     // 파일 업로드 로직 구현
-    console.log('File upload requested:', file.name);
+    this.debugService.printConsole('File upload requested:', file.name);
     // 실제 구현에서는 파일을 서버에 업로드하고 메시지로 전송
   }
 
   // === 이모지/리액션 (확장 기능) ===
   addReaction(messageId: string, emoji: string): void {
     // 리액션 추가 로직
-    console.log('Reaction added:', messageId, emoji);
+    this.debugService.printConsole('Reaction added:', messageId, emoji);
   }
 
   // === 메시지 검색 (확장 기능) ===

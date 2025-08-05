@@ -2,6 +2,7 @@
 import { Injectable } from '@angular/core';
 import { UserService } from './UserService';
 import { UserJoinList } from '../Models/user';
+import { DebugService } from '../../Debug/DebugService';
 
 interface SearchResult {
   id: string;
@@ -18,7 +19,7 @@ interface SearchResult {
 export class SearchService {
   private userJoinList: UserJoinList | null = null;
 
-  constructor(private userService: UserService) {
+  constructor(private userService: UserService, private debugService: DebugService) {
     this.initializeData();
   }
 
@@ -26,7 +27,7 @@ export class SearchService {
     try {
       this.userJoinList = await this.userService.getUserJoinList();
     } catch (error) {
-      console.error('Error loading user join list in SearchService:', error);
+      this.debugService.printConsole('Error loading user join list in SearchService:', error);
     }
   }
 

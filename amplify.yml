@@ -71,7 +71,7 @@ frontend:
             aws_cognito_identity_pool_id: '$COGNITO_IDENTITY_POOL_ID',
             oauth: {
               domain: '$COGNITO_DOMAIN',
-              scope: ['phone', 'email', 'openid', 'profile', 'aws.cognito.signin.user.admin'],
+              scope: ['email', 'openid', 'profile'],
               redirectSignIn: '$REDIRECT_SIGN_IN',
               redirectSignOut: '$REDIRECT_SIGN_OUT',
               responseType: 'code'
