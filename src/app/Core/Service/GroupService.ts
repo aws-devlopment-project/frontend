@@ -78,7 +78,7 @@ export class GroupService {
         const headers: HttpHeaders = new HttpHeaders({
             'Content-Type': 'application/json'
         });
-        const body = JSON.stringify({group: group, user: user});
+        const body = JSON.stringify({user: user, group: group});
         await this.httpService.post(url, body, headers).toPromise();
         let cacheGroup: Group | null = await this.dataService.getCache(group);
         if (cacheGroup) {
