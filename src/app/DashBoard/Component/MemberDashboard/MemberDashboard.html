@@ -3,7 +3,7 @@
     <!-- 사이드바 메뉴 -->
     <div class="options-sidebar">
       <div class="user-summary">
-        <!-- <div class="user-avatar">{{ userProfile().avatar }}</div> -->
+        <div class="user-avatar">{{ userProfile().avatar }}</div>
         <div class="user-info">
           <h3>{{ userProfile().username }}</h3>
           <p>가입 {{ getJoinDuration() }} 차</p>
@@ -36,10 +36,34 @@
           </div>
           
           <div class="profile-section">
-            <!-- <div class="profile-avatar-section">
+            <div class="profile-avatar-section">
               <div class="avatar-display">{{ userProfile().avatar }}</div>
-              <button class="btn btn-secondary">아바타 변경</button>
-            </div> -->
+              <button class="btn btn-secondary" (click)="toggleAvatarSelector()">
+                아바타 변경
+              </button>
+              
+              <!-- 아바타 선택기 -->
+              @if (showAvatarSelector()) {
+                <div class="avatar-selector">
+                  <h4>아바타 선택</h4>
+                  <div class="avatar-grid">
+                    @for (avatar of availableAvatars; track avatar) {
+                      <button class="avatar-option" 
+                              [class.selected]="userProfile().avatar === avatar"
+                              [disabled]="isLoading()"
+                              (click)="changeAvatar(avatar)">
+                        {{ avatar }}
+                      </button>
+                    }
+                  </div>
+                  <div class="avatar-selector-actions">
+                    <button class="btn btn-secondary btn-sm" (click)="toggleAvatarSelector()">
+                      취소
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
             
             <div class="profile-form">
               <div class="form-group">
@@ -111,22 +135,38 @@
           } @else {
             <div class="groups-list">
               @for (group of joinedGroups(); track group?.groupname) {
-                <div class="group-item">
-                  <div class="group-info">
-                    <h4>{{ group?.groupname }}</h4>
-                    <div class="group-channels">
-                      참여 채널: 
-                      @for (channel of group?.clubList; track channel; let last = $last) {
-                        <span>{{ channel }}{{ !last ? ', ' : '' }}</span>
-                      }
+                <div class="group-item-expanded">
+                  <div class="group-header">
+                    <div class="group-info">
+                      <h4>{{ group?.groupname }}</h4>
+                      <p>{{ group?.clubList?.length || 0 }}개 채널 참여 중</p>
+                    </div>
+                    <div class="group-actions">
+                      <button class="btn btn-danger btn-sm" 
+                              (click)="leaveGroup(group?.groupname || '')">
+                        그룹 탈퇴
+                      </button>
                     </div>
                   </div>
-                  <div class="group-actions">
-                    <button class="btn btn-danger btn-sm" 
-                            (click)="leaveGroup(group?.groupname || '')">
-                      탈퇴
-                    </button>
-                  </div>
+                  
+                  <!-- 채널 목록 -->
+                  @if (group?.clubList && group.clubList.length > 0) {
+                    <div class="channels-list">
+                      <h5>참여 채널</h5>
+                      @for (channel of group.clubList; track channel) {
+                        <div class="channel-item">
+                          <div class="channel-info">
+                            <mat-icon>tag</mat-icon>
+                            <span>{{ channel }}</span>
+                          </div>
+                          <button class="btn btn-warning btn-sm" 
+                                  (click)="leaveClub(group.groupname, channel)">
+                            채널 탈퇴
+                          </button>
+                        </div>
+                      }
+                    </div>
+                  }
                 </div>
               } @empty {
                 <div class="empty-state">

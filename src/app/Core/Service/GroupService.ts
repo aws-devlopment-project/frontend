@@ -5,6 +5,7 @@ import { HttpHeaders } from "@angular/common/http";
 import { environment } from "../../../environments/environment.prod";
 import { Group } from "../Models/group";
 import { UserService } from "./UserService";
+import { groupList } from "../Models/groupList";
 
 @Injectable({
     providedIn: 'root'
@@ -14,7 +15,7 @@ export class GroupService {
     constructor(private httpService: HttpService, private dataService: DataCacheService, private userSerivce: UserService) {}
 
     async checkQuestCreateTime(groupname: string) : Promise<boolean> {
-        const group = await this.dataService.getCache(groupname);
+        const group: Group | null = await this.dataService.getCache(groupname);
 
         if (group) {
             const record = group.questCreateTime.setHours(0, 0, 0, 0);
@@ -26,7 +27,7 @@ export class GroupService {
     }
 
     async getGroupInfo(groupname: string): Promise<Group | undefined> {
-        const group = await this.dataService.getCache(groupname);
+        const group: Group | null = await this.dataService.getCache(groupname);
         if (group) {
             return group;
         }
@@ -42,7 +43,7 @@ export class GroupService {
     }
 
     async getGroupList(): Promise<string[]> {
-        const cacheGroupList = await this.dataService.getCache('groupList');
+        const cacheGroupList: string[] | null = await this.dataService.getCache('groupList');
 
         if (cacheGroupList) {
             return cacheGroupList;
@@ -53,7 +54,8 @@ export class GroupService {
         });
         const response = await this.httpService.get(url, headers).toPromise();
         this.dataService.setCache('groupList', response);
-        return await this.dataService.getCache('groupList');
+        const groupList: string[] | null = await this.dataService.getCache('groupList')
+        return groupList ? groupList : [];
     }
 
     async joinUser(group: string, user: string): Promise<boolean> {
@@ -63,7 +65,7 @@ export class GroupService {
         });
         const body = JSON.stringify({group: group, user: user});
         const response = await this.httpService.post(url, body, headers).toPromise();
-        let cacheGroup: Group | undefined = await this.dataService.getCache(group);
+        let cacheGroup: Group | null = await this.dataService.getCache(group);
         if (cacheGroup) {
             cacheGroup.memberNum += 1;
         }
@@ -77,8 +79,8 @@ export class GroupService {
             'Content-Type': 'application/json'
         });
         const body = JSON.stringify({group: group, user: user});
-        const response = await this.httpService.post(url, body, headers).toPromise();
-        let cacheGroup: Group | undefined = await this.dataService.getCache(group);
+        await this.httpService.post(url, body, headers).toPromise();
+        let cacheGroup: Group | null = await this.dataService.getCache(group);
         if (cacheGroup) {
             cacheGroup.memberNum -= 1;
         }
@@ -93,7 +95,7 @@ export class GroupService {
         });
         const body = JSON.stringify({group: group, user: user, questList: questList});
         const response = await this.httpService.post(url, body, headers).toPromise();
-        let cacheGroup: Group | undefined = await this.dataService.getCache(group);
+        let cacheGroup: Group | null = await this.dataService.getCache(group);
         if (cacheGroup) {
             questList.forEach((quest) => {
                 if (questList.filter((q) => q === quest).length)

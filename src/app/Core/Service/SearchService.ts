@@ -16,7 +16,7 @@ interface SearchResult {
   providedIn: 'root'
 })
 export class SearchService {
-  private userJoinList: UserJoinList | undefined = undefined;
+  private userJoinList: UserJoinList | null = null;
 
   constructor(private userService: UserService) {
     this.initializeData();

@@ -23,9 +23,9 @@ export class ActivityDashboardService {
     }
 
     async getQuestScore(): Promise<number[]> {
-        const userQuestPrev: UserQuestPrev | undefined = await this.userService.getUserQuestPrev();
-        const userQuestCur: UserQuestCur | undefined = await this.userService.getUserQuestCur();
-        const userQuestContinuous: UserQuestContinuous | undefined = await this.userService.getUserQuestContinuous();
+        const userQuestPrev: UserQuestPrev | null = await this.userService.getUserQuestPrev();
+        const userQuestCur: UserQuestCur | null = await this.userService.getUserQuestCur();
+        const userQuestContinuous: UserQuestContinuous | null = await this.userService.getUserQuestContinuous();
         let totalSuccess = 0;
 
         if (!(userQuestPrev && userQuestContinuous && userQuestCur)) {
@@ -59,7 +59,7 @@ export class ActivityDashboardService {
             {date: '금', completed: 0, target: 0},
             {date: '토', completed: 0, target: 0}
         ];
-        const userQuestPrev: UserQuestPrev | undefined = await this.userService.getUserQuestPrev();
+        const userQuestPrev: UserQuestPrev | null = await this.userService.getUserQuestPrev();
 
         if (!userQuestPrev)
             return successCount;
@@ -83,7 +83,7 @@ export class ActivityDashboardService {
             {day: '토', hours: 0, totalActivities: 0}
         ];
 
-        const weeklyQuestList: UserQuestWeekly | undefined = await this.userService.getUserQuestWeekly();
+        const weeklyQuestList: UserQuestWeekly | null = await this.userService.getUserQuestWeekly();
 
         if (!weeklyQuestList)
             return weeklyPattern;
@@ -101,7 +101,7 @@ export class ActivityDashboardService {
         ];
 
         const pattern = ["일", "월", "화", "수", "목", "금", "토"];
-        const weeklyPattern: UserQuestWeekly | undefined = await this.userService.getUserQuestWeekly();
+        const weeklyPattern: UserQuestWeekly | null = await this.userService.getUserQuestWeekly();
 
         if (!weeklyPattern)
             return successList;

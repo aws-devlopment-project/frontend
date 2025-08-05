@@ -1,4 +1,5 @@
 <div class="MenuWrapper">
+    <!-- 메뉴바 - 항상 표시 -->
     <aside class="menuBar">
         <div class="menuBarIcon" 
              (click)="setActiveTab('home')"
@@ -8,7 +9,7 @@
             <p>홈</p>
         </div>
         <div class="menuBarIcon" 
-             (click)="toggle(); setActiveTab('group')"
+             (click)="setActiveTab('group')"
              [class.active]="isActiveTab('group')"
              title="그룹">
             <mat-icon>group</mat-icon>
@@ -30,7 +31,10 @@
         </div>
     </aside>
     
-    <aside class="groupBar" [class.collapsed]="!isSidebarShown()">
+    <!-- 그룹바 - 그룹 탭에서만 표시되고, 토글 가능 -->
+    <aside class="groupBar" 
+           [class.collapsed]="!isGroupBarShown()"
+           [style.display]="isGroupTabActive() ? 'flex' : 'none'">
         <div class="workspace-header">
             <h2 class="workspace-name">워크스페이스</h2>
             <div class="workspace-status">

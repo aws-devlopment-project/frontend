@@ -1,47 +1,159 @@
 <div class="app-container">
-  <!-- 사이드바 -->
-  <app-sidebar 
-    (navigationChange)="onNavigationChange($event)"
-    (groupSelect)="onGroupSelect($event)"
-    (channelSelect)="onChannelSelect($event)">
-  </app-sidebar>
+  <!-- 로딩 상태 표시 -->
+  @if (shouldShowLoading()) {
+    <div class="page-placeholder">
+      <div class="loading-container">
+        <div class="loading-spinner"></div>
+        <h2>{{ getLoadingMessage() }}</h2>
+        <p>잠시만 기다려 주세요...</p>
+        
+        <!-- 디버그 정보 (개발 환경에서만) -->
+        @if (environment.production === false) {
+          <div class="debug-info">
+            <details>
+              <summary>디버그 정보</summary>
+              <pre>{{
+                {
+                  initialized: sharedState.initialized(),
+                  hasValidData: sharedState.hasValidData(),
+                  loadingState: sharedState.loadingState(),
+                  error: sharedState.error()
+                } | json
+              }}</pre>
+              <button (click)="debugState()" class="secondary-button">
+                콘솔에 상태 출력
+              </button>
+            </details>
+          </div>
+        }
+      </div>
+    </div>
+  }
 
-  <!-- 메인 콘텐츠 영역 -->
-  <div class="main-area">
-    <!-- 헤더 -->
-    <app-header
-      [showSearch]="true"
-      [currentPage]="sharedState.currentPageTitle()"
-      (searchQuery)="onSearchQuery($event)"
-      (notificationClick)="onNotificationClick()"
-      (helpClick)="onHelpClick()"
-      (profileClick)="onProfileClick()">
-    </app-header>
+  <!-- 에러 상태 표시 -->
+  @else if (shouldShowError()) {
+    <div class="page-placeholder">
+      <div class="error-container">
+        <div class="error-icon">⚠️</div>
+        <h2>문제가 발생했습니다</h2>
+        <p>{{ errorMessage() }}</p>
+        
+        <div class="error-actions">
+          <button (click)="refreshData()" class="primary-button">
+            다시 시도
+          </button>
+          <button (click)="clearError()" class="secondary-button">
+            오류 무시
+          </button>
+        </div>
+        
+        <!-- 상세한 에러 정보 (개발 환경에서만) -->
+        @if (environment.production === false) {
+          <details class="error-details">
+            <summary>상세 정보</summary>
+            <pre>{{ errorMessage() }}</pre>
+          </details>
+        }
+      </div>
+    </div>
+  }
 
-    <!-- 콘텐츠 영역 -->
-    <main class="content-area">
-      @switch (sharedState.activeTab()) {
-        @case ('home') {
-          <app-home-dashboard></app-home-dashboard>
-        }
-        @case ('group') {
-          @if (sharedState.isChannelSelected()) {
-            <app-main-container></app-main-container>
+  <!-- 정상 상태 - 메인 컨텐츠 -->
+  @else if (shouldShowContent()) {
+    <!-- 사이드바 - 메뉴바는 항상, 그룹바는 조건부 표시 -->
+    <app-sidebar 
+      (navigationChange)="onNavigationChange($event)"
+      (groupSelect)="onGroupSelect($event)"
+      (channelSelect)="onChannelSelect($event)">
+    </app-sidebar>
+
+    <!-- 메인 콘텐츠 영역 -->
+    <div class="main-area">
+      <!-- 헤더 -->
+      <app-header
+        [showSearch]="true"
+        [currentPage]="sharedState.currentPageTitle()"
+        (searchQuery)="onSearchQuery($event)"
+        (notificationClick)="onNotificationClick()"
+        (helpClick)="onHelpClick()"
+        (profileClick)="onProfileClick()">
+      </app-header>
+
+      <!-- 콘텐츠 영역 -->
+      <main class="content-area">
+        @switch (sharedState.activeTab()) {
+          @case ('home') {
+            <app-home-dashboard></app-home-dashboard>
           }
-          @else {
-            <app-group-dashboard></app-group-dashboard>
+          
+          @case ('group') {
+            @if (sharedState.isChannelSelected()) {
+              <!-- 채널 선택됨 - 채팅 인터페이스 표시 -->
+              <app-main-container></app-main-container>
+            }
+            @else if (sharedState.isGroupSelected()) {
+              <!-- 그룹 선택됨 - 그룹 대시보드 표시 -->
+              <app-group-dashboard></app-group-dashboard>
+            }
+            @else {
+              <!-- 그룹/채널 미선택 - 선택 안내 -->
+              <div class="page-placeholder">
+                <h2>그룹을 선택해 주세요</h2>
+                <p>왼쪽 사이드바에서 참여하고 싶은 그룹을 선택해 보세요.</p>
+                
+                @if (sharedState.availableGroups().length === 0) {
+                  <div class="empty-state">
+                    <p>아직 참여한 그룹이 없습니다.</p>
+                    <button class="primary-button" (click)="onNavigationChange('member')">
+                      그룹 찾아보기
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+          }
+          
+          @case ('activity') {
+            <app-activity-dashboard></app-activity-dashboard>
+          }
+          
+          @case ('member') {
+            <app-member-dashboard></app-member-dashboard>
+          }
+          
+          @default {
+            <!-- 알 수 없는 탭 - 홈으로 리다이렉트 -->
+            <div class="page-placeholder">
+              <h2>페이지를 찾을 수 없습니다</h2>
+              <p>요청하신 페이지를 찾을 수 없습니다.</p>
+              <button (click)="onNavigationChange('home')" class="primary-button">
+                홈으로 돌아가기
+              </button>
+            </div>
           }
         }
-        @case ('activity') {
-          <app-activity-dashboard></app-activity-dashboard>
-        }
-        @case ('member') {
-          <app-member-dashboard></app-member-dashboard>
-        }
-        @default {
-          <app-home-dashboard></app-home-dashboard>
-        }
-      }
-    </main>
-  </div>
+      </main>
+    </div>
+  }
+
+  <!-- 초기화되지 않은 상태 -->
+  @else {
+    <div class="page-placeholder">
+      <div class="initialization-container">
+        <div class="loading-spinner"></div>
+        <h2>애플리케이션을 시작하는 중...</h2>
+        <p>초기 설정을 진행하고 있습니다.</p>
+        
+        <!-- 초기화 타임아웃 시 재시도 옵션 -->
+        <div class="initialization-timeout" 
+             [style.display]="'none'"
+             #timeoutElement>
+          <p>초기화가 오래 걸리고 있습니다.</p>
+          <button (click)="refreshData()" class="secondary-button">
+            다시 시도
+          </button>
+        </div>
+      </div>
+    </div>
+  }
 </div>
