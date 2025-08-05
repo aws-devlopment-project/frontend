@@ -1,5 +1,4 @@
 import { Injectable } from "@angular/core";
-import { DebugService } from "../../Debug/DebugService";
 
 import { 
   fetchAuthSession, 
@@ -22,7 +21,7 @@ import {
     providedIn: 'platform',
 })
 export class LoginService {
-    constructor(private debugService: DebugService) {}
+    
     async signInUser(username: string, password: string) {
         try {
             const user = await signIn({username, password});
@@ -43,7 +42,7 @@ export class LoginService {
                 return {status: 400, username: '', accessToken: ''};
             }
         } catch (error: any) {
-            this.debugService.printConsole('로그인 오류:', error);
+            console.error('로그인 오류:', error);
             
             // 에러 타입별 처리
             if (error.name === 'UserNotFoundException') {
@@ -69,7 +68,7 @@ export class LoginService {
                 provider: "Google"
             });
         } catch (error: any) {
-            this.debugService.printConsole('Google 로그인 오류:', error);
+            console.error('Google 로그인 오류:', error);
             
             // 사용자 친화적 에러 메시지
             if (error.name === 'OAuthError') {
@@ -112,7 +111,7 @@ export class LoginService {
                 expiresAt: new Date(tokenPayload.exp * 1000)
             };
         } catch (error: any) {
-            this.debugService.printConsole('사용자 정보 가져오기 오류:', error);
+            console.error('사용자 정보 가져오기 오류:', error);
             throw error;
         }
     }
@@ -135,7 +134,7 @@ export class LoginService {
             
             return !isExpired;
         } catch (error) {
-            this.debugService.printConsole('인증 상태 확인 중 오류:', error);
+            console.log('인증 상태 확인 중 오류:', error);
             return false;
         }
     }
@@ -158,10 +157,10 @@ export class LoginService {
                 },
             });
             
-            this.debugService.printConsole("회원가입 결과:", { isSignUpComplete, userId, nextStep });
+            console.log("회원가입 결과:", { isSignUpComplete, userId, nextStep });
             return { success: true, userId, nextStep };
         } catch (error: any) {
-            this.debugService.printConsole('회원가입 오류:', error);
+            console.error('회원가입 오류:', error);
             
             if (error.name === 'UsernameExistsException') {
                 throw new Error('이미 존재하는 이메일입니다.');
@@ -182,10 +181,10 @@ export class LoginService {
                 confirmationCode 
             });
             
-            this.debugService.printConsole('이메일 인증 완료:', { isSignUpComplete, userId, nextStep });
+            console.log('이메일 인증 완료:', { isSignUpComplete, userId, nextStep });
             return { status: 200, username: username, isSignUpComplete };
         } catch (error: any) {
-            this.debugService.printConsole('이메일 인증 오류:', error);
+            console.error('이메일 인증 오류:', error);
             
             if (error.name === 'CodeMismatchException') {
                 throw new Error('인증 코드가 올바르지 않습니다.');
@@ -206,7 +205,7 @@ export class LoginService {
             this.clearLocalData();
             return { success: true };
         } catch (error: any) {
-            this.debugService.printConsole('로그아웃 오류:', error);
+            console.error('로그아웃 오류:', error);
             throw new Error('로그아웃 중 오류가 발생했습니다.');
         }
     }
@@ -214,10 +213,10 @@ export class LoginService {
     async requestPassswordReset(username: string): Promise<ResetPasswordOutput> {
         try {
             const result = await resetPassword({ username });
-            this.debugService.printConsole('비밀번호 재설정 코드 전송:', result.nextStep);
+            console.log('비밀번호 재설정 코드 전송:', result.nextStep);
             return result;
         } catch (error: any) {
-            this.debugService.printConsole('비밀번호 재설정 요청 실패:', error);
+            console.error('비밀번호 재설정 요청 실패:', error);
             
             if (error.name === 'UserNotFoundException') {
                 throw new Error('등록되지 않은 이메일입니다.');
@@ -247,7 +246,7 @@ export class LoginService {
             };
             await confirmResetPassword(input);
         } catch (error: any) {
-            this.debugService.printConsole('비밀번호 재설정 확인 실패:', error);
+            console.error('비밀번호 재설정 확인 실패:', error);
             
             if (error.name === 'CodeMismatchException') {
                 throw new Error('인증 코드가 올바르지 않습니다.');
@@ -281,7 +280,7 @@ export class LoginService {
             const session = await fetchAuthSession();
             return session.tokens?.accessToken?.toString() || null;
         } catch (error) {
-            this.debugService.printConsole('토큰 가져오기 실패:', error);
+            console.error('토큰 가져오기 실패:', error);
             return null;
         }
     }
@@ -291,7 +290,7 @@ export class LoginService {
             await deleteUser();
             await this.clearLocalData();
 
-            this.debugService.printConsole('사용자 삭제 완료');
+            console.log('사용자 삭제 완료');
 
             return {
                 success: true,
@@ -299,7 +298,7 @@ export class LoginService {
             };
 
         } catch (error: any) {
-            this.debugService.printConsole('사용자 삭제 실패:', error);
+            console.error('사용자 삭제 실패:', error);
             
             if (error.name === 'NotAuthorizedException') {
                 return {
@@ -355,9 +354,9 @@ export class LoginService {
                 });
             });
 
-            this.debugService.printConsole('로컬 데이터 정리 완료');
+            console.log('로컬 데이터 정리 완료');
         } catch (error) {
-            this.debugService.printConsole('로컬 데이터 정리 실패:', error);
+            console.error('로컬 데이터 정리 실패:', error);
         }
     }
 
@@ -376,7 +375,7 @@ export class LoginService {
             }
             return isAuthenticated;
         } catch (error) {
-            this.debugService.printConsole('OAuth 리다이렉트 처리 오류:', error);
+            console.error('OAuth 리다이렉트 처리 오류:', error);
             return false;
         }
     }

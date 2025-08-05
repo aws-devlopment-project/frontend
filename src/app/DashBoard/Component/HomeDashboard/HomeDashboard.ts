@@ -4,7 +4,6 @@ import { MatIconModule } from "@angular/material/icon";
 import { SharedStateService } from "../../../Core/Service/SharedService";
 import { HomeDashboardService } from "../../Service/HomeDashboard";
 import { Router } from "@angular/router";
-import { DebugService } from "../../../Debug/DebugService";
 
 interface QuickStat {
   id: string;
@@ -196,7 +195,7 @@ export class HomeDashboardComponent implements OnInit {
     }
   ]);
 
-  constructor(public sharedState: SharedStateService, private router: Router, private homeDashboardService:HomeDashboardService, private debugService: DebugService) {
+  constructor(public sharedState: SharedStateService, private router: Router, private homeDashboardService:HomeDashboardService) {
   }
 
   async ngOnInit(): Promise<void> {
@@ -207,9 +206,9 @@ export class HomeDashboardComponent implements OnInit {
     // 사용자 정보가 로드되지 않았다면 로딩 상태 확인
     this.quickStats.set(await this.homeDashboardService.getTodayBoard());
     this.recommendedChallenges.set(await this.homeDashboardService.getRecommendedChallenge());
-    this.debugService.printConsole(this.recommendedChallenges);
+    console.log(this.recommendedChallenges);
     if (!this.sharedState.currentUser()) {
-      this.debugService.printConsole('User not loaded yet, waiting for user data...');
+      console.log('User not loaded yet, waiting for user data...');
     }
   }
 
@@ -254,7 +253,7 @@ export class HomeDashboardComponent implements OnInit {
   }
 
   onQuickAction(action: QuickAction): void {
-    this.debugService.printConsole('Quick action clicked:', action.route);
+    console.log('Quick action clicked:', action.route);
     
     // SharedState를 통한 네비게이션
     switch (action.route) {
@@ -271,25 +270,25 @@ export class HomeDashboardComponent implements OnInit {
         this.sharedState.setActiveTab('activity');
         break;
       default:
-        this.debugService.printConsole('Unknown route:', action.route);
+        console.log('Unknown route:', action.route);
     }
   }
 
   onJoinChallenge(challenge: RecommendedChallenge): void {
-    this.debugService.printConsole('Join challenge:', challenge.id);
+    console.log('Join challenge:', challenge.id);
     this.sharedState.setSelectedGroup(challenge.category);
     this.sharedState.setSelectedChannel(null);
     this.sharedState.setActiveTab('group');
   }
 
   onViewAllChallenges(): void {
-    this.debugService.printConsole('View all challenges');
+    console.log('View all challenges');
     // 전체 챌린지 페이지로 이동
     this.sharedState.setActiveTab('group');
   }
 
   onViewAllHighlights(): void {
-    this.debugService.printConsole('View all highlights');
+    console.log('View all highlights');
     // 전체 활동 피드 페이지로 이동
     this.sharedState.setActiveTab('activity');
   }

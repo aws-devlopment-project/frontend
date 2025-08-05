@@ -5,7 +5,6 @@ import { CommonModule } from "@angular/common";
 import { SharedStateService } from "../../Service/SharedService";
 import { Router } from "@angular/router";
 import { UserService } from "../../Service/UserService";
-import { DebugService } from "../../../Debug/DebugService";
 
 @Component({
     selector: 'app-sidebar',
@@ -23,19 +22,18 @@ export class SideBarComponent implements OnInit {
     constructor(
         public sharedState: SharedStateService, 
         private userService: UserService, 
-        private router: Router,
-        private debugService: DebugService
+        private router: Router
     ) {
-        this.debugService.printConsole('SideBarComponent initialized with SharedStateService');
+        console.log('SideBarComponent initialized with SharedStateService');
     }
 
     async ngOnInit(): Promise<void> {
         try {
             // 컴포넌트 초기화 시 사용자 가입 목록 로드
             this.userJoinList = await this.userService.getUserJoinList();
-            this.debugService.printConsole('User join list loaded:', this.userJoinList);
+            console.log('User join list loaded:', this.userJoinList);
         } catch (error) {
-            this.debugService.printConsole('Error loading user join list:', error);
+            console.error('Error loading user join list:', error);
         }
     }
 
@@ -99,13 +97,13 @@ export class SideBarComponent implements OnInit {
             }
         }
         
-        this.debugService.printConsole('Channel not found in any group:', channelId);
+        console.log('Channel not found in any group:', channelId);
         return null;
     }
 
     // === Utility Actions ===
     browseChannels(): void {
-        this.debugService.printConsole('Browsing channels...');
+        console.log('Browsing channels...');
         this.router.navigate(['group/join']);
     }
 
@@ -113,9 +111,9 @@ export class SideBarComponent implements OnInit {
     async refreshUserJoinList(): Promise<void> {
         try {
             this.userJoinList = await this.userService.getUserJoinList();
-            this.debugService.printConsole('User join list refreshed:', this.userJoinList);
+            console.log('User join list refreshed:', this.userJoinList);
         } catch (error) {
-            this.debugService.printConsole('Error refreshing user join list:', error);
+            console.error('Error refreshing user join list:', error);
         }
     }
 

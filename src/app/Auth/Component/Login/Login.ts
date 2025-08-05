@@ -4,8 +4,6 @@ import { Router } from "@angular/router";
 import { LoginService } from "../../Service/LoginService";
 import { DataCacheService } from "../../../Core/Service/DataCacheService";
 import { UserCredentials, UserStatus } from "../../../Core/Models/user";
-import { DebugService } from "../../../Debug/DebugService";
-import { debug } from "console";
 
 @Component({
     selector: 'app-auth-login',
@@ -28,8 +26,7 @@ export class LoginComponent implements OnInit {
         private fb: FormBuilder, 
         private auth: LoginService, 
         private router: Router,
-        private cacheService: DataCacheService,
-        private debugService: DebugService
+        private cacheService: DataCacheService
     ) {}
 
     ngOnInit(): void {
@@ -53,7 +50,7 @@ export class LoginComponent implements OnInit {
             this.isLoading.update(() => true);
             await this.auth.signInWithGoogle();
         } catch (error) {
-            this.debugService.printConsole('Google 로그인 오류:', error);
+            console.error('Google 로그인 오류:', error);
             this.handleError(error);
         } finally {
             this.isLoading.update(() => false);
@@ -88,7 +85,7 @@ export class LoginComponent implements OnInit {
             await this.router.navigate(['/board']);
             }
         } catch (error) {
-            this.debugService.printConsole('인증 상태 확인 오류:', error);
+            console.error('인증 상태 확인 오류:', error);
         }
     }
 
@@ -118,10 +115,10 @@ export class LoginComponent implements OnInit {
                     await this.handleVerification();
                     break;
                 default:
-                    this.debugService.printConsole('Unknown form submitted:', formId);
+                    console.warn('Unknown form submitted:', formId);
             }
         } catch (error) {
-            this.debugService.printConsole('Form submission error:', error);
+            console.error('Form submission error:', error);
             this.handleError(error);
         } finally {
             this.isLoading.update(() => false);
@@ -219,12 +216,12 @@ export class LoginComponent implements OnInit {
         try {
             this.isLoading.update(() => true);
             const result = await this.auth.requestPassswordReset(email);
-            this.debugService.printConsole("비밀번호 재설정 요청 완료:", result);
+            console.log("비밀번호 재설정 요청 완료:", result);
             
             // 사용자에게 이메일 확인 안내
             alert('비밀번호 재설정 링크가 이메일로 전송되었습니다.');
         } catch (error: any) {
-            this.debugService.printConsole('비밀번호 재설정 오류:', error);
+            console.error('비밀번호 재설정 오류:', error);
             this.errMsg = '비밀번호 재설정 요청 중 오류가 발생했습니다.';
         } finally {
             this.isLoading.update(() => false);

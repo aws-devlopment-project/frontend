@@ -4,7 +4,6 @@ import { SearchBarComponent } from "../SearchBar/SearchBar";
 import { MatIconModule } from "@angular/material/icon";
 import { CommonModule } from "@angular/common";
 import { SharedStateService } from "../../Service/SharedService";
-import { DebugService } from "../../../Debug/DebugService";
 
 interface SearchResult {
   id: string;
@@ -30,17 +29,17 @@ export class HeaderBarComponent {
     // 출력 이벤트
     searchQuery = output<string>();
 
-    constructor(public sharedState: SharedStateService, private debugService: DebugService) {
-        this.debugService.printConsole('HeaderBarComponent initialized with SharedStateService');
+    constructor(public sharedState: SharedStateService) {
+        console.log('HeaderBarComponent initialized with SharedStateService');
     }
 
     onSearchQuery(query: string): void {
-        this.debugService.printConsole('Search query received:', query, typeof query);
+        console.log('Search query received:', query, typeof query);
         this.searchQuery.emit(query);
     }
 
     onSearchQueryResultSelected(result: SearchResult): void {
-        this.debugService.printConsole('Search result selected:', result);
+        console.log('Search result selected:', result);
         // 일반적인 검색 결과 처리 (필요시)
     }
 
@@ -51,7 +50,7 @@ export class HeaderBarComponent {
 
     // 네비게이션 메서드들
     navigateToGroup(groupName: string): void {
-        this.debugService.printConsole('Navigating to group from search:', groupName);
+        console.log('Navigating to group from search:', groupName);
         
         // 1. 그룹 탭으로 변경
         this.sharedState.setActiveTab('group');
@@ -72,7 +71,7 @@ export class HeaderBarComponent {
     }
 
     navigateToChannel(groupName: string, channelName: string): void {
-        this.debugService.printConsole('Navigating to channel from search:', { groupName, channelName });
+        console.log('Navigating to channel from search:', { groupName, channelName });
         
         // 1. 그룹 탭으로 변경
         this.sharedState.setActiveTab('group');

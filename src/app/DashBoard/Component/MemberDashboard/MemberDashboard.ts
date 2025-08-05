@@ -5,7 +5,6 @@ import { FormsModule } from "@angular/forms";
 import { RouterLink } from "@angular/router";
 import { ManagementDashboardService } from "../../Service/ManagementDashboard";
 import { UserJoinList } from "../../../Core/Models/user";
-import { DebugService } from "../../../Debug/DebugService";
 
 interface UserProfile {
   username: string;
@@ -109,7 +108,7 @@ export class MemberOptionsComponent implements OnInit {
     { id: 'account', label: '계정 관리', icon: 'account_circle', description: '비밀번호 변경 및 계정 탈퇴' }
   ];
 
-  constructor(private managementDashboardService: ManagementDashboardService, private debugService: DebugService) {}
+  constructor(private managementDashboardService: ManagementDashboardService) {}
 
   async ngOnInit(): Promise<void> {
     await this.loadUserData();
@@ -126,10 +125,10 @@ export class MemberOptionsComponent implements OnInit {
     this.groupsLoading.set(true);
     try {
       const groupList = await this.managementDashboardService.getGroupList();
-      this.debugService.printConsole("management: ", groupList);
+      console.log("management: ", groupList);
       this.joinedGroups.set(groupList?.joinList);
     } catch (error) {
-      this.debugService.printConsole('그룹 데이터 로드 실패:', error);
+      console.error('그룹 데이터 로드 실패:', error);
       this.joinedGroups.set(undefined);
     } finally {
       this.groupsLoading.set(false);
@@ -162,7 +161,7 @@ export class MemberOptionsComponent implements OnInit {
       this.showAvatarSelector.set(false);
       this.showSuccessMessage('아바타가 성공적으로 변경되었습니다.');
     } catch (error) {
-      this.debugService.printConsole('아바타 변경 실패:', error);
+      console.error('아바타 변경 실패:', error);
       this.showSuccessMessage('아바타 변경에 실패했습니다.');
     } finally {
       this.isLoading.set(false);
@@ -177,7 +176,7 @@ export class MemberOptionsComponent implements OnInit {
       await this.managementDashboardService.setUsername(this.userProfile().username);
       this.showSuccessMessage('프로필이 성공적으로 업데이트되었습니다.');
     } catch (error) {
-      this.debugService.printConsole('프로필 업데이트 실패:', error);
+      console.error('프로필 업데이트 실패:', error);
       this.showSuccessMessage('프로필 업데이트에 실패했습니다.');
     } finally {
       this.isLoading.set(false);
@@ -194,14 +193,14 @@ export class MemberOptionsComponent implements OnInit {
     if (confirm('정말로 이 그룹에서 탈퇴하시겠습니까? 그룹 내 모든 채널에서도 탈퇴됩니다.')) {
       try {
         // 실제 탈퇴 로직 수행
-        this,this.debugService.printConsole('그룹 탈퇴:', groupId);
+        console.log('그룹 탈퇴:', groupId);
         await this.managementDashboardService.leaveGroup(groupId);
         
         // 탈퇴 후 그룹 목록 새로고침
         await this.loadJoinedGroups();
         this.showSuccessMessage('그룹에서 탈퇴되었습니다.');
       } catch (error) {
-        this.debugService.printConsole('그룹 탈퇴 실패:', error);
+        console.error('그룹 탈퇴 실패:', error);
         this.showSuccessMessage('그룹 탈퇴에 실패했습니다.');
       }
     }
@@ -217,7 +216,7 @@ export class MemberOptionsComponent implements OnInit {
         await this.loadJoinedGroups();
         this.showSuccessMessage(`"${channelId}" 채널에서 탈퇴되었습니다.`);
       } catch (error) {
-        this.debugService.printConsole('채널 탈퇴 실패:', error);
+        console.error('채널 탈퇴 실패:', error);
         this.showSuccessMessage('채널 탈퇴에 실패했습니다.');
       }
     }

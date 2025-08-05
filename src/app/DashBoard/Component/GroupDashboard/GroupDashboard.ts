@@ -6,7 +6,6 @@ import { GroupDashboardService } from "../../Service/GroupDashboard";
 import { Quest, Stat } from "../../Models/GroupDashboardModels";
 import { SharedStateService } from "../../../Core/Service/SharedService";
 import { UserService } from "../../../Core/Service/UserService";
-import { DebugService } from "../../../Debug/DebugService";
 
 @Component({
   selector: 'app-group-dashboard',
@@ -35,8 +34,7 @@ export class GroupDashboardComponent implements OnInit {
     private groupDashboardService: GroupDashboardService,
     private shared: SharedStateService,
     private router: Router,
-    private userService: UserService,
-    private debugService: DebugService,
+    private userService: UserService
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -49,25 +47,25 @@ export class GroupDashboardComponent implements OnInit {
     let selectedGroup = this.shared.selectedGroup();
     
     if (!selectedGroup) {
-      this.debugService.printConsole('선택된 그룹이 없음. 자동 선택 시도...');
+      console.log('선택된 그룹이 없음. 자동 선택 시도...');
       
       // 1. localStorage에서 참여한 그룹 확인
       const joinedGroups = await this.getJoinedGroups();
       if (joinedGroups.length > 0) {
         // 첫 번째 그룹 자동 선택
         const firstGroup = joinedGroups[0];
-        this.debugService.printConsole('자동 그룹 선택:', firstGroup);
+        console.log('자동 그룹 선택:', firstGroup);
         
         this.shared.setSelectedGroup(firstGroup);
       } else {
         // 참여한 그룹이 없으면 그룹 참여 페이지로 리다이렉트
-        this.debugService.printConsole('참여한 그룹이 없음. 그룹 참여 페이지로 이동');
+        console.log('참여한 그룹이 없음. 그룹 참여 페이지로 이동');
         this.navigateToGroupJoin();
         return;
       }
     }
     
-    this.debugService.printConsole('최종 선택된 그룹:', selectedGroup);
+    console.log('최종 선택된 그룹:', selectedGroup);
   }
 
   private async getJoinedGroups(): Promise<string[]> {
@@ -76,13 +74,13 @@ export class GroupDashboardComponent implements OnInit {
       const joinedGroups = userJoinList ? userJoinList.joinList.map(join => join.groupname) : [];
       return joinedGroups ? joinedGroups : [];
     } catch (error) {
-      this.debugService.printConsole('참여 그룹 조회 실패:', error);
+      console.error('참여 그룹 조회 실패:', error);
       return [];
     }
   }
 
   private navigateToGroupJoin(): void {
-    this.debugService.printConsole('그룹 참여 페이지로 이동');
+    console.log('그룹 참여 페이지로 이동');
     this.router.navigate(['/group/join']);
   }
 
@@ -97,7 +95,7 @@ export class GroupDashboardComponent implements OnInit {
         throw new Error('선택된 그룹이 없습니다.');
       }
 
-      this.debugService.printConsole('그룹 데이터 로딩 시작:', selectedGroup);
+      console.log('그룹 데이터 로딩 시작:', selectedGroup);
 
       const group = await this.groupDashboardService.getGroupData(selectedGroup);
       
@@ -110,7 +108,7 @@ export class GroupDashboardComponent implements OnInit {
       this.quests.set(this.groupDashboardService.processingQuest(group));
       this.stats.set(this.groupDashboardService.processingStat(group));
 
-      this.debugService.printConsole('그룹 데이터 로딩 완료:', {
+      console.log('그룹 데이터 로딩 완료:', {
         title: this.title(),
         questsCount: this.quests().length,
         statsCount: this.stats().length
@@ -120,7 +118,7 @@ export class GroupDashboardComponent implements OnInit {
       setTimeout(() => this.animateProgress(), 500);
 
     } catch (error) {
-      this.debugService.printConsole('그룹 데이터 로딩 실패:', error);
+      console.error('그룹 데이터 로딩 실패:', error);
       this.error.set(error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.');
     } finally {
       this.isLoading.set(false);
@@ -197,7 +195,7 @@ export class GroupDashboardComponent implements OnInit {
     // 통계 업데이트
     this.updateStats();
     
-    this.debugService.printConsole(`Quest ${questId} completed!`);
+    console.log(`Quest ${questId} completed!`);
   }
 
   // === 상태 관련 메서드 ===
