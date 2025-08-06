@@ -3,12 +3,6 @@
   <div class="join-header">
     <h1>그룹에 참여해보세요! 🎯</h1>
     <p>관심 있는 그룹을 선택하고 원하는 채널에 참여해서 활동을 시작해보세요</p>
-    
-    <!-- 뒤로가기 버튼 (우상단) -->
-    <button class="back-to-main-btn" (click)="goBackToMain()" title="메인으로 돌아가기">
-      <mat-icon>arrow_back</mat-icon>
-      {{ getBackButtonText() }}
-    </button>
   </div>
 
   <!-- 단계 표시기 -->
@@ -31,13 +25,6 @@
   @if (isStep(1)) {
     <div class="step-content">
       <h2>관심 있는 그룹을 선택하세요</h2>
-      <p class="step-subtitle">
-        @if (getCurrentUserInfo().hasGroups) {
-          추가로 참여할 그룹을 선택해보세요
-        } @else {
-          첫 번째 그룹을 선택해보세요
-        }
-      </p>
       
       <div class="groups-grid">
         @for (group of availableGroups(); track group.name) {
@@ -51,9 +38,7 @@
                 <h3>{{ group.name }}</h3>
                 <div class="group-stats">
                   <span>👥 {{ group.memberCount }}명</span>
-                  @if (group.activeToday) {
-                    <span>🔥 오늘 {{ group.activeToday }}명 활동</span>
-                  }
+                  <span>🔥 오늘 {{ group.activeToday }}명 활동</span>
                 </div>
               </div>
             </div>
@@ -67,12 +52,8 @@
             </div>
             
             <div class="group-metrics">
-              @if (group.achievementRate) {
-                <span class="metric">📈 달성률 {{ group.achievementRate }}%</span>
-              }
-              @if (group.rating) {
-                <span class="metric">⭐ 평점 {{ group.rating }}</span>
-              }
+              <span class="metric">📈 달성률 {{ group.achievementRate }}%</span>
+              <span class="metric">⭐ 평점 {{ group.rating }}</span>
             </div>
           </div>
         }
@@ -117,9 +98,7 @@
               <div class="channel-icon">{{ channel.icon }}</div>
               <div class="channel-info">
                 <h4>{{ channel.name }}</h4>
-                @if (channel.activity) {
-                  <div class="channel-activity">{{ channel.activity }}</div>
-                }
+                <div class="channel-activity">{{ channel.activity }}</div>
               </div>
             </div>
             
@@ -177,7 +156,7 @@
       <div class="action-buttons">
         <button class="btn btn-primary btn-large" (click)="goToDashboard()">
           <mat-icon>dashboard</mat-icon>
-          {{ getCompletionButtonText() }}
+          대시보드로 이동
         </button>
       </div>
     </div>
