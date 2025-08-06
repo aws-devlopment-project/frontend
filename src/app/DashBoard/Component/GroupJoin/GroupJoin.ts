@@ -6,6 +6,7 @@ import { SharedStateService } from "../../../Core/Service/SharedService";
 import { GroupService } from "../../../Core/Service/GroupService";
 import { UserService } from "../../../Core/Service/UserService";
 import { matchingGroup } from "../../../../environments/environtment";
+import { group } from "console";
 
 interface GroupInfo {
   name: string;
@@ -57,18 +58,18 @@ export class GroupJoinComponent implements OnInit {
   }
 
   private async loadAvailableGroups(): Promise<void> {
-    const groups: string[] | null = await this.groupService.getGroupList();
+    let groups: string[] | null = await this.groupService.getGroupList();
     let viewGroups: GroupInfo[] = [];
     if (groups) {
       groups.forEach(async (group: string, index: number) => {
         let info = await this.groupService.getGroupInfo(group);
-        console.log(info);
         if (info) {
           viewGroups.push({
             name: info.name,
             description: info.description ? info.description : '',
             emoji: info.icon? info.icon : '👥',
             memberCount: info.memberNum,
+            activeToday: info.questSuccessNum ? Math.max(...info.questSuccessNum) : 0,
             tags: info.tag
           });
         } else {

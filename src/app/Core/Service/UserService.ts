@@ -288,7 +288,7 @@ export class UserService {
             }));
 
             const url = `${environment.apiUrl}/api/user/setUserQuestRecord`;
-            const body = { user: id, quest: uq };
+            const body = { user: id, group: group, quest: userQuest };
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
             await firstValueFrom(
