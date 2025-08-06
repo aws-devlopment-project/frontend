@@ -709,3 +709,230 @@
     color: #fbd38d;
   }
 }
+
+/* 버튼 호버 효과 개선 */
+.primary-button, .secondary-button {
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.primary-button:before,
+.secondary-button:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s;
+}
+
+.primary-button:hover:before,
+.secondary-button:hover:before {
+  left: 100%;
+}
+
+/* 스크롤바 스타일링 개선 */
+.debug-info pre::-webkit-scrollbar,
+.error-details pre::-webkit-scrollbar {
+  width: 6px;
+}
+
+.debug-info pre::-webkit-scrollbar-thumb,
+.error-details pre::-webkit-scrollbar-thumb {
+  background-color: rgba(49, 130, 206, 0.3);
+  border-radius: 3px;
+}
+
+.debug-info pre::-webkit-scrollbar-thumb:hover,
+.error-details pre::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(49, 130, 206, 0.5);
+}
+
+.new-user-welcome {
+  text-align: center;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.welcome-icon {
+  font-size: 80px;
+  margin-bottom: 24px;
+  animation: bounce 2s infinite;
+}
+
+.welcome-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 24px;
+  margin: 40px 0;
+}
+
+.feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: transform 0.3s ease;
+}
+
+.feature-item:hover {
+  transform: translateY(-4px);
+}
+
+.feature-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.feature-text {
+  text-align: left;
+}
+
+.feature-text h4 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #2d3748;
+  margin: 0 0 8px 0;
+}
+
+.feature-text p {
+  font-size: 14px;
+  color: #718096;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.empty-state-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 32px;
+}
+
+.btn-large {
+  padding: 16px 32px;
+  font-size: 16px;
+  min-width: 200px;
+}
+
+.debug-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+/* 반응형 개선 */
+@media (max-width: 768px) {
+  .welcome-features {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin: 32px 0;
+  }
+  
+  .feature-item {
+    padding: 20px;
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+  }
+  
+  .feature-text {
+    text-align: center;
+  }
+  
+  .empty-state-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .btn-large {
+    width: 100%;
+    max-width: 280px;
+  }
+  
+  .debug-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .debug-actions .secondary-button {
+    width: 100%;
+    max-width: 200px;
+  }
+}
+
+@media (max-width: 480px) {
+  .welcome-icon {
+    font-size: 60px;
+    margin-bottom: 20px;
+  }
+  
+  .new-user-welcome h2 {
+    font-size: 24px;
+  }
+  
+  .new-user-welcome p {
+    font-size: 14px;
+  }
+  
+  .feature-item {
+    padding: 16px;
+  }
+  
+  .feature-icon {
+    font-size: 28px;
+  }
+  
+  .feature-text h4 {
+    font-size: 15px;
+  }
+  
+  .feature-text p {
+    font-size: 13px;
+  }
+}
+
+/* 애니메이션 */
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-10px);
+  }
+  60% {
+    transform: translateY(-5px);
+  }
+}
+
+.new-user-welcome {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.feature-item {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.feature-item:nth-child(1) { animation-delay: 0.1s; }
+.feature-item:nth-child(2) { animation-delay: 0.2s; }
+.feature-item:nth-child(3) { animation-delay: 0.3s; }

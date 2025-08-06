@@ -6,7 +6,6 @@ export interface UserCredentials {
 
 export interface UserJoinList {
     id: string,
-    name: string,
     joinList: {
         groupname: string,
         clubList: string[],

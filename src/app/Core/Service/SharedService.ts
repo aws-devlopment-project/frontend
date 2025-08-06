@@ -1,8 +1,15 @@
+// SharedService.ts - 개선된 버전 (동적 그룹/채널 추가 지원)
 import { Injectable, signal, computed, effect } from '@angular/core';
 import { Router } from '@angular/router';
 import { UserStatus, UserJoinList } from '../Models/user';
 import { ChatMessage } from '../../Channel/Models/chatMessage';
 import { UserService } from './UserService';
+
+// 타입 정의
+type JoinListItem = {
+  groupname: string;
+  clubList: string[];
+};
 
 export interface LoadingState {
   user: boolean;
@@ -105,7 +112,9 @@ export class SharedStateService {
     }
   });
 
-  readonly shouldShowSidebar = computed(() => true);
+  readonly shouldShowSidebar = computed(() => 
+    true // 메뉴바는 항상 표시
+  );
 
   readonly shouldShowGroupBar = computed(() => 
     this.activeTab() === 'group' && this.sidebarExpanded()
@@ -129,16 +138,20 @@ export class SharedStateService {
     return this.initialized() && this.currentUser() !== null && this.userJoinList() !== null;
   });
 
+  // 새로 추가: 빈 목록인지 확인
+  readonly hasJoinedGroups = computed(() => {
+    const joinList = this.userJoinList();
+    return joinList ? joinList.joinList.length > 0 : false;
+  });
+
   // === Constructor ===
-  constructor(private userService: UserService, private router: Router) {
-    // 초기화 효과
+  constructor(private userService: UserService) {
     effect(() => {
       if (!this.initialized()) {
         this.initializeUserData();
       }
     });
 
-    // 에러 상태 모니터링
     effect(() => {
       const error = this.error();
       if (error) {
@@ -176,17 +189,29 @@ export class SharedStateService {
         this.setError('사용자 정보를 불러올 수 없습니다.');
       }
 
-      // 가입 목록 처리
-      if (joinList.status === 'fulfilled' && joinList.value) {
-        this._userJoinList.set(joinList.value);
-        console.log('User join list loaded:', joinList.value);
+      // 가입 목록 처리 - 빈 목록도 허용
+      if (joinList.status === 'fulfilled') {
+        const joinListData = joinList.value || { id: '', joinList: [] };
+        this._userJoinList.set(joinListData);
+        
+        // 가입한 그룹이 있는 경우에만 기본 선택 설정
+        if (joinListData.joinList.length > 0) {
+          this.initializeDefaultSelections(joinListData);
+        } else {
+          console.log('User has no joined groups - skipping default selections');
+        }
       } else if (joinList.status === 'rejected') {
         console.error('Failed to load user join list:', joinList.reason);
-        this.setError('가입 목록을 불러올 수 없습니다.');
+        // 빈 목록으로 초기화 (에러로 처리하지 않음)
+        this._userJoinList.set({ id: '', joinList: [] });
+        console.log('Initialized with empty join list due to error');
       }
 
       this._initialized.set(true);
-      console.log('SharedStateService initialized successfully');
+      console.log('SharedStateService initialized successfully', {
+        hasUser: !!this.currentUser(),
+        hasJoinedGroups: this.hasJoinedGroups()
+      });
 
     } catch (error) {
       console.error('Error initializing SharedStateService:', error);
@@ -404,7 +429,209 @@ export class SharedStateService {
     }
   }
 
-  // === 기존 메서드들 유지 ===
+  // === 새로 추가: 그룹/채널 동적 추가 메서드들 ===
+  
+  /**
+   * 새로운 그룹을 사용자 가입 목록에 추가
+   */
+  addUserGroup(groupName: string): void {
+    const currentJoinList = this._userJoinList();
+    
+    if (!currentJoinList) {
+      console.error('Cannot add group - no join list initialized');
+      return;
+    }
+
+    // 이미 존재하는 그룹인지 확인
+    const existingGroup = currentJoinList.joinList.find(item => item.groupname === groupName);
+    if (existingGroup) {
+      console.log('Group already exists in join list:', groupName);
+      return;
+    }
+
+    // 새 그룹 추가
+    const newGroupItem: JoinListItem = {
+      groupname: groupName,
+      clubList: []
+    };
+
+    const updatedJoinList: UserJoinList = {
+      ...currentJoinList,
+      joinList: [...currentJoinList.joinList, newGroupItem]
+    };
+
+    this._userJoinList.set(updatedJoinList);
+    
+    // 확장된 섹션에 추가
+    this._expandedSections.update(sections => [...sections, groupName]);
+    
+    console.log('Group added to join list:', groupName);
+
+    // 첫 번째 그룹이라면 자동 선택 (그룹 탭에서)
+    if (currentJoinList.joinList.length === 0 && this.activeTab() === 'group') {
+      this.setSelectedGroup(groupName);
+    }
+  }
+
+  /**
+   * 그룹에 새로운 채널들을 추가
+   */
+  addUserChannels(groupName: string, channelNames: string[]): void {
+    const currentJoinList = this._userJoinList();
+    
+    if (!currentJoinList) {
+      console.error('Cannot add channels - no join list initialized');
+      return;
+    }
+
+    const groupIndex = currentJoinList.joinList.findIndex(item => item.groupname === groupName);
+    if (groupIndex === -1) {
+      console.error('Cannot add channels - group not found:', groupName);
+      return;
+    }
+
+    const updatedJoinList = { ...currentJoinList };
+    const targetGroup = { ...updatedJoinList.joinList[groupIndex] };
+    
+    // 중복 제거하여 채널 추가
+    const existingChannels = new Set(targetGroup.clubList);
+    const newChannels = channelNames.filter(channel => !existingChannels.has(channel));
+    
+    if (newChannels.length === 0) {
+      console.log('No new channels to add for group:', groupName);
+      return;
+    }
+
+    targetGroup.clubList = [...targetGroup.clubList, ...newChannels];
+    updatedJoinList.joinList[groupIndex] = targetGroup;
+    
+    this._userJoinList.set(updatedJoinList);
+    
+    console.log('Channels added to group:', { groupName, newChannels });
+
+    // 첫 번째 채널이라면 자동 선택 (그룹이 현재 선택된 상태에서)
+    if (targetGroup.clubList.length === newChannels.length && 
+        this.selectedGroup() === groupName && 
+        !this.selectedChannel()) {
+      this.setSelectedChannel(newChannels[0], groupName);
+    }
+  }
+
+  /**
+   * 그룹과 채널을 한번에 추가 (GroupJoin에서 사용)
+   */
+  addUserGroupWithChannels(groupName: string, channelNames: string[]): void {
+    console.log('Adding group with channels:', { groupName, channelNames });
+    
+    const currentJoinList = this._userJoinList();
+    
+    if (!currentJoinList) {
+      console.error('Cannot add group with channels - no join list initialized');
+      return;
+    }
+
+    // 그룹이 이미 존재하는지 확인
+    const existingGroupIndex = currentJoinList.joinList.findIndex(item => item.groupname === groupName);
+    
+    if (existingGroupIndex !== -1) {
+      // 기존 그룹에 채널만 추가
+      this.addUserChannels(groupName, channelNames);
+    } else {
+      // 새 그룹을 채널과 함께 추가
+      const newGroupItem: JoinListItem = {
+        groupname: groupName,
+        clubList: [...channelNames]
+      };
+
+      const updatedJoinList: UserJoinList = {
+        ...currentJoinList,
+        joinList: [...currentJoinList.joinList, newGroupItem]
+      };
+
+      this._userJoinList.set(updatedJoinList);
+      
+      // 확장된 섹션에 추가
+      this._expandedSections.update(sections => [...sections, groupName]);
+      
+      console.log('New group with channels added:', { groupName, channelNames });
+
+      // 첫 번째 그룹이거나 그룹 탭에서 선택된 그룹이 없다면 자동 선택
+      if ((currentJoinList.joinList.length === 0 || !this.selectedGroup()) && 
+          this.activeTab() === 'group') {
+        this.setSelectedGroup(groupName);
+        if (channelNames.length > 0) {
+          this.setSelectedChannel(channelNames[0], groupName);
+        }
+      }
+    }
+  }
+
+  /**
+   * 그룹 제거 (탈퇴 시 사용)
+   */
+  removeUserGroup(groupName: string): void {
+    const currentJoinList = this._userJoinList();
+    
+    if (!currentJoinList) {
+      console.error('Cannot remove group - no join list initialized');
+      return;
+    }
+
+    const updatedJoinList: UserJoinList = {
+      ...currentJoinList,
+      joinList: currentJoinList.joinList.filter(item => item.groupname !== groupName)
+    };
+
+    this._userJoinList.set(updatedJoinList);
+    
+    // 확장된 섹션에서 제거
+    this._expandedSections.update(sections => sections.filter(section => section !== groupName));
+    
+    // 현재 선택된 그룹이라면 선택 해제
+    if (this.selectedGroup() === groupName) {
+      this._selectedGroup.set(null);
+      this._selectedChannel.set(null);
+      this.clearMessages();
+    }
+    
+    console.log('Group removed from join list:', groupName);
+  }
+
+  /**
+   * 특정 채널 제거 (채널 탈퇴 시 사용)
+   */
+  removeUserChannel(groupName: string, channelName: string): void {
+    const currentJoinList = this._userJoinList();
+    
+    if (!currentJoinList) {
+      console.error('Cannot remove channel - no join list initialized');
+      return;
+    }
+
+    const groupIndex = currentJoinList.joinList.findIndex(item => item.groupname === groupName);
+    if (groupIndex === -1) {
+      console.error('Cannot remove channel - group not found:', groupName);
+      return;
+    }
+
+    const updatedJoinList = { ...currentJoinList };
+    const targetGroup = { ...updatedJoinList.joinList[groupIndex] };
+    
+    targetGroup.clubList = targetGroup.clubList.filter(channel => channel !== channelName);
+    updatedJoinList.joinList[groupIndex] = targetGroup;
+    
+    this._userJoinList.set(updatedJoinList);
+    
+    // 현재 선택된 채널이라면 선택 해제
+    if (this.selectedChannel() === channelName && this.selectedGroup() === groupName) {
+      this._selectedChannel.set(null);
+      this.clearMessages();
+    }
+    
+    console.log('Channel removed from group:', { groupName, channelName });
+  }
+
+  // === 기존 메서드들 ===
   async refreshUserJoinList(): Promise<void> {
     this.setLoadingState('userJoinList', true);
     try {
@@ -415,6 +642,10 @@ export class SharedStateService {
         this._userJoinList.set(joinList);
         console.log('User join list refreshed successfully');
         this.validateCurrentSelections();
+      } else {
+        // API에서 빈 결과가 왔을 때 빈 목록으로 설정
+        this._userJoinList.set({ id: '', joinList: [] });
+        console.log('User join list refreshed with empty result');
       }
     } catch (error) {
       console.error('Error refreshing user join list:', error);
@@ -442,25 +673,57 @@ export class SharedStateService {
     }
   }
 
-  private async loadUserStatus(): Promise<UserStatus | null> {
-    try {
-      return await this.userService.getUserStatus() || null;
-    } catch (error) {
-      console.error('Error loading user status:', error);
-      throw error;
+  private validateCurrentSelections(): void {
+    const joinList = this._userJoinList();
+    if (!joinList) return;
+
+    const selectedGroup = this._selectedGroup();
+    const selectedChannel = this._selectedChannel();
+
+    if (selectedGroup) {
+      const group = joinList.joinList.find(g => g.groupname === selectedGroup);
+      if (!group) {
+        console.log('Selected group no longer exists, clearing selection');
+        this._selectedGroup.set(null);
+        this._selectedChannel.set(null);
+        return;
+      }
+
+      if (selectedChannel && !group.clubList.includes(selectedChannel)) {
+        console.log('Selected channel no longer exists, clearing channel selection');
+        this._selectedChannel.set(null);
+      }
     }
   }
 
-  private async loadUserJoinList(): Promise<UserJoinList | null> {
-    try {
-      return await this.userService.getUserJoinList() || null;
-    } catch (error) {
-      console.error('Error loading user join list:', error);
-      throw error;
+  setActiveTab(tab: string): void {
+    const previousTab = this._activeTab();
+    this._activeTab.set(tab);
+    
+    if (tab === 'group') {
+      this._sidebarExpanded.set(true);
+      
+      // 가입한 그룹이 있는 경우에만 기본 선택
+      if (!this._selectedGroup() && this.hasJoinedGroups()) {
+        const firstGroup = this.availableGroups()[0];
+        this.setSelectedGroup(firstGroup.groupname);
+        
+        if (firstGroup.clubList.length > 0) {
+          this.setSelectedChannel(firstGroup.clubList[0], firstGroup.groupname);
+        }
+      }
+    } else {
+      this._sidebarExpanded.set(false);
     }
+    
+    console.log(`Tab changed: ${previousTab} → ${tab}`, {
+      selectedGroup: this._selectedGroup(),
+      selectedChannel: this._selectedChannel(),
+      sidebarExpanded: this._sidebarExpanded(),
+      hasJoinedGroups: this.hasJoinedGroups()
+    });
   }
 
-  // === 나머지 기존 메서드들은 동일하게 유지 ===
   setSelectedGroup(groupId: string | null): void {
     if (!this.isValidGroup(groupId)) {
       console.warn('Invalid group ID:', groupId);
@@ -505,30 +768,6 @@ export class SharedStateService {
     console.log(`Channel changed: ${previousChannel} → ${channelId}`, { groupId });
   }
 
-  // [기존의 다른 메서드들은 모두 동일하게 유지]
-  private validateCurrentSelections(): void {
-    const joinList = this._userJoinList();
-    if (!joinList) return;
-
-    const selectedGroup = this._selectedGroup();
-    const selectedChannel = this._selectedChannel();
-
-    if (selectedGroup) {
-      const group = joinList.joinList.find(g => g.groupname === selectedGroup);
-      if (!group) {
-        console.log('Selected group no longer exists, clearing selection');
-        this._selectedGroup.set(null);
-        this._selectedChannel.set(null);
-        return;
-      }
-
-      if (selectedChannel && !group.clubList.includes(selectedChannel)) {
-        console.log('Selected channel no longer exists, clearing channel selection');
-        this._selectedChannel.set(null);
-      }
-    }
-  }
-
   private isValidGroup(groupId: string | null): boolean {
     if (!groupId) return true;
     const joinList = this._userJoinList();
@@ -542,7 +781,6 @@ export class SharedStateService {
     return group?.clubList.includes(channelId) || false;
   }
 
-  // [나머지 모든 기존 메서드들 동일하게 유지]
   private setLoadingState(key: keyof LoadingState, loading: boolean): void {
     this._loadingState.update(state => ({
       ...state,
