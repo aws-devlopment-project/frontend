@@ -17,7 +17,10 @@
                   initialized: sharedState.initialized(),
                   hasValidData: sharedState.hasValidData(),
                   loadingState: sharedState.loadingState(),
-                  error: sharedState.error()
+                  error: sharedState.error(),
+                  hasGroups: sharedState.hasGroups(),
+                  hasChannels: sharedState.hasChannels(),
+                  navigationState: sharedState.navigationState()
                 } | json
               }}</pre>
               <button (click)="debugState()" class="secondary-button">
@@ -96,20 +99,68 @@
               <app-group-dashboard></app-group-dashboard>
             }
             @else {
-              <!-- 그룹/채널 미선택 - 선택 안내 -->
-              <div class="page-placeholder">
-                <h2>그룹을 선택해 주세요</h2>
-                <p>왼쪽 사이드바에서 참여하고 싶은 그룹을 선택해 보세요.</p>
-                
-                @if (sharedState.availableGroups().length === 0) {
-                  <div class="empty-state">
-                    <p>아직 참여한 그룹이 없습니다.</p>
-                    <button class="primary-button" (click)="onNavigationChange('member')">
-                      그룹 찾아보기
-                    </button>
+              <!-- 그룹/채널 미선택 또는 가입 필요 상태 -->
+              @if (sharedState.hasGroups() && sharedState.hasChannels()) {
+                <!-- 그룹과 채널이 있지만 선택되지 않은 경우 -->
+                <div class="page-placeholder">
+                  <h2>그룹을 선택해 주세요</h2>
+                  <p>왼쪽 사이드바에서 참여하고 싶은 그룹과 채널을 선택해 보세요.</p>
+                </div>
+              }
+              @else if (sharedState.hasGroups() && !sharedState.hasChannels()) {
+                <!-- 그룹은 있지만 채널이 없는 경우 -->
+                <div class="page-placeholder">
+                  <div class="join-guidance-container">
+                    <div class="guidance-icon">📢</div>
+                    <h2>채널 가입이 필요합니다</h2>
+                    <p>그룹에는 가입하셨지만, 아직 채널에 가입하지 않으셨네요.</p>
+                    <p>채널에 가입해야 다른 멤버들과 소통할 수 있습니다.</p>
+                    
+                    <div class="guidance-actions">
+                      <button (click)="onNavigationChange('member')" class="primary-button">
+                        채널 가입하기
+                      </button>
+                      <button (click)="refreshData()" class="secondary-button">
+                        새로고침
+                      </button>
+                    </div>
+                    
+                    <div class="guidance-tip">
+                      <p><strong>💡 팁:</strong> 관리 탭에서 다양한 그룹과 채널을 탐색할 수 있습니다.</p>
+                    </div>
                   </div>
-                }
-              </div>
+                </div>
+              }
+              @else {
+                <!-- 그룹이 없는 경우 -->
+                <div class="page-placeholder">
+                  <div class="join-guidance-container">
+                    <div class="guidance-icon">🚀</div>
+                    <h2>첫 그룹에 가입해보세요!</h2>
+                    <p>아직 가입한 그룹이 없습니다.</p>
+                    <p>관심 있는 그룹에 가입하여 다른 사람들과 목표를 공유하고 함께 성장해보세요!</p>
+                    
+                    <div class="guidance-actions">
+                      <button (click)="onNavigationChange('member')" class="primary-button">
+                        그룹 탐색하기
+                      </button>
+                      <button (click)="refreshData()" class="secondary-button">
+                        새로고침
+                      </button>
+                    </div>
+                    
+                    <div class="guidance-benefits">
+                      <h4>그룹 가입의 장점:</h4>
+                      <ul>
+                        <li>같은 목표를 가진 사람들과 소통</li>
+                        <li>서로 격려하며 동기부여 받기</li>
+                        <li>진행 상황 공유 및 피드백</li>
+                        <li>다양한 도전과 활동 참여</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              }
             }
           }
           
