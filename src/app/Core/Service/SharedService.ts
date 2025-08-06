@@ -191,7 +191,7 @@ export class SharedStateService {
 
       // 가입 목록 처리 - 빈 목록도 허용
       if (joinList.status === 'fulfilled') {
-        const joinListData = joinList.value || { id: '', joinList: [] };
+        const joinListData = joinList.value || { id: '', name: '', joinList: [] };
         this._userJoinList.set(joinListData);
         
         // 가입한 그룹이 있는 경우에만 기본 선택 설정
@@ -442,9 +442,9 @@ export class SharedStateService {
       return;
     }
 
-    // 이미 존재하는 그룹인지 확인
-    const existingGroup = currentJoinList.joinList.find(item => item.groupname === groupName);
-    if (existingGroup) {
+    // Set을 사용하여 중복 체크
+    const existingGroupNames = new Set(currentJoinList.joinList.map(item => item.groupname));
+    if (existingGroupNames.has(groupName)) {
       console.log('Group already exists in join list:', groupName);
       return;
     }
@@ -462,8 +462,11 @@ export class SharedStateService {
 
     this._userJoinList.set(updatedJoinList);
     
-    // 확장된 섹션에 추가
-    this._expandedSections.update(sections => [...sections, groupName]);
+    // 확장된 섹션에 추가 (중복 방지)
+    this._expandedSections.update(sections => {
+      const sectionSet = new Set([...sections, groupName]);
+      return Array.from(sectionSet);
+    });
     
     console.log('Group added to join list:', groupName);
 
@@ -493,26 +496,29 @@ export class SharedStateService {
     const updatedJoinList = { ...currentJoinList };
     const targetGroup = { ...updatedJoinList.joinList[groupIndex] };
     
-    // 중복 제거하여 채널 추가
-    const existingChannels = new Set(targetGroup.clubList);
-    const newChannels = channelNames.filter(channel => !existingChannels.has(channel));
+    // Set을 사용하여 중복 제거
+    const existingChannelSet = new Set(targetGroup.clubList);
+    const newChannelSet = new Set([...existingChannelSet, ...channelNames]);
+    const newChannels = Array.from(newChannelSet).filter(channel => !existingChannelSet.has(channel));
     
     if (newChannels.length === 0) {
       console.log('No new channels to add for group:', groupName);
       return;
     }
 
-    targetGroup.clubList = [...targetGroup.clubList, ...newChannels];
+    // Set으로 중복 제거된 전체 채널 목록 생성
+    targetGroup.clubList = Array.from(newChannelSet);
     updatedJoinList.joinList[groupIndex] = targetGroup;
     
     this._userJoinList.set(updatedJoinList);
     
-    console.log('Channels added to group:', { groupName, newChannels });
+    console.log('Channels added to group:', { groupName, newChannels, totalChannels: targetGroup.clubList.length });
 
     // 첫 번째 채널이라면 자동 선택 (그룹이 현재 선택된 상태에서)
-    if (targetGroup.clubList.length === newChannels.length && 
+    if (existingChannelSet.size === 0 && 
         this.selectedGroup() === groupName && 
-        !this.selectedChannel()) {
+        !this.selectedChannel() &&
+        newChannels.length > 0) {
       this.setSelectedChannel(newChannels[0], groupName);
     }
   }
@@ -530,17 +536,20 @@ export class SharedStateService {
       return;
     }
 
-    // 그룹이 이미 존재하는지 확인
-    const existingGroupIndex = currentJoinList.joinList.findIndex(item => item.groupname === groupName);
+    // Set을 사용하여 중복 체크
+    const existingGroupNames = new Set(currentJoinList.joinList.map(item => item.groupname));
     
-    if (existingGroupIndex !== -1) {
-      // 기존 그룹에 채널만 추가
+    if (existingGroupNames.has(groupName)) {
+      // 기존 그룹에 채널만 추가 (중복 제거)
+      console.log('Group exists, adding channels only:', groupName);
       this.addUserChannels(groupName, channelNames);
     } else {
-      // 새 그룹을 채널과 함께 추가
+      // 새 그룹을 채널과 함께 추가 (채널 목록도 중복 제거)
+      const uniqueChannels = Array.from(new Set(channelNames));
+      
       const newGroupItem: JoinListItem = {
         groupname: groupName,
-        clubList: [...channelNames]
+        clubList: uniqueChannels
       };
 
       const updatedJoinList: UserJoinList = {
@@ -550,17 +559,25 @@ export class SharedStateService {
 
       this._userJoinList.set(updatedJoinList);
       
-      // 확장된 섹션에 추가
-      this._expandedSections.update(sections => [...sections, groupName]);
+      // 확장된 섹션에 추가 (중복 방지)
+      this._expandedSections.update(sections => {
+        const sectionSet = new Set([...sections, groupName]);
+        return Array.from(sectionSet);
+      });
       
-      console.log('New group with channels added:', { groupName, channelNames });
+      console.log('New group with channels added:', { 
+        groupName, 
+        uniqueChannels, 
+        originalChannelCount: channelNames.length,
+        finalChannelCount: uniqueChannels.length 
+      });
 
       // 첫 번째 그룹이거나 그룹 탭에서 선택된 그룹이 없다면 자동 선택
       if ((currentJoinList.joinList.length === 0 || !this.selectedGroup()) && 
           this.activeTab() === 'group') {
         this.setSelectedGroup(groupName);
-        if (channelNames.length > 0) {
-          this.setSelectedChannel(channelNames[0], groupName);
+        if (uniqueChannels.length > 0) {
+          this.setSelectedChannel(uniqueChannels[0], groupName);
         }
       }
     }
@@ -736,7 +753,10 @@ export class SharedStateService {
     this.clearMessages();
     
     if (groupId && !this._expandedSections().includes(groupId)) {
-      this._expandedSections.update(sections => [...sections, groupId]);
+      this._expandedSections.update(sections => {
+        const sectionSet = new Set([...sections, groupId]);
+        return Array.from(sectionSet);
+      });
     }
     
     console.log(`Group changed: ${previousGroup} → ${groupId}`);
@@ -828,11 +848,15 @@ export class SharedStateService {
     const wasExpanded = this._expandedSections().includes(sectionId);
     
     this._expandedSections.update(sections => {
-      if (sections.includes(sectionId)) {
-        return sections.filter(id => id !== sectionId);
+      const sectionSet = new Set(sections);
+      
+      if (sectionSet.has(sectionId)) {
+        sectionSet.delete(sectionId);
       } else {
-        return [...sections, sectionId];
+        sectionSet.add(sectionId);
       }
+      
+      return Array.from(sectionSet);
     });
 
     if (!wasExpanded) {

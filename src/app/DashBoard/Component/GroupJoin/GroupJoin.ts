@@ -100,7 +100,6 @@ export class GroupJoinComponent implements OnInit {
             };
           }
         });
-        
         viewGroups = await Promise.all(groupInfoPromises);
       } else {
         viewGroups = matchingGroup.map((group: any) => ({
@@ -290,7 +289,7 @@ export class GroupJoinComponent implements OnInit {
     });
 
     // 메인 페이지로 이동 (이미 그룹 탭으로 설정되어 있음)
-    this.router.navigate(['/main']);
+    this.router.navigate(['/']);
   }
 
   private updateStep(step: number): void {
