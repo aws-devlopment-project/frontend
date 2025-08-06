@@ -1,0 +1,64 @@
+<div class="streak-calendar">
+      <div class="calendar-header">
+        <div class="calendar-controls">
+          <button class="nav-btn" (click)="previousMonth()" [disabled]="!canGoPrevious()">
+            <mat-icon>chevron_left</mat-icon>
+          </button>
+          <h3 class="month-title">{{ currentMonthTitle() }}</h3>
+          <button class="nav-btn" (click)="nextMonth()" [disabled]="!canGoNext()">
+            <mat-icon>chevron_right</mat-icon>
+          </button>
+        </div>
+        <div class="streak-info">
+          <div class="streak-stat">
+            <span class="streak-number">{{ currentStreak }}</span>
+            <span class="streak-label">일 연속</span>
+          </div>
+          <div class="streak-stat">
+            <span class="streak-number">{{ longestStreak }}</span>
+            <span class="streak-label">최고 기록</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="calendar-grid">
+        <div class="weekday-header">
+          @for (day of weekdays; track day) {
+            <div class="weekday">{{ day }}</div>
+          }
+        </div>
+        
+        @for (week of calendarWeeks(); track $index) {
+          <div class="calendar-week">
+            @for (day of week.days; track day.date) {
+              <div 
+                class="calendar-day"
+                [class.today]="day.isToday"
+                [class.other-month]="!day.isCurrentMonth"
+                [attr.data-level]="day.level"
+                [title]="getDayTooltip(day)"
+                (click)="onDayClick(day)">
+                <span class="day-number">{{ day.dayOfMonth }}</span>
+                <div class="activity-indicator" [attr.data-level]="day.level">
+                  @if (day.value > 0) {
+                    <span class="points">+{{ day.value }}</span>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="calendar-legend">
+        <span class="legend-label">활동 강도:</span>
+        <div class="legend-items">
+          @for (level of legendLevels; track level.value) {
+            <div class="legend-item">
+              <div class="legend-square" [attr.data-level]="level.value"></div>
+              <span class="legend-text">{{ level.label }}</span>
+            </div>
+          }
+        </div>
+      </div>
+    </div>

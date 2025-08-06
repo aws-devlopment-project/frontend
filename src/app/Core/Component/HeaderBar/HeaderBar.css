@@ -20,6 +20,40 @@
   flex: 1;
 }
 
+/* 모바일 메뉴 버튼 - 기본적으로 숨김 */
+.mobile-menu-button {
+  display: none;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  font-size: 24px;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 40px;
+}
+
+.mobile-menu-button:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  transform: scale(1.05);
+}
+
+.mobile-menu-button:active {
+  transform: scale(0.95);
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.mobile-menu-button mat-icon {
+  font-size: 24px;
+  width: 24px;
+  height: 24px;
+}
+
 .header-title {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   font-size: 18px;
@@ -183,6 +217,15 @@
     height: 56px;
   }
   
+  /* 모바일에서 메뉴 버튼 표시 */
+  .mobile-menu-button {
+    display: flex;
+  }
+  
+  .header-left {
+    gap: 12px;
+  }
+  
   .header-title {
     font-size: 16px;
   }
@@ -218,7 +261,24 @@
   }
   
   .header-left {
-    gap: 12px;
+    gap: 8px;
+  }
+  
+  /* 더 작은 화면에서 메뉴 버튼 크기 조정 */
+  .mobile-menu-button {
+    min-width: 36px;
+    height: 36px;
+    padding: 6px;
+  }
+  
+  .mobile-menu-button mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+  
+  .header-title {
+    font-size: 14px;
   }
   
   .current-page {
