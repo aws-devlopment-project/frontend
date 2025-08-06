@@ -39,6 +39,7 @@ export class GroupDashboardComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     // 그룹 선택 상태 확인 및 처리
+    console.log("group pass");
     await this.ensureGroupSelected();
     await this.loadGroupData();
   }

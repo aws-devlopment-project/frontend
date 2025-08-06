@@ -5,7 +5,7 @@ export const environment = {
   identityPoolId: '',
   region: 'ap-northeast-2',
   googleClientId: '',
-  apiUrl: 'http://localhost:3001',
+  apiUrl: 'http://localhost:3000',
   cognitoDomain: '',
   redirectSignIn: '',
   redirectSignOut: ''

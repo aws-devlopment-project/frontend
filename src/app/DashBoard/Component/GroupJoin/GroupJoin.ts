@@ -289,7 +289,7 @@ export class GroupJoinComponent implements OnInit {
     });
 
     // 메인 페이지로 이동 (이미 그룹 탭으로 설정되어 있음)
-    this.router.navigate(['/']);
+    this.router.navigate(['/board']);
   }
 
   private updateStep(step: number): void {
