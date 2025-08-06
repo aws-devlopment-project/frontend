@@ -16,13 +16,19 @@
                 {
                   initialized: sharedState.initialized(),
                   hasValidData: sharedState.hasValidData(),
+                  hasJoinedGroups: sharedState.hasJoinedGroups(),
                   loadingState: sharedState.loadingState(),
                   error: sharedState.error()
                 } | json
               }}</pre>
-              <button (click)="debugState()" class="secondary-button">
-                콘솔에 상태 출력
-              </button>
+              <div class="debug-actions">
+                <button (click)="debugState()" class="secondary-button">
+                  콘솔에 상태 출력
+                </button>
+                <button (click)="simulateGroupJoin()" class="secondary-button">
+                  그룹 참여 시뮬레이션
+                </button>
+              </div>
             </details>
           </div>
         }
@@ -96,25 +102,83 @@
               <app-group-dashboard></app-group-dashboard>
             }
             @else {
-              <!-- 그룹/채널 미선택 - 선택 안내 -->
+              <!-- 그룹/채널 미선택 상태 -->
               <div class="page-placeholder">
-                <h2>그룹을 선택해 주세요</h2>
-                <p>왼쪽 사이드바에서 참여하고 싶은 그룹을 선택해 보세요.</p>
-                
-                @if (sharedState.availableGroups().length === 0) {
-                  <div class="empty-state">
-                    <p>아직 참여한 그룹이 없습니다.</p>
-                    <button class="primary-button" (click)="onNavigationChange('member')">
-                      그룹 찾아보기
-                    </button>
+                @if (sharedState.hasJoinedGroups()) {
+                  <!-- 기존 사용자 - 그룹 선택 안내 -->
+                  <h2>그룹을 선택해 주세요</h2>
+                  <p>{{ getGroupSelectionMessage() }}</p>
+                } @else {
+                  <!-- 새 사용자 - 그룹 참여 안내 -->
+                  <div class="new-user-welcome">
+                    <div class="welcome-icon">🎯</div>
+                    <h2>환영합니다!</h2>
+                    <p>아직 참여한 그룹이 없습니다.<br>새로운 그룹에 참여해서 목표를 달성해보세요!</p>
+                    
+                    <div class="welcome-features">
+                      <div class="feature-item">
+                        <div class="feature-icon">👥</div>
+                        <div class="feature-text">
+                          <h4>함께 성장</h4>
+                          <p>같은 목표를 가진 사람들과 함께 동기부여받으세요</p>
+                        </div>
+                      </div>
+                      
+                      <div class="feature-item">
+                        <div class="feature-icon">📊</div>
+                        <div class="feature-text">
+                          <h4>진행상황 추적</h4>
+                          <p>개인 및 그룹의 달성률을 한눈에 확인하세요</p>
+                        </div>
+                      </div>
+                      
+                      <div class="feature-item">
+                        <div class="feature-icon">🏆</div>
+                        <div class="feature-text">
+                          <h4>성취감 극대화</h4>
+                          <p>다양한 활동을 통해 성취감을 느껴보세요</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 }
+                
+                <div class="empty-state">
+                  @if (!sharedState.hasJoinedGroups()) {
+                    <div class="empty-state-actions">
+                      <button class="primary-button btn-large" [routerLink]="['/group/join']">
+                        <mat-icon>group_add</mat-icon>
+                        그룹 참여하기
+                      </button>
+                      <button class="secondary-button" (click)="onNavigationChange('home')">
+                        <mat-icon>home</mat-icon>
+                        홈으로 이동
+                      </button>
+                    </div>
+                  } @else {
+                    <p>왼쪽 사이드바에서 그룹을 선택하면 활동을 시작할 수 있습니다.</p>
+                  }
+                </div>
               </div>
             }
           }
           
           @case ('activity') {
-            <app-activity-dashboard></app-activity-dashboard>
+            @if (sharedState.hasJoinedGroups()) {
+              <app-activity-dashboard></app-activity-dashboard>
+            } @else {
+              <!-- 활동 탭이지만 참여한 그룹이 없는 경우 -->
+              <div class="page-placeholder">
+                <h2>활동 통계</h2>
+                <p>그룹에 참여하면 활동 통계를 확인할 수 있습니다.</p>
+                <div class="empty-state">
+                  <button class="primary-button" [routerLink]="['/group/join']">
+                    <mat-icon>group_add</mat-icon>
+                    그룹 참여하기
+                  </button>
+                </div>
+              </div>
+            }
           }
           
           @case ('member') {

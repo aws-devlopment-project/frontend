@@ -1,8 +1,9 @@
-// Main.ts - 개선된 버전
+// Main.ts - 개선된 버전 (초기 사용자 지원)
 import { Component, OnInit, OnDestroy, effect, computed } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { Subject } from "rxjs";
 import { takeUntil } from "rxjs/operators";
+import { MatIconModule } from "@angular/material/icon";
 
 import { SideBarComponent } from "../Core/Component/SideBar/SideBar";
 import { HeaderBarComponent } from "../Core/Component/HeaderBar/HeaderBar";
@@ -13,6 +14,7 @@ import { MemberOptionsComponent } from "../DashBoard/Component/MemberDashboard/M
 import { ActivityDashboardComponent } from "../DashBoard/Component/ActivityDashboard/ActivityDashboard";
 import { SharedStateService } from "../Core/Service/SharedService";
 import { environment } from "../../environments/environtment";
+import { RouterModule } from "@angular/router";
 
 @Component({
   selector: 'app-main',
@@ -20,6 +22,8 @@ import { environment } from "../../environments/environtment";
   styleUrl: './Main.css',
   imports: [
     CommonModule,
+    RouterModule,
+    MatIconModule,
     SideBarComponent,
     HeaderBarComponent,
     GroupDashboardComponent,
@@ -42,6 +46,7 @@ export class MainComponent implements OnInit, OnDestroy {
   readonly errorMessage = computed(() => this.sharedState.error());
   readonly isInitialized = computed(() => this.sharedState.initialized());
   readonly hasValidData = computed(() => this.sharedState.hasValidData());
+  readonly hasJoinedGroups = computed(() => this.sharedState.hasJoinedGroups());
 
   constructor(public sharedState: SharedStateService) {
     console.log('MainComponent initialized with SharedStateService');
@@ -50,16 +55,23 @@ export class MainComponent implements OnInit, OnDestroy {
     effect(() => {
       const initialized = this.sharedState.initialized();
       const hasData = this.sharedState.hasValidData();
+      const hasGroups = this.sharedState.hasJoinedGroups();
       const error = this.sharedState.error();
       
       console.log('MainComponent state:', {
         initialized,
         hasData,
+        hasGroups,
         error,
         activeTab: this.sharedState.activeTab(),
         selectedGroup: this.sharedState.selectedGroup(),
         selectedChannel: this.sharedState.selectedChannel()
       });
+
+      // 초기화 완료 후 첫 방문자 처리
+      if (initialized && hasData && !hasGroups && !error) {
+        this.handleNewUser();
+      }
     });
 
     // 에러 상태 모니터링
@@ -75,6 +87,23 @@ export class MainComponent implements OnInit, OnDestroy {
     effect(() => {
       const loading = this.sharedState.isLoading();
       console.log('MainComponent loading state:', loading);
+    });
+
+    // 그룹 참여 상태 변화 모니터링
+    effect(() => {
+      const hasGroups = this.sharedState.hasJoinedGroups();
+      const availableGroups = this.sharedState.availableGroups();
+      
+      console.log('Group participation changed:', {
+        hasGroups,
+        groupCount: availableGroups.length,
+        groups: availableGroups.map(g => g.groupname)
+      });
+
+      // 새로 그룹에 참여했을 때 처리
+      if (hasGroups && this.sharedState.activeTab() === 'home') {
+        console.log('User now has groups - staying on current tab');
+      }
     });
   }
 
@@ -109,17 +138,43 @@ export class MainComponent implements OnInit, OnDestroy {
     console.log('MainComponent fully initialized with valid data');
   }
 
+  // === 새 사용자 처리 ===
+  private handleNewUser(): void {
+    console.log('Handling new user (no joined groups)');
+    
+    // 새 사용자에게 환영 메시지나 온보딩 가이드를 보여줄 수 있음
+    // 현재는 홈 탭에서 그룹 가입을 권유하는 UI를 표시
+    
+    // 필요시 자동으로 그룹 가입 페이지로 안내할 수도 있음
+    // this.suggestGroupJoin();
+  }
+
+  private suggestGroupJoin(): void {
+    // 사용자에게 그룹 가입을 제안하는 알림 표시
+    console.log('Suggesting group join to new user');
+    
+    // 예시: 3초 후 그룹 가입 페이지로 이동 제안
+    setTimeout(() => {
+      if (!this.sharedState.hasJoinedGroups()) {
+        const shouldJoin = confirm(
+          '아직 참여한 그룹이 없습니다.\n그룹에 참여해서 다른 사람들과 함께 목표를 달성해보시겠어요?'
+        );
+        
+        if (shouldJoin) {
+          this.navigateToGroupJoin();
+        }
+      }
+    }, 3000);
+  }
+
   // === 에러 처리 ===
   private handleError(error: string): void {
-    // 사용자에게 에러 표시 (토스트, 모달 등)
     console.error('Handling error in MainComponent:', error);
     
     // 필요에 따라 특정 에러에 대한 처리
     if (error.includes('사용자 정보')) {
-      // 사용자 정보 에러 처리
       this.handleUserError();
     } else if (error.includes('가입 목록')) {
-      // 가입 목록 에러 처리
       this.handleJoinListError();
     }
   }
@@ -130,8 +185,10 @@ export class MainComponent implements OnInit, OnDestroy {
   }
 
   private handleJoinListError(): void {
-    console.log('Handling join list error - may show join group options');
-    // 그룹 가입 페이지로 이동하거나 새로고침 옵션 제공
+    console.log('Handling join list error - treating as new user');
+    // 가입 목록 로드 실패는 새 사용자로 처리
+    // 에러를 무시하고 빈 목록으로 계속 진행
+    this.sharedState.clearError();
   }
 
   // === 데이터 부족 처리 ===
@@ -140,13 +197,11 @@ export class MainComponent implements OnInit, OnDestroy {
     
     if (!this.sharedState.currentUser()) {
       console.log('Missing user data');
-      // 사용자 정보 재로드 시도
       this.retryUserDataLoad();
     }
 
     if (!this.sharedState.userJoinList()) {
       console.log('Missing join list data');
-      // 가입 목록 재로드 시도
       this.retryJoinListLoad();
     }
   }
@@ -166,6 +221,8 @@ export class MainComponent implements OnInit, OnDestroy {
       await this.sharedState.refreshUserJoinList();
     } catch (error) {
       console.error('Failed to retry join list data load:', error);
+      // 가입 목록 로드 실패는 새 사용자로 처리
+      console.log('Treating join list load failure as new user scenario');
     }
   }
 
@@ -181,6 +238,12 @@ export class MainComponent implements OnInit, OnDestroy {
     try {
       this.sharedState.setActiveTab(tab);
       console.log('Navigation successful:', tab);
+      
+      // 그룹 탭으로 이동했는데 참여한 그룹이 없는 경우 안내
+      if (tab === 'group' && !this.sharedState.hasJoinedGroups()) {
+        console.log('User navigated to group tab but has no joined groups');
+      }
+      
     } catch (error) {
       console.error('Navigation failed:', error);
     }
@@ -282,6 +345,12 @@ export class MainComponent implements OnInit, OnDestroy {
     this.sharedState.clearError();
   }
 
+  navigateToGroupJoin(): void {
+    console.log('Navigating to group join page');
+    // RouterModule을 통해 그룹 가입 페이지로 이동
+    // 실제 라우팅 경로는 앱의 라우팅 설정에 따라 다름
+  }
+
   // === 템플릿 헬퍼 메서드들 ===
   getLoadingMessage(): string {
     const loadingState = this.sharedState.loadingState();
@@ -301,11 +370,31 @@ export class MainComponent implements OnInit, OnDestroy {
   }
 
   shouldShowError(): boolean {
-    return this.sharedState.error() !== null;
+    const error = this.sharedState.error();
+    // 가입 목록 관련 에러는 새 사용자로 처리하므로 에러로 표시하지 않음
+    if (error && error.includes('가입 목록')) {
+      return false;
+    }
+    return error !== null;
   }
 
   shouldShowLoading(): boolean {
     return this.sharedState.isLoading() || !this.sharedState.initialized();
+  }
+
+  // 새로 추가: 새 사용자 안내 메시지 표시 여부
+  shouldShowNewUserGuide(): boolean {
+    return this.shouldShowContent() && 
+           !this.sharedState.hasJoinedGroups() && 
+           this.sharedState.activeTab() === 'group';
+  }
+
+  // 새로 추가: 그룹 선택 안내 메시지 커스터마이징
+  getGroupSelectionMessage(): string {
+    if (!this.sharedState.hasJoinedGroups()) {
+      return '아직 참여한 그룹이 없습니다. 새로운 그룹에 참여해보세요!';
+    }
+    return '왼쪽 사이드바에서 참여하고 싶은 그룹을 선택해 보세요.';
   }
 
   // === 디버깅 메서드들 (개발용) ===
@@ -313,6 +402,7 @@ export class MainComponent implements OnInit, OnDestroy {
     console.log('=== DEBUG STATE ===');
     console.log('Initialized:', this.sharedState.initialized());
     console.log('Has Valid Data:', this.sharedState.hasValidData());
+    console.log('Has Joined Groups:', this.sharedState.hasJoinedGroups());
     console.log('Is Loading:', this.sharedState.isLoading());
     console.log('Error:', this.sharedState.error());
     console.log('Active Tab:', this.sharedState.activeTab());
@@ -320,6 +410,24 @@ export class MainComponent implements OnInit, OnDestroy {
     console.log('Selected Channel:', this.sharedState.selectedChannel());
     console.log('Available Groups:', this.sharedState.availableGroups());
     console.log('Current User:', this.sharedState.currentUser());
+    console.log('User Join List:', this.sharedState.userJoinList());
     console.log('=================');
+  }
+
+  // 테스트용 메서드들 (개발 환경에서만 사용)
+  
+  simulateGroupJoin(): void {
+    if (!environment.production) {
+      console.log('Simulating group join for testing');
+      this.sharedState.addUserGroupWithChannels('테스트 그룹', ['테스트 채널1', '테스트 채널2']);
+    }
+  }
+
+  simulateGroupLeave(): void {
+    if (!environment.production && this.sharedState.hasJoinedGroups()) {
+      const firstGroup = this.sharedState.availableGroups()[0];
+      console.log('Simulating group leave for testing:', firstGroup.groupname);
+      this.sharedState.removeUserGroup(firstGroup.groupname);
+    }
   }
 }
