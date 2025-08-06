@@ -10,4 +10,11 @@
       </app-header-searchBar>
     }
   </div>
+  <div class="header-right">
+    @if (isActivateGroup()) {
+      <button class="mobile-menu-button" (click)="usePassiveActivateGroupTabForMobile()">
+        <mat-icon>{{ getSidebarToggleIcon() }}</mat-icon>
+      </button>
+    }
+  </div>
 </header>

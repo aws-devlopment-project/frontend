@@ -40,7 +40,6 @@ export class HeaderBarComponent {
 
     onSearchQueryResultSelected(result: SearchResult): void {
         console.log('Search result selected:', result);
-        // 일반적인 검색 결과 처리 (필요시)
     }
 
     // SearchBar에서 직접 호출되는 이벤트 핸들러
@@ -101,5 +100,19 @@ export class HeaderBarComponent {
 
     isLoading(): boolean {
         return this.sharedState.isLoading();
+    }
+    
+    usePassiveActivateGroupTabForMobile(): void {
+        this.sharedState.setSidebarExpanded(!this.sharedState.sidebarExpanded());
+    }
+
+    isActivateGroup(): boolean {
+        if (this.sharedState.activeTab() === 'group')
+            return true;
+        return false;
+    }
+
+    getSidebarToggleIcon(): string {
+        return this.sharedState.sidebarExpanded() ? 'close_fullscreen' : 'open_in_full';
     }
 }

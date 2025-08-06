@@ -44,6 +44,7 @@ export class SideBarComponent implements OnInit {
         // 그룹 탭일 때만 그룹바를 표시
         if (tab === 'group') {
             this.sharedState.setSidebarExpanded(true);
+            this.sharedState.setSelectedChannel(null);
         } else {
             // 다른 탭일 때는 그룹바만 숨김 (메뉴바는 유지)
             this.sharedState.setSidebarExpanded(false);
