@@ -2,7 +2,7 @@ import { Injectable } from "@angular/core";
 import { UserService } from "../../Core/Service/UserService";
 import { SharedStateService } from "../../Core/Service/SharedService";
 import { LoginService } from "../../Auth/Service/LoginService";
-import { UserJoinList } from "../../Core/Models/user";
+import { UserJoin } from "../../Core/Models/user";
 import { HttpHeaders } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { environment } from "../../../environments/environtment";
@@ -215,8 +215,8 @@ export class ManagementDashboardService {
         }
     }
 
-    async getGroupList(): Promise<UserJoinList | null> {
-        const group: UserJoinList | null = await this.userService.getUserJoinList();
+    async getGroupList(): Promise<UserJoin | null> {
+        const group: UserJoin | null = await this.userService.getUserJoin();
         return group;
     }
 

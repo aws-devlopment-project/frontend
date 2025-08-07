@@ -1,6 +1,6 @@
 // SharedService.ts - 개선된 버전 (동적 그룹/채널 추가 지원)
 import { Injectable, signal, computed, effect } from '@angular/core';
-import { UserStatus, UserJoinList } from '../Models/user';
+import { UserStatus, UserJoin } from '../Models/user';
 import { SimpleChatMessage } from '../../Channel/Models/chatMessage';
 import { UserService } from './UserService';
 
@@ -35,7 +35,7 @@ export class SharedStateService {
   private _messages = signal<SimpleChatMessage[]>([]);
   private _sidebarExpanded = signal(false);
   private _expandedSections = signal<string[]>([]);
-  private _userJoinList = signal<UserJoinList | null>(null);
+  private _userJoinList = signal<UserJoin | null>(null);
   private _initialized = signal(false);
   private _error = signal<string | null>(null);
 
@@ -197,16 +197,16 @@ export class SharedStateService {
     }
   }
 
-  private async loadUserJoinList(): Promise<UserJoinList | null> {
+  private async loadUserJoinList(): Promise<UserJoin | null> {
     try {
-      return await this.userService.getUserJoinList() || null;
+      return await this.userService.getUserJoin() || null;
     } catch (error) {
       console.error('Error loading user join list:', error);
       throw error;
     }
   }
 
-  private initializeDefaultSelections(joinList: UserJoinList): void {
+  private initializeDefaultSelections(joinList: UserJoin): void {
     if (joinList.joinList.length > 0) {
       const firstGroup = joinList.joinList[0];
       
@@ -251,7 +251,7 @@ export class SharedStateService {
       clubList: []
     };
 
-    const updatedJoinList: UserJoinList = {
+    const updatedJoinList: UserJoin = {
       ...currentJoinList,
       joinList: [...currentJoinList.joinList, newGroupItem]
     };
@@ -348,7 +348,7 @@ export class SharedStateService {
         clubList: uniqueChannels
       };
 
-      const updatedJoinList: UserJoinList = {
+      const updatedJoinList: UserJoin = {
         ...currentJoinList,
         joinList: [...currentJoinList.joinList, newGroupItem]
       };
@@ -390,7 +390,7 @@ export class SharedStateService {
       return;
     }
 
-    const updatedJoinList: UserJoinList = {
+    const updatedJoinList: UserJoin = {
       ...currentJoinList,
       joinList: currentJoinList.joinList.filter(item => item.groupname !== groupName)
     };

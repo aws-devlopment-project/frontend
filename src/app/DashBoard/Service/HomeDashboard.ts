@@ -60,7 +60,7 @@ export class HomeDashboardService {
                 color: '#f6ad55'
             }
         ]
-        const userInfo = await this.userService.getUserJoinList();
+        const userInfo = await this.userService.getUserJoin();
         const userQuestCur = await this.userService.getUserQuestCur();
         const userQuestContinuous = await this.userService.getUserQuestContinuous();
 

@@ -1,7 +1,7 @@
 // SearchService.ts
 import { Injectable } from '@angular/core';
 import { UserService } from './UserService';
-import { UserJoinList } from '../Models/user';
+import { UserJoin } from '../Models/user';
 
 interface SearchResult {
   id: string;
@@ -16,7 +16,7 @@ interface SearchResult {
   providedIn: 'root'
 })
 export class SearchService {
-  private userJoinList: UserJoinList | null = null;
+  private userJoinList: UserJoin | null = null;
 
   constructor(private userService: UserService) {
     this.initializeData();
@@ -24,7 +24,7 @@ export class SearchService {
 
   private async initializeData(): Promise<void> {
     try {
-      this.userJoinList = await this.userService.getUserJoinList();
+      this.userJoinList = await this.userService.getUserJoin();
     } catch (error) {
       console.error('Error loading user join list in SearchService:', error);
     }

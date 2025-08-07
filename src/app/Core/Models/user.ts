@@ -4,7 +4,7 @@ export interface UserCredentials {
     accessToken: string
 }
 
-export interface UserJoinList {
+export interface UserJoin {
     id: string,
     joinList: {
         groupname: string,

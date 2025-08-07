@@ -30,7 +30,7 @@ export class SideBarComponent implements OnInit {
     async ngOnInit(): Promise<void> {
         try {
             // 컴포넌트 초기화 시 사용자 가입 목록 로드
-            this.userJoinList = await this.userService.getUserJoinList();
+            this.userJoinList = await this.userService.getUserJoin();
             console.log('User join list loaded:', this.userJoinList);
         } catch (error) {
             console.error('Error loading user join list:', error);
@@ -86,7 +86,7 @@ export class SideBarComponent implements OnInit {
     private async getCurrentGroupForChannel(channelId: string): Promise<string | null> {
         // 이미 로드된 userJoinList가 없다면 다시 로드
         if (!this.userJoinList) {
-            this.userJoinList = await this.userService.getUserJoinList();
+            this.userJoinList = await this.userService.getUserJoin();
         }
 
         // UserJoinList 인터페이스에 맞게 수정
@@ -112,7 +112,7 @@ export class SideBarComponent implements OnInit {
     // === Data Refresh ===
     async refreshUserJoinList(): Promise<void> {
         try {
-            this.userJoinList = await this.userService.getUserJoinList();
+            this.userJoinList = await this.userService.getUserJoin();
             console.log('User join list refreshed:', this.userJoinList);
         } catch (error) {
             console.error('Error refreshing user join list:', error);

@@ -3,7 +3,7 @@ import { HttpService } from "./HttpService";
 import { HttpHeaders } from "@angular/common/http";
 import { environment } from "../../../environments/environtment";
 import { DataCacheService } from "./DataCacheService";
-import { UserCredentials, UserJoinList, UserStatus } from "../Models/user";
+import { UserCredentials, UserJoin, UserStatus } from "../Models/user";
 import { UserQuestContinuous, UserQuestCur, UserQuestPrev, UserQuestWeekly } from "../Models/user";
 import { Router } from "@angular/router";
 import { firstValueFrom, throwError } from 'rxjs';
@@ -81,7 +81,7 @@ export class UserService {
     }
 
     // === 개선된 사용자 가입 목록 조회 ===
-    async getUserJoinList(id: string = ""): Promise<UserJoinList | null> {
+    async getUserJoin(id: string = ""): Promise<UserJoin | null> {
         try {
             // ID 확인
             if (!id) {
@@ -93,24 +93,24 @@ export class UserService {
             }
 
             // 캐시 확인
-            const cache: UserJoinList | null = this.cacheService.getCache('userJoinList');
+            const cache: UserJoin | null = this.cacheService.getCache('userJoinList');
             if (cache && cache.id === id) {
                 return cache;
             }
 
             // API 호출  
-            const url = `${environment.apiUrl}/api/user/getUserJoinList?email=${id}`;
+            const url = `${environment.apiUrl}/api/user/getUserJoin?email=${id}`;
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
             const response = await firstValueFrom(
-                this.httpService.get<UserJoinList>(url, headers).pipe(
+                this.httpService.get<UserJoin>(url, headers).pipe(
                     tap(data => {
                         // ID 정보 추가하여 캐시
                         const dataWithId = { ...data, id };
                         this.cacheService.setCache('userJoinList', dataWithId);
                     }),
                     catchError(error => {
-                        console.error('[API] getUserJoinList error:', error);
+                        console.error('[API] getUserJoin error:', error);
                         this.cacheService.removeCache('userJoinList');
                         return throwError(error);
                     })
@@ -119,7 +119,7 @@ export class UserService {
 
             return response;
         } catch (error) {
-            console.error('[API] getUserJoinList failed:', error);
+            console.error('[API] getUserJoin failed:', error);
             return null;
         }
     }
@@ -670,13 +670,13 @@ export class UserService {
     // === 헬퍼 메서드들 ===
     private async updateJoinListCache(
         id: string, 
-        updateFn: (joinList: UserJoinList) => UserJoinList
+        updateFn: (joinList: UserJoin) => UserJoin
     ): Promise<void> {
         try {
-            let userJoinList: UserJoinList | null = this.cacheService.getCache('userJoinList');
+            let userJoinList: UserJoin | null = this.cacheService.getCache('userJoinList');
             
             if (!userJoinList || userJoinList.id !== id) {
-                userJoinList = await this.getUserJoinList(id);
+                userJoinList = await this.getUserJoin(id);
             }
 
             if (userJoinList) {
@@ -712,7 +712,7 @@ export class UserService {
     async refreshAllUserData(id: string = ""): Promise<{
         credentials: UserCredentials | null;
         status: UserStatus | null;
-        joinList: UserJoinList | null;
+        joinList: UserJoin | null;
     }> {
         try {
             if (!id) {
@@ -730,7 +730,7 @@ export class UserService {
             const [credentials, status, joinList] = await Promise.allSettled([
                 this.getUserCredentials(),
                 this.getUserStatus(id),
-                this.getUserJoinList(id)
+                this.getUserJoin(id)
             ]);
 
             const result = {
@@ -761,7 +761,7 @@ export class UserService {
                typeof status.name === 'string';
     }
 
-    isValidUserJoinList(joinList: any): joinList is UserJoinList {
+    isValidUserJoinList(joinList: any): joinList is UserJoin {
         return joinList && 
                Array.isArray(joinList.joinList) &&
                joinList.joinList.every((item: any) => 
