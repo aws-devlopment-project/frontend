@@ -1,4 +1,3 @@
-// testtesttest
 export interface Group {
     id: number,
     name: string,
@@ -10,7 +9,6 @@ export interface Group {
     questSuccessNum: number[],
     currentActivateUserNum?: number,
     clubList: {
-        id: number,
         name: string,
         description?: string,
         icon?: string,

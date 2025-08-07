@@ -7,6 +7,8 @@ import { HttpHeaders } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { environment } from "../../../environments/environtment";
 import { HttpService } from "../../Core/Service/HttpService";
+import { DataCacheService } from "../../Core/Service/DataCacheService";
+import { Router } from "@angular/router";
 
 interface UserProfile {
   username: string;
@@ -27,7 +29,9 @@ export class ManagementDashboardService {
         public shared: SharedStateService,
         private userService: UserService, 
         private loginService: LoginService,
-        private httpService: HttpService
+        private httpService: HttpService,
+        private cacheService: DataCacheService,
+        private router: Router
     ) {}
 
     async getUserProfile() {
@@ -76,45 +80,72 @@ export class ManagementDashboardService {
         }
     }
 
+    // 이미지 리사이징 기능 추가
+    private async resizeImage(file: File, maxWidth: number = 200, maxHeight: number = 200): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        
+        img.onload = () => {
+        // 비율 계산
+        const ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
+        canvas.width = img.width * ratio;
+        canvas.height = img.height * ratio;
+        
+        // 이미지 그리기
+        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        // base64로 변환
+        const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        resolve(resizedDataUrl);
+        };
+        
+        img.onerror = () => reject(new Error('이미지 로드 실패'));
+        img.src = URL.createObjectURL(file);
+    });
+    }
+
+    // setAvatarImage 메서드에서 리사이징 사용
     async setAvatarImage(file: File): Promise<{ success: boolean; error?: string }> {
-        try {
-            const user = this.shared.currentUser();
-            const userId = user ? user.id : "";
+    try {
+        const user = this.shared.currentUser();
+        const userId = user ? user.id : "";
 
-            // 파일 유효성 검사
-            const validation = this.validateImageFile(file);
-            if (!validation.isValid) {
-                return { success: false, error: validation.error };
-            }
-
-            // 파일을 base64로 변환하여 업로드
-            const base64Data = await this.fileToBase64(file);
-            
-            const payload = {
-                user: userId,
-                avatar: base64Data.split(',')[1] // base64 헤더 제거
-            };
-
-            const response = await firstValueFrom(
-                this.httpService.post(`${environment.apiUrl}/api/user/setUserAvatar`, payload, 
-                    new HttpHeaders({ 'Content-Type': 'application/json' })
-                )
-            );
-
-            // 로컬 상태 업데이트
-            if (user) {
-                user.avatar = base64Data;
-                await this.shared.setCurrentUser(user);
-            }
-            
-            return { success: true };
-        } catch (error) {
-            console.error('아바타 업로드 실패:', error);
-            return { 
-                success: false, 
-                error: '아바타 업로드에 실패했습니다. 다시 시도해 주세요.' 
-            };
+        // 파일 유효성 검사
+        const validation = this.validateImageFile(file);
+        if (!validation.isValid) {
+        return { success: false, error: validation.error };
         }
+
+        // 이미지 리사이징
+        const resizedBase64 = await this.resizeImage(file);
+        
+        const payload = {
+        user: userId,
+        avatar: resizedBase64.split(',')[1] // base64 헤더 제거
+        };
+
+        const response = await firstValueFrom(
+        this.httpService.post(`${environment.apiUrl}/api/user/setUserAvatar`, payload, 
+            new HttpHeaders({ 'Content-Type': 'application/json' })
+        )
+        );
+
+        // 로컬 상태 업데이트
+        if (user) {
+        user.avatar = resizedBase64;
+        await this.shared.setCurrentUser(user);
+        }
+        
+        return { success: true };
+    } catch (error) {
+        console.error('아바타 업로드 실패:', error);
+        return { 
+        success: false, 
+        error: '아바타 업로드에 실패했습니다. 다시 시도해 주세요.' 
+        };
+    }
     }
 
     /**
@@ -222,9 +253,12 @@ export class ManagementDashboardService {
     async departUser(username: string = ""): Promise<void> {
         const user = this.shared.currentUser();
         if (user) {
-            await this.loginService.deleteCurrentUser();
+            const ans = await this.loginService.deleteCurrentUser();
+            this.cacheService.clearAllCache();
+            this.shared.reset();
         } else {
             await this.userService.leaveGroup("", username);
         }
+        this.router.navigate(['/login']);
     }
 }

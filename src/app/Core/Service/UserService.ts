@@ -6,7 +6,7 @@ import { DataCacheService } from "./DataCacheService";
 import { UserCredentials, UserJoinList, UserStatus } from "../Models/user";
 import { UserQuestContinuous, UserQuestCur, UserQuestPrev, UserQuestWeekly } from "../Models/user";
 import { Router } from "@angular/router";
-import { firstValueFrom, Observable, throwError } from 'rxjs';
+import { firstValueFrom, throwError } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
 
 @Injectable({
