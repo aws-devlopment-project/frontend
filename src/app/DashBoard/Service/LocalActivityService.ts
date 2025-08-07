@@ -64,7 +64,6 @@ export class LocalActivityService {
   async trackQuestCompletion(groupName: string, questList: string[]): Promise<void> {
     const userCreds = await this.userService.getUserCredentials();
     if (!userCreds) return;
-
     // 실제 API 호출과 연동
     const success = await this.userService.setUserQuestRecord(userCreds.id, groupName, questList);
     
@@ -577,7 +576,6 @@ export class LocalActivityService {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
   }
 
-  // 스토리지 관련 메서드들 (기존 유지)
   private loadFromStorage(): void {
     try {
       const stored = localStorage.getItem(this.STORAGE_KEY);
@@ -610,7 +608,7 @@ export class LocalActivityService {
       return [];
     }
   }
-
+  
   private saveStreakToStorage(streakData: DailyStreak[]): void {
     try {
       localStorage.setItem(this.STREAK_KEY, JSON.stringify(streakData));

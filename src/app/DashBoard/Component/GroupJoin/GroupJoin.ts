@@ -56,6 +56,21 @@ export class GroupJoinComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadAvailableGroups();
+    this.checkCurrentUserState();
+  }
+
+  private checkCurrentUserState(): void {
+    // 현재 사용자의 가입 상태 확인
+    const hasGroups = this.shared.hasGroups();
+    const hasChannels = this.shared.hasChannels();
+    
+    console.log('Current user join status:', { hasGroups, hasChannels });
+    
+    // 이미 그룹과 채널이 모두 있는 경우 알림
+    if (hasGroups && hasChannels) {
+      console.log('User already has groups and channels');
+      // 사용자가 의도적으로 추가 가입을 원할 수 있으므로 계속 진행
+    }
   }
 
   private async loadAvailableGroups(): Promise<void> {
