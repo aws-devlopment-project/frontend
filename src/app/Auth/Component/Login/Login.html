@@ -1,0 +1,257 @@
+<div class="login-catchphrase">
+    <h2>로그인</h2>
+    <p>좋은 친구들과 함께 습관을 만들어보세요</p>
+</div>
+
+<div class="loginView">
+    <div class="loginOrSign">
+        <div class="selectLogin" 
+             (click)="toggle(true)" 
+             [class.loginCollapsed]="clickLogin()"
+             tabindex="0"
+             role="tab"
+             [attr.aria-selected]="clickLogin()">
+            로그인
+        </div>
+        <div class="selectSign" 
+             (click)="toggle(false)" 
+             [class.signCollapsed]="!clickLogin()"
+             tabindex="0"
+             role="tab"
+             [attr.aria-selected]="!clickLogin()">
+            회원가입
+        </div>
+    </div>
+
+    <!-- 로그인 폼 -->
+    @if (clickLogin() == true) {
+        <form id="aws-login-form" 
+              class="login-form" 
+              [formGroup]="loginForm" 
+              (ngSubmit)="onSubmit($event)"
+              novalidate>
+            <div class="form-row">
+                <div class="form-col">
+                    <label class="form-label" for="login-email">이메일 주소</label>
+                    <input class="form-control" 
+                           id="login-email"
+                           type="email" 
+                           formControlName="email"
+                           placeholder="name@company.com"
+                           autocomplete="email">
+                    @if (loginForm.get('email')?.invalid && loginForm.get('email')?.touched) {
+                        <small class="text-danger">
+                            올바른 이메일 주소를 입력해주세요
+                        </small>
+                    }
+                </div>
+                <div class="form-col">
+                    <label class="form-label" for="login-password">비밀번호</label>
+                    <input class="form-control" 
+                           id="login-password"
+                           type="password" 
+                           formControlName="password"
+                           placeholder="비밀번호를 입력하세요"
+                           autocomplete="current-password">
+                    @if (loginForm.get('password')?.invalid && loginForm.get('password')?.touched) {
+                        <small class="text-danger">
+                            비밀번호를 입력해주세요
+                        </small>
+                    }
+                </div>
+            </div>
+        </form>
+        
+        <div class="failureLogin" [class.collapsed]="successLogin()">
+            <p class="alert-account">{{ errMsg }}</p>
+            <p class="find-password" (click)="passwordReset()" tabindex="0">
+                비밀번호를 잊어버리셨나요?
+            </p>
+        </div>
+        
+        <button class="btn btn-aws" 
+                type="submit" 
+                form="aws-login-form" 
+                [disabled]="loginForm.invalid"
+                aria-label="AWS로 로그인">
+            로그인
+        </button>
+        
+        <div class="btn btn-google" 
+            (click)="onGoogleLogin()"
+            [class.disabled]="isLoading()"
+            tabindex="0" 
+            role="button"
+            aria-label="Google로 로그인">
+            {{ isLoading() ? '로그인 중...' : 'Google로 로그인' }}
+        </div>
+    }
+
+    <!-- 회원가입 폼 -->
+    @else if (signUpNextStep() == false) {
+        <form id="aws-sign-up-form" 
+              class="login-form" 
+              [formGroup]="loginForm" 
+              (ngSubmit)="onSubmit($event)"
+              novalidate>
+            <div class="form-row">
+                <div class="form-col">
+                    <label class="form-label" for="signup-email">이메일 주소</label>
+                    <input class="form-control" 
+                           id="signup-email"
+                           type="email" 
+                           formControlName="email"
+                           placeholder="name@company.com"
+                           autocomplete="email">
+                    @if (loginForm.get('email')?.invalid && loginForm.get('email')?.touched) {
+                        <small class="text-danger">
+                            올바른 이메일 주소를 입력해주세요
+                        </small>
+                    }
+                </div>
+                
+                <div class="form-col">
+                    <label class="form-label" for="signup-password">비밀번호</label>
+                    <div class="password-input-container">
+                        <div class="password-input-wrapper">
+                            <input class="form-control" 
+                                   id="signup-password"
+                                   [type]="showPassword() ? 'text' : 'password'"
+                                   formControlName="password"
+                                   placeholder="8자 이상의 비밀번호를 입력하세요"
+                                   autocomplete="new-password">
+                            <button type="button" 
+                                    class="password-toggle"
+                                    (click)="togglePasswordVisibility()"
+                                    [attr.aria-label]="showPassword() ? '비밀번호 숨기기' : '비밀번호 보기'">
+                                {{ showPassword() ? '🙈' : '👁️' }}
+                            </button>
+                        </div>
+                        
+                        <!-- 비밀번호 강도 표시기 -->
+                        @if (showPasswordRequirements()) {
+                            <div class="password-strength-container">
+                                <div class="password-strength-bar">
+                                    <div class="strength-indicator" 
+                                         [class]="'strength-' + passwordStrength()"
+                                         [style.width.%]="passwordCompletionPercentage">
+                                    </div>
+                                </div>
+                                <span class="strength-text">
+                                    {{ passwordStrength() === 'weak' ? '약함' : 
+                                       passwordStrength() === 'medium' ? '보통' : '강함' }}
+                                    ({{ passwordCompletionPercentage }}%)
+                                </span>
+                            </div>
+                            
+                            <!-- 비밀번호 요구사항 체크리스트 -->
+                            <div class="password-requirements">
+                                <div class="requirement-item" 
+                                     [class.completed]="passwordRequirements().minLength">
+                                    <span class="requirement-icon">
+                                        {{ passwordRequirements().minLength ? '✓' : '○' }}
+                                    </span>
+                                    최소 8자 이상
+                                </div>
+                                <div class="requirement-item" 
+                                     [class.completed]="passwordRequirements().hasLowercase">
+                                    <span class="requirement-icon">
+                                        {{ passwordRequirements().hasLowercase ? '✓' : '○' }}
+                                    </span>
+                                    소문자 포함
+                                </div>
+                                <div class="requirement-item" 
+                                     [class.completed]="passwordRequirements().hasUppercase">
+                                    <span class="requirement-icon">
+                                        {{ passwordRequirements().hasUppercase ? '✓' : '○' }}
+                                    </span>
+                                    대문자 포함
+                                </div>
+                                <div class="requirement-item" 
+                                     [class.completed]="passwordRequirements().hasNumber">
+                                    <span class="requirement-icon">
+                                        {{ passwordRequirements().hasNumber ? '✓' : '○' }}
+                                    </span>
+                                    숫자 포함
+                                </div>
+                                <div class="requirement-item" 
+                                     [class.completed]="passwordRequirements().hasSpecialChar">
+                                    <span class="requirement-icon">
+                                        {{ passwordRequirements().hasSpecialChar ? '✓' : '○' }}
+                                    </span>
+                                    특수문자 포함
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    
+                    @if (loginForm.get('password')?.invalid && loginForm.get('password')?.touched) {
+                        <small class="text-danger">
+                            {{ passwordStrength() === 'weak' ? 
+                               '비밀번호가 너무 약합니다. 요구사항을 확인해주세요' : 
+                               '비밀번호를 입력해주세요' }}
+                        </small>
+                    }
+                </div>
+                
+                <div class="form-col">
+                    <label class="form-label" for="signup-username">별칭</label>
+                    <input class="form-control"
+                           id="signup-username"
+                           type="text"
+                           formControlName="username"
+                           placeholder="서비스에서 사용할 별칭을 입력해주세요"
+                           autocomplete="username">
+                    @if (loginForm.get('username')?.invalid && loginForm.get('username')?.touched) {
+                        <small class="text-danger">
+                            별칭을 입력해주세요
+                        </small>
+                    }
+                </div>
+            </div>
+        </form>
+        
+        <button class="btn btn-sign-up-aws" 
+                type="submit" 
+                form="aws-sign-up-form" 
+                [disabled]="loginForm.invalid || passwordStrength() === 'weak'"
+                aria-label="AWS로 회원가입">
+            계정 만들기
+        </button>
+    }
+
+    <!-- 인증 코드 확인 폼 -->
+    @else {
+        <form id="verification-form" 
+              class="login-form" 
+              [formGroup]="emailForm" 
+              (ngSubmit)="onSubmit($event)"
+              novalidate>
+            <div class="form-row">
+                <div class="form-col">
+                    <label class="form-label" for="verification-code">인증 코드</label>
+                    <input class="form-control" 
+                           id="verification-code"
+                           type="text" 
+                           formControlName="verificationCode"
+                           placeholder="6자리 인증 코드를 입력하세요"
+                           maxlength="6"
+                           autocomplete="one-time-code">
+                    @if (emailForm.get('verificationCode')?.invalid && emailForm.get('verificationCode')?.touched) {
+                        <small class="text-danger">
+                            6자리 인증 코드를 입력해주세요
+                        </small>
+                    }
+                </div>
+            </div>
+        </form>
+        
+        <button class="btn btn-sign-up-aws" 
+                type="submit" 
+                form="verification-form" 
+                [disabled]="emailForm.invalid"
+                aria-label="인증 코드 확인">
+            인증 코드 확인
+        </button>
+    }
+</div>

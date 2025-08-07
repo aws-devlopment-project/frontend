@@ -1,0 +1,163 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - node --version
+        - npm --version
+        - npm ci --no-audit --prefer-offline
+        - npx ng version
+        - |
+          if [ -z "$COGNITO_USER_POOL_ID" ] || [ -z "$COGNITO_CLIENT_ID" ]; then
+            echo "Warning: Cognito environment variables are not set - using placeholder values"
+            echo "Please update these after getting the Amplify domain"
+            export COGNITO_USER_POOL_ID="${COGNITO_USER_POOL_ID:-placeholder}"
+            export COGNITO_CLIENT_ID="${COGNITO_CLIENT_ID:-placeholder}"
+            export COGNITO_IDENTITY_POOL_ID="${COGNITO_IDENTITY_POOL_ID:-placeholder}"
+            export COGNITO_DOMAIN="${COGNITO_DOMAIN:-placeholder.auth.ap-northeast-2.amazoncognito.com}"
+            export REDIRECT_SIGN_IN="${REDIRECT_SIGN_IN:-https://placeholder.amplifyapp.com}"
+            export REDIRECT_SIGN_OUT="${REDIRECT_SIGN_OUT:-https://placeholder.amplifyapp.com}"
+            export APP_REGION="${APP_REGION:-ap-northeast-2}"
+          fi
+        - |
+          cat <<EOF > src/environments/environment.prod.ts
+          export const environment = {
+            production: true,
+            framework: 'Angular',
+            version: '20.1.0',
+            buildTool: 'esbuild',
+            runtime: 'Node.js',
+            userPoolId: '${COGNITO_USER_POOL_ID:-}',
+            userPoolClientId: '${COGNITO_CLIENT_ID:-}',
+            identityPoolId: '${COGNITO_IDENTITY_POOL_ID:-}',
+            region: '${APP_REGION:-ap-northeast-2}',
+            googleClientId: '${GOOGLE_CLIENT_ID:-}',
+            cognitoDomain: '${COGNITO_DOMAIN:-}',
+            redirectSignIn: '${REDIRECT_SIGN_IN:-}',
+            redirectSignOut: '${REDIRECT_SIGN_OUT:-}',
+            apiUrl: '$API_URL',
+            environment: 'production',
+            logLevel: 'error'
+          };
+          EOF
+        - |
+          cat <<EOF > src/environments/environment.ts
+          export const environment = {
+            production: false,
+            framework: 'Angular',
+            version: '20.1.0',
+            buildTool: 'esbuild',
+            runtime: 'Node.js',
+            userPoolId: '$COGNITO_USER_POOL_ID',
+            userPoolClientId: '$COGNITO_CLIENT_ID',
+            identityPoolId: '$COGNITO_IDENTITY_POOL_ID',
+            region: '$APP_REGION',
+            googleClientId: '$GOOGLE_CLIENT_ID',
+            cognitoDomain: '$COGNITO_DOMAIN',
+            redirectSignIn: '$GOOGLE_REDIRECT_SIGNIN',
+            redirectSignOut: '$GOOGLE_REDIRECT_SIGNOUT',
+            apiUrl: '$API_URL_DEV',
+            environment: 'development',
+            logLevel: 'debug'
+          };
+          EOF
+        - |
+          cat <<EOF > src/app/Auth/Configure/aws-export.ts
+          const awsmobile = {
+            aws_project_region: '$APP_REGION',
+            aws_cognito_region: '$APP_REGION',
+            aws_user_pools_id: '$COGNITO_USER_POOL_ID',
+            aws_user_pools_web_client_id: '$COGNITO_CLIENT_ID',
+            aws_cognito_identity_pool_id: '$COGNITO_IDENTITY_POOL_ID',
+            oauth: {
+              domain: '$COGNITO_DOMAIN',
+              scope: ['email', 'openid', 'profile'],
+              redirectSignIn: '$REDIRECT_SIGN_IN',
+              redirectSignOut: '$REDIRECT_SIGN_OUT',
+              responseType: 'code'
+            },
+            aws_cognito_username_attributes: ['email'],
+            aws_cognito_social_providers: ['GOOGLE'],
+            aws_cognito_signup_attributes: ['EMAIL'],
+            aws_cognito_mfa_configuration: 'OPTIONAL',
+            aws_cognito_password_protection_settings: {
+              passwordPolicyMinLength: 8,
+              passwordPolicyCharacters: [
+                'REQUIRES_LOWERCASE',
+                'REQUIRES_UPPERCASE', 
+                'REQUIRES_NUMBERS',
+                'REQUIRES_SYMBOLS'
+              ]
+            },
+            aws_cognito_verification_mechanisms: ['EMAIL'],
+            API: {
+              endpoints: [
+                {
+                  name: 'api',
+                  endpoint: '$API_URL',
+                  region: '$APP_REGION'
+                }
+              ]
+            },
+            Auth: {
+              Cognito: {
+                userPoolId: '$COGNITO_USER_POOL_ID',
+                userPoolClientId: '$COGNITO_CLIENT_ID',
+                identityPoolId: '$COGNITO_IDENTITY_POOL_ID',
+                signUpVerificationMethod: 'code' as const,
+                loginWith: {
+                  username: false,
+                  email: true,
+                  phone: false
+                }
+              }
+            }
+          };
+          
+          export default awsmobile;
+          EOF
+
+        - echo "Pre-build configuration completed"
+    
+    build:
+      commands:
+        - npm run build -- --configuration production --verbose --progress=false
+        - |
+          if [ ! -d "dist/frontend/browser" ]; then
+            echo "Error: Build output directory not found"
+            exit 1
+          fi
+        - du -sh dist/frontend/browser/
+    
+    postBuild:
+      commands:
+        - |
+          if [ -z "$COGNITO_USER_POOL_ID" ] || [ "$COGNITO_USER_POOL_ID" = "placeholder" ]; then
+            echo ""
+            echo "🔶 NEXT STEPS REQUIRED:"
+            echo "1. Note your Amplify app domain from the Amplify console"
+            echo "2. Update Cognito settings with this domain"
+            echo "3. Set the following environment variables in Amplify:"
+            echo "   - COGNITO_USER_POOL_ID"
+            echo "   - COGNITO_CLIENT_ID"
+            echo "   - COGNITO_IDENTITY_POOL_ID"
+            echo "   - COGNITO_DOMAIN"
+            echo "   - REDIRECT_SIGN_IN (your Amplify domain)"
+            echo "   - REDIRECT_SIGN_OUT (your Amplify domain)"
+            echo "4. Trigger a new build to enable authentication"
+            echo ""
+          else
+            echo "✅ Authentication configured successfully"
+          fi
+
+  artifacts:
+    baseDirectory: dist/frontend/browser/
+    files:
+      - '**/*'
+    name: frontend-build-artifacts
+  
+  cache:
+    paths:
+      - node_modules/**/*
+      - .angular/cache/**/*
+      - ~/.npm/**/*
