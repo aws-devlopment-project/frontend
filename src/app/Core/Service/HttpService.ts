@@ -79,8 +79,8 @@ export class HttpService {
         customHeaders.set('Authorization', authHeaders.get('Authorization') || '') : 
         authHeaders;
 
-      return this.http.get<{data: T}>(url, { headers }).pipe(
-        map(response => response.data),
+      return this.http.get<{data: T[]}>(url, { headers }).pipe(
+        map(response => response.data[0]),
         catchError(error => this.handleError(error, url))
       );
     } catch (error) {
