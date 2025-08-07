@@ -71,7 +71,7 @@ export class GroupDashboardComponent implements OnInit {
 
   private async getJoinedGroups(): Promise<string[]> {
     try {
-      const userJoinList = await this.userService.getUserJoinList(this.shared.currentUser()?.name);
+      const userJoinList = await this.userService.getUserJoin(this.shared.currentUser()?.name);
       const joinedGroups = userJoinList ? userJoinList.joinList.map(join => join.groupname) : [];
       return joinedGroups ? joinedGroups : [];
     } catch (error) {

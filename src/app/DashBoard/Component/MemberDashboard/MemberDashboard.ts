@@ -6,7 +6,7 @@ import { MatIconModule } from "@angular/material/icon";
 import { FormsModule } from "@angular/forms";
 import { RouterLink } from "@angular/router";
 import { ManagementDashboardService } from "../../Service/ManagementDashboard";
-import { UserJoinList } from "../../../Core/Models/user";
+import { UserJoin } from "../../../Core/Models/user";
 
 interface UserProfile {
   username: string;
@@ -80,7 +80,7 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
   });
 
   // 그룹 데이터를 signal로 관리
-  joinedGroups = signal<UserJoinList['joinList'] | undefined>(undefined);
+  joinedGroups = signal<UserJoin['joinList'] | undefined>(undefined);
   groupsLoading = signal<boolean>(false);
 
   // 아바타 미리보기 URL

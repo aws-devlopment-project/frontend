@@ -2,7 +2,7 @@ import { Injectable, signal } from '@angular/core';
 import { DataCacheService } from '../../Core/Service/DataCacheService';
 import { UserService } from '../../Core/Service/UserService';
 import { GroupService } from '../../Core/Service/GroupService';
-import { UserCredentials, UserStatus, UserJoinList, UserQuestCur, UserQuestPrev, UserQuestWeekly } from '../../Core/Models/user'
+import { UserCredentials, UserStatus, UserJoin, UserQuestCur, UserQuestPrev, UserQuestWeekly } from '../../Core/Models/user'
 import { Group } from '../../Core/Models/group';
 import { Club } from '../../Core/Models/club';
 
@@ -219,7 +219,7 @@ export class LocalActivityService {
     if (!userCreds) return this.getEmptyGroupStats();
 
     try {
-      const joinList = await this.userService.getUserJoinList(userCreds.id);
+      const joinList = await this.userService.getUserJoin(userCreds.id);
       if (!joinList) return this.getEmptyGroupStats();
 
       const totalGroups = joinList.joinList.length;
@@ -361,7 +361,7 @@ export class LocalActivityService {
     if (!userCreds) return;
 
     try {
-      const joinList = await this.userService.getUserJoinList(userCreds.id);
+      const joinList = await this.userService.getUserJoin(userCreds.id);
       if (!joinList) return;
 
       if (type === 'group' && joinList.joinList.length === 1) {
