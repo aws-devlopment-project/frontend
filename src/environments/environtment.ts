@@ -258,3 +258,9 @@ export const matchingGroup = [
     tags: ["뷰티", "안티에이징", "셀프케어", "건강한피부"]
   }
 ]
+
+export const matchingGroupTable: { [key: string]: number} = {
+  '건강': 0,
+  '금융': 1,
+  '스킨케어': 2
+}

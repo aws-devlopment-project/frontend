@@ -2,10 +2,9 @@ import { Injectable } from "@angular/core";
 import { DataCacheService } from "./DataCacheService";
 import { HttpService } from "./HttpService";
 import { HttpHeaders } from "@angular/common/http";
-import { environment } from "../../../environments/environment.prod";
+import { matchingGroupTable, environment } from "../../../environments/environtment";
 import { Group } from "../Models/group";
 import { UserService } from "./UserService";
-import { groupList } from "../Models/groupList";
 
 @Injectable({
     providedIn: 'root'
@@ -14,6 +13,7 @@ export class GroupService {
 
     constructor(private httpService: HttpService, private dataService: DataCacheService, private userSerivce: UserService) {}
 
+    table = matchingGroupTable;
     async checkQuestCreateTime(groupname: string) : Promise<boolean> {
         const group: Group | null = await this.dataService.getCache(groupname);
 
@@ -42,19 +42,18 @@ export class GroupService {
         return undefined;
     }
 
-    async getGroupList(): Promise<string[]> {
-        const cacheGroupList: string[] | null = await this.dataService.getCache('groupList');
-
-        if (cacheGroupList) {
-            return cacheGroupList;
-        }
+    async getGroupList(): Promise<Group[] | []> {
         const url = environment.apiUrl + '/api/group/getGroupList';
         const headers: HttpHeaders = new HttpHeaders({
             'Content-Type': 'application/json'
         });
         const response = await this.httpService.get(url, headers).toPromise();
-        this.dataService.setCache('groupList', response);
-        const groupList: string[] | null = await this.dataService.getCache('groupList')
+        const groupList: Group[] | null = JSON.parse(response.data);
+        if (groupList) {
+            groupList.forEach((group) => {
+                this.dataService.setCache(group.name, group);
+            });
+        }
         return groupList ? groupList : [];
     }
 

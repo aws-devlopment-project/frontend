@@ -61,6 +61,7 @@ export class SideBarComponent implements OnInit {
 
     // === Section Toggle ===
     toggleSection(sectionId: string): void {
+        console.log('Toggling section:', sectionId);
         this.sharedState.toggleSection(sectionId);
         
         // 부모에게 그룹 선택 알림

@@ -4,7 +4,6 @@ import { Router } from "@angular/router";
 import { LoginService } from "../../Service/LoginService";
 import { DataCacheService } from "../../../Core/Service/DataCacheService";
 import { UserCredentials, UserStatus } from "../../../Core/Models/user";
-import { fetchUserAttributes } from '@aws-amplify/auth';
 
 @Component({
     selector: 'app-auth-login',

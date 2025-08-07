@@ -15,7 +15,7 @@
     <div class="dashboard-header">
       <div class="header-content">
         <h1>나의 활동 현황</h1>
-        <p>개인 활동 기록과 성장 패턴을 확인해보세요</p>
+        <p class="page-description">개인 활동 기록과 성장 패턴을 확인해보세요</p>
       </div>
       <div class="header-actions">
         <button class="refresh-btn" (click)="refreshData()">
@@ -28,12 +28,21 @@
     <div class="stats-section">
       <div class="stats-grid">
         @for (stat of weeklyStats(); track stat.label) {
-          <div class="stat-card">
-            <div class="stat-icon" [style.background-color]="stat.color">
+          <div class="stat-card" [class.trending]="stat.trend === 'up'" [style.--stat-color]="stat.color">
+            <div class="stat-icon" [style.background]="'linear-gradient(135deg, ' + stat.color + ', ' + stat.color + '99)'">
               <mat-icon>{{ stat.icon }}</mat-icon>
             </div>
             <div class="stat-content">
-              <div class="stat-value">{{ stat.value }}{{ stat.unit }}</div>
+              <div class="stat-value">
+                {{ stat.value }}{{ stat.unit }}
+                @if (stat.trend) {
+                  <span class="stat-trend" [class]="stat.trend">
+                    @if (stat.trend === 'up') { ↗ }
+                    @else if (stat.trend === 'down') { ↘ }
+                    @else { → }
+                  </span>
+                }
+              </div>
               <div class="stat-label">{{ stat.label }}</div>
             </div>
           </div>
@@ -41,11 +50,44 @@
       </div>
     </div>
 
+    <!-- 스마트 인사이트 섹션 -->
+    @if (smartInsights().length > 0) {
+      <div class="insights-section">
+        <div class="section-card">
+          <div class="section-header">
+            <h2>💡 개인화된 인사이트</h2>
+            <div class="insight-summary">
+              @if (hasHighPriorityInsights()) {
+                <span style="color: #3182ce; font-weight: 600;">🔥 주목할 성과가 있어요!</span>
+              }
+            </div>
+          </div>
+          
+          <div class="insights-grid">
+            @for (insight of smartInsights(); track insight.message; let i = $index) {
+              @if (i < 3) {
+                <div class="insight-card" [class.high-priority]="insight.priority === 'high'">
+                  <div class="insight-icon">{{ getInsightIcon(insight) }}</div>
+                  <div class="insight-content">
+                    <p class="insight-message">{{ insight.message }}</p>
+                    @if (insight.suggestion) {
+                      <p class="insight-suggestion">{{ insight.suggestion }}</p>
+                    }
+                  </div>
+                  <div class="priority-indicator" [class]="insight.priority"></div>
+                </div>
+              }
+            }
+          </div>
+        </div>
+      </div>
+    }
+
     <!-- 주간 퀘스트 현황 -->
     @if (activityData(); as data) {
       <div class="section-card">
         <div class="section-header">
-          <h2>이번 주 퀘스트 현황</h2>
+          <h2>📊 이번 주 퀘스트 현황</h2>
           <div class="completion-rate">
             <span class="rate-number">{{ getCompletionRate() }}%</span>
             <span class="rate-label">완료율</span>
@@ -59,7 +101,7 @@
               <div class="day-bars">
                 <div class="quest-bar-container">
                   <div class="quest-bar completed" 
-                       [style.height.%]="(day.completed / day.target) * 100">
+                       [style.height.%]="day.target > 0 ? (day.completed / day.target) * 100 : 0">
                   </div>
                   <div class="quest-bar total"></div>
                 </div>
@@ -77,15 +119,17 @@
       <!-- 활동 패턴 분석 -->
       <div class="section-card">
         <div class="section-header">
-          <h2>활동 패턴 분석</h2>
-          <div class="pattern-insights">
-            <span class="insight-item">
-              <strong>가장 활발한 요일:</strong> {{ getBestPerformanceDay() }}
-            </span>
-            <span class="insight-item">
-              <strong>선호 활동:</strong> {{ data.favoriteQuestType }}
-            </span>
-          </div>
+          <h2>📈 일별 활동 패턴 분석</h2>
+          @if (data.personalizedStats?.groupStats) {
+            <div class="pattern-insights">
+              <span class="insight-item">
+                <strong>참여 그룹:</strong> {{ data.personalizedStats.groupStats.totalGroups }}개
+              </span>
+              <span class="insight-item">
+                <strong>활발한 그룹:</strong> {{ data.personalizedStats.groupStats.mostActiveGroup }}
+              </span>
+            </div>
+          }
         </div>
         
         <div class="weekly-pattern">
@@ -94,51 +138,119 @@
               <div class="pattern-day-label">{{ dayData.day }}</div>
               <div class="pattern-bar">
                 <div class="pattern-fill" 
-                     [style.width.%]="(dayData.totalActivities / 5) * 100"
-                     [style.background-color]="dayData.totalActivities > 3 ? '#4ecdc4' : '#e0e6ed'">
+                     [style.width.%]="getPatternBarWidth(dayData.totalActivities, data.weeklyPattern)"
+                     [style.background-color]="getPatternBarColor(dayData.totalActivities, data.weeklyPattern)"
+                     [title]="getActivityLevel(dayData.totalActivities, data.weeklyPattern)">
                 </div>
               </div>
               <div class="pattern-count">{{ dayData.totalActivities }}</div>
+              <div class="pattern-level">{{ getActivityLevel(dayData.totalActivities, data.weeklyPattern) }}</div>
             </div>
           }
+        </div>
+
+        <!-- 활동 패턴 범례 및 통계 -->
+        <div class="pattern-legend">
+          <div class="legend-item">
+            <div class="legend-color" style="background-color: #3182ce;"></div>
+            <span>매우 활발</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background-color: #4299e1;"></div>
+            <span>활발</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background-color: #63b3ed;"></div>
+            <span>보통</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background-color: #90cdf4;"></div>
+            <span>낮음</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background-color: #e2e8f0;"></div>
+            <span>휴식</span>
+          </div>
+        </div>
+
+        <div class="pattern-stats">
+          <div class="pattern-stat">
+            <span class="pattern-stat-value">{{ getWeeklyTotal(data.weeklyPattern) }}</span>
+            <span class="pattern-stat-label">주간 총합</span>
+          </div>
+          <div class="pattern-stat">
+            <span class="pattern-stat-value">{{ getWeeklyAverage(data.weeklyPattern) }}</span>
+            <span class="pattern-stat-label">일평균</span>
+          </div>
+          <div class="pattern-stat">
+            <span class="pattern-stat-value">{{ getMostActiveDay(data.weeklyPattern) }}</span>
+            <span class="pattern-stat-label">최고 활동일</span>
+          </div>
+          <div class="pattern-stat">
+            <span class="pattern-stat-value">{{ getActiveDays(data.weeklyPattern) }}</span>
+            <span class="pattern-stat-label">활동일수</span>
+          </div>
         </div>
       </div>
     }
 
-    <!-- 최근 활동 타임라인 -->
+    <!-- 최근 활동 타임라인 - 우선순위 기반 -->
     <div class="section-card">
       <div class="section-header">
-        <h2>최근 활동</h2>
+        <h2>🎯 주요 최근 활동</h2>
         <div class="activity-summary">
-          총 {{ recentActivities().length }}개 활동
+          중요한 활동 {{ recentActivities().length }}개
         </div>
       </div>
       
       <div class="activity-timeline">
-        @for (activity of recentActivities(); track activity.id) {
-          <div class="timeline-item">
-            <div class="timeline-marker">
-              <div class="activity-icon">{{ activity.icon }}</div>
-            </div>
-            <div class="timeline-content">
-              <div class="activity-header">
-                <h4 class="activity-title">{{ activity.title }}</h4>
-                <div class="activity-meta">
-                  <span class="activity-badge" 
-                        [style.background-color]="getActivityTypeColor(activity.type)">
-                    {{ getActivityTypeBadge(activity.type) }}
-                  </span>
-                  @if (activity.points) {
-                    <span class="activity-points">+{{ activity.points }}pt</span>
-                  }
-                  <span class="activity-time">{{ getTimeAgo(activity.timestamp) }}</span>
-                </div>
+        @for (activity of recentActivities(); track activity.id; let i = $index) {
+          @if (i < 6) {
+            <div class="timeline-item">
+              <div class="timeline-marker">
+                <div class="activity-icon">{{ activity.icon }}</div>
               </div>
-              <p class="activity-description">{{ activity.description }}</p>
+              <div class="timeline-content">
+                <div class="priority-indicator" [class]="activity.priority"></div>
+                <div class="activity-header">
+                  <h4 class="activity-title">{{ activity.title }}</h4>
+                  <div class="activity-meta">
+                    <span class="activity-badge" 
+                          [style.background]="getActivityTypeColor(activity.type)">
+                      {{ getActivityTypeBadge(activity.type) }}
+                    </span>
+                    @if (activity.points) {
+                      <span class="activity-points">+{{ activity.points }}pt</span>
+                    }
+                    <span class="activity-time">{{ getTimeAgo(activity.timestamp) }}</span>
+                  </div>
+                </div>
+                <p class="activity-description">{{ activity.description }}</p>
+              </div>
             </div>
-          </div>
+          }
         }
       </div>
+
+      <!-- 전체 활동 보기 버튼 -->
+      @if (recentActivities().length === 0) {
+        <div class="timeline-footer">
+          <div style="text-align: center; padding: 40px; color: #718096;">
+            <mat-icon style="font-size: 48px; color: #cbd5e0; margin-bottom: 16px;">insights</mat-icon>
+            <h3 style="color: #4a5568; margin: 16px 0 8px 0;">활동을 시작해보세요!</h3>
+            <p style="margin: 0;">첫 번째 퀘스트를 완료하거나 그룹에 참여해보세요.</p>
+          </div>
+        </div>
+      }
+      
+      @if (recentActivities().length > 6) {
+        <div class="timeline-footer">
+          <button class="btn btn-secondary">
+            <mat-icon>visibility</mat-icon>
+            전체 활동 보기
+          </button>
+        </div>
+      }
     </div>
   }
 </div>

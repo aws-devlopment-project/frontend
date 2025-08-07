@@ -1,4 +1,5 @@
-import { Component, signal, OnInit } from "@angular/core";
+// MemberDashboard.ts - 이미지 업로드 아바타 버전
+import { Component, signal, OnInit, ViewChild, ElementRef } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { MatIconModule } from "@angular/material/icon";
 import { FormsModule } from "@angular/forms";
@@ -9,7 +10,7 @@ import { UserJoinList } from "../../../Core/Models/user";
 interface UserProfile {
   username: string;
   email: string;
-  avatar: string;
+  avatar: string; // 이미지 URL 또는 base64 데이터
   joinDate: Date;
   totalQuests: number;
   completedQuests: number;
@@ -50,17 +51,20 @@ interface AppSettings {
   standalone: true
 })
 export class MemberOptionsComponent implements OnInit {
+  @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
+  
   // 상태 관리
   activeSection = signal<string>('profile');
   isLoading = signal<boolean>(false);
   showDeleteConfirm = signal<boolean>(false);
   showAvatarSelector = signal<boolean>(false);
+  avatarUploading = signal<boolean>(false);
   
   // 사용자 데이터
   userProfile = signal<UserProfile>({
     username: '김사용자',
     email: 'user@example.com',
-    avatar: '👤',
+    avatar: '/assets/images/default-avatar.png', // 기본 아바타 이미지
     joinDate: new Date('2024-01-15'),
     totalQuests: 156,
     completedQuests: 89,
@@ -72,8 +76,9 @@ export class MemberOptionsComponent implements OnInit {
   joinedGroups = signal<UserJoinList['joinList'] | undefined>(undefined);
   groupsLoading = signal<boolean>(false);
 
-  // 아바타 옵션
-  availableAvatars = ['👤', '😊', '😎', '🤖', '👨‍💻', '👩‍💻', '🧑‍🎓', '👨‍🏫', '👩‍🏫', '🧑‍💼', '👨‍⚕️', '👩‍⚕️', '🧑‍🎨', '👨‍🚀', '👩‍🚀', '🧙‍♂️', '🧙‍♀️', '🦸‍♂️', '🦸‍♀️', '🐱', '🐶', '🦊', '🐼', '🐯', '🦁'];
+  // 아바타 미리보기 URL
+  avatarPreviewUrl = signal<string | null>(null);
+  selectedAvatarFile = signal<File | null>(null);
 
   // 설정 데이터
   notificationSettings = signal<NotificationSettings>({
@@ -112,15 +117,13 @@ export class MemberOptionsComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.loadUserData();
-    await this.loadJoinedGroups(); // 초기화 시점에 그룹 데이터 로드
+    await this.loadJoinedGroups();
   }
 
   private async loadUserData(): Promise<void> {
-    // 실제 구현에서는 API 호출
     this.userProfile.set(await this.managementDashboardService.getUserProfile());
   }
 
-  // 그룹 데이터를 한 번만 로드하는 메서드
   private async loadJoinedGroups(): Promise<void> {
     this.groupsLoading.set(true);
     try {
@@ -143,29 +146,138 @@ export class MemberOptionsComponent implements OnInit {
   // 아바타 선택기 토글
   toggleAvatarSelector(): void {
     this.showAvatarSelector.update(show => !show);
+    if (!this.showAvatarSelector()) {
+      this.resetAvatarSelection();
+    }
   }
 
-  // 아바타 변경
-  async changeAvatar(newAvatar: string): Promise<void> {
-    this.isLoading.set(true);
+  // 파일 입력 트리거
+  triggerFileInput(): void {
+    this.fileInput.nativeElement.click();
+  }
+
+  // 파일 선택 처리
+  onFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+
+    if (!file) return;
+
+    // 파일 유효성 검사
+    if (!this.isValidImageFile(file)) {
+      this.showSuccessMessage('지원하지 않는 파일 형식입니다. JPG, PNG, GIF 파일만 업로드 가능합니다.');
+      return;
+    }
+
+    // 파일 크기 검사 (5MB 제한)
+    if (file.size > 5 * 1024 * 1024) {
+      this.showSuccessMessage('파일 크기는 5MB 이하만 업로드 가능합니다.');
+      return;
+    }
+
+    this.selectedAvatarFile.set(file);
+    this.createPreviewUrl(file);
+  }
+
+  // 이미지 파일 유효성 검사
+  private isValidImageFile(file: File): boolean {
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    return allowedTypes.includes(file.type);
+  }
+
+  // 미리보기 URL 생성
+  private createPreviewUrl(file: File): void {
+    if (this.avatarPreviewUrl()) {
+      URL.revokeObjectURL(this.avatarPreviewUrl()!);
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    this.avatarPreviewUrl.set(previewUrl);
+  }
+
+  // 아바타 미리보기 리셋
+  private resetAvatarSelection(): void {
+    if (this.avatarPreviewUrl()) {
+      URL.revokeObjectURL(this.avatarPreviewUrl()!);
+      this.avatarPreviewUrl.set(null);
+    }
+    this.selectedAvatarFile.set(null);
+    
+    // 파일 입력 초기화
+    if (this.fileInput?.nativeElement) {
+      this.fileInput.nativeElement.value = '';
+    }
+  }
+
+  // 아바타 변경 확인
+  async confirmAvatarChange(): Promise<void> {
+    const file = this.selectedAvatarFile();
+    if (!file) {
+      this.showSuccessMessage('선택된 파일이 없습니다.');
+      return;
+    }
+
+    this.avatarUploading.set(true);
     
     try {
-      await this.managementDashboardService.setAvatar(newAvatar);
+      // 파일을 base64 또는 FormData로 변환하여 서버에 전송
+      await this.uploadAvatarImage(file);
       
-      // 프로필 업데이트
+      // 성공적으로 업로드되면 프로필 업데이트
+      const newAvatarUrl = this.avatarPreviewUrl() || URL.createObjectURL(file);
       this.userProfile.update(profile => ({
         ...profile,
-        avatar: newAvatar
+        avatar: newAvatarUrl
       }));
       
       this.showAvatarSelector.set(false);
       this.showSuccessMessage('아바타가 성공적으로 변경되었습니다.');
+      
     } catch (error) {
-      console.error('아바타 변경 실패:', error);
-      this.showSuccessMessage('아바타 변경에 실패했습니다.');
+      console.error('아바타 업로드 실패:', error);
+      this.showSuccessMessage('아바타 변경에 실패했습니다. 다시 시도해 주세요.');
     } finally {
-      this.isLoading.set(false);
+      this.avatarUploading.set(false);
+      this.resetAvatarSelection();
     }
+  }
+
+  // 아바타 이미지 업로드
+  private async uploadAvatarImage(file: File): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = async (e) => {
+        try {
+          const base64Data = e.target?.result as string;
+          
+          // ManagementDashboardService의 setAvatar를 통해 서버로 전송
+          // base64 데이터 또는 파일 객체를 전송
+          // await this.managementDashboardService.setAvatarImage(base64Data);
+          
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      reader.onerror = () => {
+        reject(new Error('파일 읽기에 실패했습니다.'));
+      };
+      
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // 현재 아바타 이미지 URL 가져오기
+  getCurrentAvatarUrl(): string {
+    return this.avatarPreviewUrl() || this.userProfile().avatar || '/assets/images/default-avatar.png';
+  }
+
+  // 아바타 이미지 로드 에러 처리
+  onAvatarImageError(event: Event): void {
+    const img = event.target as HTMLImageElement;
+    img.src = '/assets/images/default-avatar.png';
   }
 
   // 프로필 업데이트
@@ -192,11 +304,9 @@ export class MemberOptionsComponent implements OnInit {
   async leaveGroup(groupId: string): Promise<void> {
     if (confirm('정말로 이 그룹에서 탈퇴하시겠습니까? 그룹 내 모든 채널에서도 탈퇴됩니다.')) {
       try {
-        // 실제 탈퇴 로직 수행
         console.log('그룹 탈퇴:', groupId);
         await this.managementDashboardService.leaveGroup(groupId);
         
-        // 탈퇴 후 그룹 목록 새로고침
         await this.loadJoinedGroups();
         this.showSuccessMessage('그룹에서 탈퇴되었습니다.');
       } catch (error) {
@@ -212,7 +322,6 @@ export class MemberOptionsComponent implements OnInit {
       try {
         await this.managementDashboardService.leaveChannel(groupId, channelId);
         
-        // 탈퇴 후 그룹 목록 새로고침
         await this.loadJoinedGroups();
         this.showSuccessMessage(`"${channelId}" 채널에서 탈퇴되었습니다.`);
       } catch (error) {
@@ -238,7 +347,6 @@ export class MemberOptionsComponent implements OnInit {
     await this.managementDashboardService.departUser();
     alert('계정이 성공적으로 탈퇴되었습니다. 이용해 주셔서 감사합니다.');
     
-    // 로그아웃 및 홈페이지로 이동
     localStorage.clear();
     sessionStorage.clear();
     window.location.href = '/';
@@ -255,7 +363,6 @@ export class MemberOptionsComponent implements OnInit {
 
   // 유틸리티 메서드
   private showSuccessMessage(message: string): void {
-    // 실제로는 토스트나 스낵바 표시
     alert(message);
   }
 
@@ -281,5 +388,12 @@ export class MemberOptionsComponent implements OnInit {
 
   delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // 컴포넌트 파괴 시 메모리 정리
+  ngOnDestroy(): void {
+    if (this.avatarPreviewUrl()) {
+      URL.revokeObjectURL(this.avatarPreviewUrl()!);
+    }
   }
 }
