@@ -1,0 +1,87 @@
+<div class="searchBar-container">
+    <div class="searchBar" [class.focused]="isFocused()">
+        <mat-icon fontIcon="search" class="searchIcon"></mat-icon>
+        <input 
+            class="search-bar-input" 
+            type="text" 
+            placeholder="채널 검색"
+            aria-label="검색"
+            autocomplete="off"
+            [value]="searchValue()"
+            (input)="onSearchInput($event)"
+            (focus)="onSearchFocus()"
+            (blur)="onSearchBlur()"
+            (keydown)="onSearchKeydown($event)"
+            #searchInput
+        />
+        <span class="search-shortcut" [class.hidden]="isFocused()">⌘K</span>
+    </div>
+
+    <!-- 검색 결과 드롭다운 -->
+    @if (shouldShowDropdown()) {
+        <div class="search-dropdown">
+            <!-- 로딩 상태 -->
+            @if (isSearching()) {
+                <div class="search-loading">
+                    <mat-icon class="loading-icon">hourglass_empty</mat-icon>
+                    <span>검색 중...</span>
+                </div>
+            }
+            
+            <!-- 검색 결과가 없을 때 -->
+            @else if (!hasSearchResults() && searchValue().trim()) {
+                <div class="no-results">
+                    <mat-icon>search_off</mat-icon>
+                    <div class="no-results-content">
+                        <span class="no-results-title">검색 결과가 없습니다</span>
+                        <span class="no-results-subtitle">"{{ searchValue() }}"에 대한 결과를 찾을 수 없습니다</span>
+                    </div>
+                </div>
+            }
+            
+            <!-- 검색 결과 목록 -->
+            @else if (hasSearchResults()) {
+                <div class="search-results">
+                    <div class="search-results-header">
+                        <span>검색 결과 ({{ searchResults().length }})</span>
+                        <span class="search-tip">↑↓ 화살표로 이동, Enter로 선택</span>
+                    </div>
+                    
+                    @for (result of searchResults(); track result.id; let i = $index) {
+                        <div 
+                            class="search-result-item"
+                            [class.selected]="selectedResultIndex() === i"
+                            [class]="'result-type-' + result.type"
+                            (click)="selectSearchResult(result, i)"
+                            (mouseenter)="selectedResultIndex.set(i)"
+                            [attr.data-index]="i">
+                            
+                            <div class="result-icon" [class]="'icon-' + result.type">
+                                <mat-icon>{{ getResultIcon(result) }}</mat-icon>
+                            </div>
+                            
+                            <div class="result-content">
+                                <div class="result-title">{{ result.title }}</div>
+                                @if (result.description) {
+                                    <div class="result-description">{{ result.description }}</div>
+                                }
+                            </div>
+                            
+                            <div class="result-type-badge">
+                                <span class="type-label" [class]="'type-' + result.type">
+                                    {{ getTypeLabel(result.type) }}
+                                </span>
+                            </div>
+                        </div>
+                    }
+                    
+                    <div class="search-footer">
+                        <span class="search-footer-text">
+                            더 많은 결과를 보려면 Enter를 누르세요
+                        </span>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
