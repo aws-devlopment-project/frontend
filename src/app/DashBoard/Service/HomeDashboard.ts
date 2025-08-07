@@ -77,8 +77,8 @@ export class HomeDashboardService {
         stat[0].value = `${rate}%`;
         stat[0].change = this.getGoalRateMessage(rate);
         stat[0].trend = rate >= 50 ? 'up' : 'down';
-        stat[1].value = `${userInfo.joinList.length}`;
-        stat[2].value = `${continuousSuccess}`;
+        stat[1].value = `${userInfo.joinList.length}개`;
+        stat[2].value = `${continuousSuccess}일`;
         return stat;
     }
 

@@ -532,6 +532,141 @@ export class UserService {
         }
     }
 
+    async setUserAvatar(id: string = "", imageData: string): Promise<boolean> {
+        try {
+            if (!id) {
+                const user = await this.getUserCredentials();
+                if (!user) return false;
+                id = user.id;
+            }
+
+            // base64 헤더 제거 (data:image/jpeg;base64, 부분)
+            const base64Data = imageData.includes(',') ? imageData.split(',')[1] : imageData;
+
+            const url = `${environment.apiUrl}/api/user/setUserAvatar`;
+            const payload = {
+                user: id,
+                avatar: base64Data
+            };
+
+            await firstValueFrom(
+                this.httpService.post(url, payload, 
+                    new HttpHeaders({ 'Content-Type': 'application/json' })
+                ).pipe(
+                    tap(() => {
+                        // 캐시 업데이트
+                        this.updateUserAvatarInCache(id, imageData);
+                    }),
+                    catchError(error => {
+                        console.error('[API] setUserAvatar error:', error);
+                        return throwError(error);
+                    })
+                )
+            );
+
+            return true;
+        } catch (error) {
+            console.error('[API] setUserAvatar failed:', error);
+            return false;
+        }
+    }
+
+    /**
+     * 아바타 리셋 (기본 아바타로)
+     */
+    async resetUserAvatar(id: string = ""): Promise<boolean> {
+        try {
+            if (!id) {
+                const user = await this.getUserCredentials();
+                if (!user) return false;
+                id = user.id;
+            }
+
+            const url = `${environment.apiUrl}/api/user/resetUserAvatar`;
+            const payload = { user: id };
+
+            await firstValueFrom(
+                this.httpService.post(url, payload, 
+                    new HttpHeaders({ 'Content-Type': 'application/json' })
+                ).pipe(
+                    tap(() => {
+                        this.updateUserAvatarInCache(id, '');
+                    }),
+                    catchError(error => {
+                        console.error('[API] resetUserAvatar error:', error);
+                        return throwError(error);
+                    })
+                )
+            );
+
+            return true;
+        } catch (error) {
+            console.error('[API] resetUserAvatar failed:', error);
+            return false;
+        }
+    }
+
+    /**
+     * 이미지 파일을 base64로 변환하여 업로드
+     */
+    async uploadAvatarFile(id: string = "", file: File): Promise<boolean> {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            
+            reader.onload = async (e) => {
+                try {
+                    const base64Data = e.target?.result as string;
+                    const result = await this.setUserAvatar(id, base64Data);
+                    resolve(result);
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            
+            reader.onerror = () => reject(new Error('파일 읽기 실패'));
+            reader.readAsDataURL(file);
+        });
+    }
+
+    /**
+     * 캐시된 아바타 정보 업데이트
+     */
+    private updateUserAvatarInCache(userId: string, avatarData: string): void {
+        try {
+            const cacheUserStatus: UserStatus | null = this.cacheService.getCache('userStatus');
+            if (cacheUserStatus && cacheUserStatus.id === userId) {
+                cacheUserStatus.avatar = avatarData || '/assets/images/default-avatar.png';
+                this.cacheService.setCache('userStatus', cacheUserStatus);
+            }
+        } catch (error) {
+            console.error('Error updating avatar in cache:', error);
+        }
+    }
+
+    /**
+     * 이미지 파일 유효성 검사
+     */
+    validateImageFile(file: File): { isValid: boolean; error?: string } {
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+        const maxSize = 5 * 1024 * 1024; // 5MB
+
+        if (!allowedTypes.includes(file.type)) {
+            return {
+                isValid: false,
+                error: '지원하지 않는 파일 형식입니다. JPG, PNG, GIF, WebP 파일만 업로드 가능합니다.'
+            };
+        }
+
+        if (file.size > maxSize) {
+            return {
+                isValid: false,
+                error: '파일 크기는 5MB 이하만 업로드 가능합니다.'
+            };
+        }
+
+        return { isValid: true };
+    }
+
     // === 헬퍼 메서드들 ===
     private async updateJoinListCache(
         id: string, 
@@ -552,41 +687,6 @@ export class UserService {
             console.error('Error updating join list cache:', error);
             // 캐시 업데이트 실패 시 캐시 무효화
             this.cacheService.removeCache('userJoinList');
-        }
-    }
-
-    private async setUserAvatar(id: string = "", avatar: string): Promise<boolean> {
-        try {
-            if (!id) {
-                const user = await this.getUserCredentials();
-                if (!user) return false;
-                id = user.id;
-            }
-
-            const url = `${environment.apiUrl}/api/user/setUserAvatar`;
-            const body = { user: id, avatar: avatar };
-            const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
-
-            await firstValueFrom(
-                this.httpService.post(url, body, headers).pipe(
-                    catchError(error => {
-                        console.error('[API] setUseravatar error:', error);
-                        return throwError(error);
-                    })
-                )
-            );
-
-            // 캐시 업데이트
-            const cacheUserStatus: UserStatus | null = this.cacheService.getCache('userStatus');
-            if (cacheUserStatus) {
-                cacheUserStatus.avatar = avatar;
-                this.cacheService.setCache('userStatus', cacheUserStatus);
-            }
-
-            return true;
-        } catch (error) {
-            console.error('[API] setUseravatar failed:', error);
-            return false;
         }
     }
 

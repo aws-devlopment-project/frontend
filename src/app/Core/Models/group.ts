@@ -1,4 +1,5 @@
 export interface Group {
+    id: number,
     name: string,
     description?: string,
     icon?: string,
@@ -8,6 +9,7 @@ export interface Group {
     questSuccessNum: number[],
     currentActivateUserNum?: number,
     clubList: {
+        id: number,
         name: string,
         description?: string,
         icon?: string,

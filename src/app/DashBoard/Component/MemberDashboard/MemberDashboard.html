@@ -3,7 +3,12 @@
     <!-- 사이드바 메뉴 -->
     <div class="options-sidebar">
       <div class="user-summary">
-        <div class="user-avatar">{{ userProfile().avatar }}</div>
+        <div class="user-avatar-image">
+          <img [src]="getCurrentAvatarUrl()" 
+               (error)="onAvatarImageError($event)"
+               alt="사용자 아바타"
+               class="avatar-image">
+        </div>
         <div class="user-info">
           <h3>{{ userProfile().username }}</h3>
           <p>가입 {{ getJoinDuration() }} 차</p>
@@ -37,29 +42,74 @@
           
           <div class="profile-section">
             <div class="profile-avatar-section">
-              <div class="avatar-display">{{ userProfile().avatar }}</div>
+              <div class="avatar-display-image">
+                <img [src]="getCurrentAvatarUrl()" 
+                     (error)="onAvatarImageError($event)"
+                     alt="사용자 아바타"
+                     class="profile-avatar-img">
+              </div>
               <button class="btn btn-secondary" (click)="toggleAvatarSelector()">
                 아바타 변경
               </button>
               
-              <!-- 아바타 선택기 -->
+              <!-- 아바타 업로드 -->
               @if (showAvatarSelector()) {
-                <div class="avatar-selector">
-                  <h4>아바타 선택</h4>
-                  <div class="avatar-grid">
-                    @for (avatar of availableAvatars; track avatar) {
-                      <button class="avatar-option" 
-                              [class.selected]="userProfile().avatar === avatar"
-                              [disabled]="isLoading()"
-                              (click)="changeAvatar(avatar)">
-                        {{ avatar }}
+                <div class="avatar-uploader">
+                  <h4>아바타 이미지 업로드</h4>
+                  
+                  <!-- 파일 입력 (숨김) -->
+                  <input #fileInput 
+                         type="file" 
+                         accept="image/*"
+                         (change)="onFileSelected($event)"
+                         style="display: none;">
+                  
+                  <!-- 미리보기 영역 -->
+                  @if (avatarPreviewUrl()) {
+                    <div class="avatar-preview">
+                      <img [src]="avatarPreviewUrl()" 
+                           alt="아바타 미리보기"
+                           class="preview-image">
+                      <p class="preview-info">미리보기</p>
+                    </div>
+                  }
+                  
+                  <!-- 업로드 버튼들 -->
+                  <div class="avatar-upload-actions">
+                    <button class="btn btn-secondary btn-sm" 
+                            (click)="triggerFileInput()"
+                            [disabled]="avatarUploading()">
+                      <mat-icon>photo_camera</mat-icon>
+                      이미지 선택
+                    </button>
+                    
+                    @if (selectedAvatarFile()) {
+                      <button class="btn btn-primary btn-sm" 
+                              (click)="confirmAvatarChange()"
+                              [disabled]="avatarUploading()">
+                        @if (avatarUploading()) {
+                          <div class="btn-spinner"></div>
+                          업로드 중...
+                        } @else {
+                          <mat-icon>check</mat-icon>
+                          적용하기
+                        }
                       </button>
                     }
-                  </div>
-                  <div class="avatar-selector-actions">
-                    <button class="btn btn-secondary btn-sm" (click)="toggleAvatarSelector()">
+                    
+                    <button class="btn btn-secondary btn-sm" 
+                            (click)="toggleAvatarSelector()"
+                            [disabled]="avatarUploading()">
                       취소
                     </button>
+                  </div>
+                  
+                  <!-- 업로드 가이드 -->
+                  <div class="upload-guide">
+                    <p class="guide-text">
+                      <mat-icon class="guide-icon">info</mat-icon>
+                      JPG, PNG, GIF 파일만 업로드 가능 (최대 5MB)
+                    </p>
                   </div>
                 </div>
               }
@@ -77,30 +127,6 @@
                 <label>이메일</label>
                 <p class="form-input">{{userProfile().email}}</p>
               </div>
-              
-              <!-- <div class="profile-stats">
-                <div class="stat-item">
-                  <div class="stat-value">{{ userProfile().totalQuests }}</div>
-                  <div class="stat-label">총 퀘스트</div>
-                </div>
-                <div class="stat-item">
-                  <div class="stat-value">{{ userProfile().completedQuests }}</div>
-                  <div class="stat-label">완료된 퀘스트</div>
-                </div>
-                <div class="stat-item">
-                  <div class="stat-value">{{ userProfile().currentStreak }}</div>
-                  <div class="stat-label">연속 참여일</div>
-                </div>
-              </div> -->
-              
-              <!-- <div class="user-badges">
-                <h4>획득한 배지</h4>
-                <div class="badges-list">
-                  @for (badge of userProfile().badges; track badge) {
-                    <span class="badge-item">{{ badge }}</span>
-                  }
-                </div>
-              </div> -->
             </div>
           </div>
           

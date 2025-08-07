@@ -1,6 +1,6 @@
 .activity-dashboard {
   padding: 24px;
-  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
   min-height: 100vh;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
@@ -15,14 +15,14 @@
 
 .loading-spinner {
   text-align: center;
-  color: #4ecdc4;
+  color: #3182ce;
 }
 
 .spinner {
   width: 48px;
   height: 48px;
   border: 4px solid #e2e8f0;
-  border-top: 4px solid #4ecdc4;
+  border-top: 4px solid #3182ce;
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 16px;
@@ -33,36 +33,56 @@
   100% { transform: rotate(360deg); }
 }
 
-/* 대시보드 헤더 */
+/* 대시보드 헤더 - SideBar와 조화로운 블루 그라데이션 */
 .dashboard-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 32px;
   padding: 24px;
-  background: linear-gradient(135deg, #4ecdc4 0%, #3cb8b3 100%);
+  background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
   border-radius: 20px;
   color: white;
-  box-shadow: 0 8px 24px rgba(78, 205, 196, 0.3);
+  box-shadow: 0 8px 24px rgba(66, 153, 225, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.dashboard-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+  border-radius: 50%;
+  transform: translate(50%, -50%);
 }
 
 .header-content h1 {
   font-size: 28px;
   font-weight: 800;
   margin: 0 0 8px 0;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  position: relative;
+  z-index: 1;
 }
 
 .page-description {
   font-size: 16px;
   margin: 0;
   color: rgba(255, 255, 255, 0.9);
+  position: relative;
+  z-index: 1;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
   gap: 16px;
+  position: relative;
+  z-index: 1;
 }
 
 .period-selector {
@@ -70,6 +90,7 @@
   background: rgba(255, 255, 255, 0.2);
   border-radius: 12px;
   padding: 4px;
+  backdrop-filter: blur(10px);
 }
 
 .period-btn {
@@ -85,7 +106,7 @@
 
 .period-btn.active {
   background: white;
-  color: #4ecdc4;
+  color: #3182ce;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
@@ -97,13 +118,15 @@
   color: white;
   cursor: pointer;
   transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
 }
 
 .refresh-btn:hover {
   background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.05);
 }
 
-/* 통계 섹션 */
+/* 통계 섹션 - SideBar 색상 팔레트 적용 */
 .stats-section {
   margin-bottom: 32px;
 }
@@ -115,22 +138,39 @@
 }
 
 .stat-card {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(20px);
   border-radius: 16px;
   padding: 24px;
   display: flex;
   align-items: center;
   gap: 16px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 16px rgba(49, 130, 206, 0.1);
+  border: 1px solid rgba(66, 153, 225, 0.1);
   transition: all 0.3s ease;
   animation: fadeInUp 0.6s ease-out;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(180deg, var(--stat-color, #3182ce), transparent);
+  transition: width 0.3s ease;
 }
 
 .stat-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 24px rgba(49, 130, 206, 0.2);
+}
+
+.stat-card:hover::before {
+  width: 8px;
 }
 
 .stat-icon {
@@ -142,10 +182,29 @@
   justify-content: center;
   color: white;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-icon::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg, transparent, rgba(255,255,255,0.2), transparent);
+  transform: rotate(45deg);
+  transition: transform 0.6s ease;
+}
+
+.stat-card:hover .stat-icon::after {
+  transform: rotate(45deg) translateX(100%);
 }
 
 .stat-icon mat-icon {
   font-size: 24px;
+  z-index: 1;
 }
 
 .stat-content {
@@ -158,6 +217,25 @@
   color: #2d3748;
   line-height: 1;
   margin-bottom: 4px;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.stat-trend {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: white;
+}
+
+.stat-trend.up {
+  background: linear-gradient(135deg, #68d391, #38a169);
+}
+
+.stat-trend.stable {
+  background: linear-gradient(135deg, #4299e1, #3182ce);
 }
 
 .stat-label {
@@ -166,16 +244,28 @@
   font-weight: 500;
 }
 
-/* 섹션 카드 */
+/* 섹션 카드 - 블루 계열 강조 */
 .section-card {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(20px);
   border-radius: 20px;
   padding: 32px;
   margin-bottom: 24px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(66, 153, 225, 0.08);
+  border: 1px solid rgba(66, 153, 225, 0.1);
   animation: slideInUp 0.6s ease-out;
+  position: relative;
+}
+
+.section-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #4299e1, #3182ce, #2b6cb0);
+  border-radius: 20px 20px 0 0;
 }
 
 .section-header {
@@ -190,6 +280,7 @@
   font-weight: 700;
   color: #2d3748;
   margin: 0;
+  position: relative;
 }
 
 .completion-rate {
@@ -199,7 +290,10 @@
 .rate-number {
   font-size: 24px;
   font-weight: 800;
-  color: #4ecdc4;
+  background: linear-gradient(135deg, #4299e1, #3182ce);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .rate-label {
@@ -208,7 +302,73 @@
   margin-left: 4px;
 }
 
-/* 일일 퀘스트 차트 */
+/* 스마트 인사이트 섹션 */
+.insights-section {
+  margin-bottom: 32px;
+}
+
+.insights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.insight-card {
+  background: linear-gradient(135deg, rgba(66, 153, 225, 0.05), rgba(49, 130, 206, 0.08));
+  border: 1px solid rgba(66, 153, 225, 0.2);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.insight-card.high-priority {
+  border-color: #3182ce;
+  box-shadow: 0 4px 16px rgba(49, 130, 206, 0.2);
+}
+
+.insight-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(66, 153, 225, 0.15);
+}
+
+.insight-icon {
+  font-size: 24px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #4299e1, #3182ce);
+  color: white;
+  flex-shrink: 0;
+}
+
+.insight-content {
+  flex: 1;
+}
+
+.insight-message {
+  font-size: 15px;
+  font-weight: 600;
+  color: #2d3748;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+}
+
+.insight-suggestion {
+  font-size: 13px;
+  color: #4a5568;
+  margin: 0;
+  font-style: italic;
+}
+
+/* 일일 퀘스트 차트 - 개선된 블루 그라데이션 */
 .daily-quest-chart {
   display: flex;
   justify-content: space-between;
@@ -216,6 +376,8 @@
   height: 200px;
   padding: 20px 0;
   margin: 20px 0;
+  background: linear-gradient(to right, rgba(66, 153, 225, 0.02), rgba(49, 130, 206, 0.02));
+  border-radius: 12px;
 }
 
 .day-column {
@@ -229,7 +391,7 @@
 .day-label {
   font-size: 12px;
   font-weight: 600;
-  color: #718096;
+  color: #4a5568;
   margin-bottom: 12px;
 }
 
@@ -245,10 +407,11 @@
   position: relative;
   width: 32px;
   height: 120px;
-  background: #f7fafc;
+  background: rgba(237, 242, 247, 0.8);
   border-radius: 16px;
   overflow: hidden;
   margin-bottom: 8px;
+  border: 1px solid rgba(66, 153, 225, 0.1);
 }
 
 .quest-bar {
@@ -256,27 +419,41 @@
   bottom: 0;
   width: 100%;
   border-radius: 16px;
-  transition: all 0.8s ease-out;
+  transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .quest-bar.completed {
-  background: linear-gradient(180deg, #4ecdc4, #3cb8b3);
-  box-shadow: 0 4px 12px rgba(78, 205, 196, 0.4);
+  background: linear-gradient(180deg, #4299e1, #3182ce);
+  box-shadow: 0 4px 12px rgba(66, 153, 225, 0.4);
+  position: relative;
+}
+
+.quest-bar.completed::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.3), transparent);
+  border-radius: 16px;
 }
 
 .quest-bar.total {
   background: transparent;
-  border: 2px dashed #e2e8f0;
+  border: 2px dashed rgba(66, 153, 225, 0.3);
   height: 100%;
 }
 
 .day-numbers {
   font-size: 12px;
   font-weight: 600;
+  display: flex;
+  align-items: center;
 }
 
 .completed {
-  color: #4ecdc4;
+  color: #3182ce;
 }
 
 .separator {
@@ -288,19 +465,32 @@
   color: #a0aec0;
 }
 
-/* 활동 패턴 */
+/* 활동 패턴 - 블루 계열 강조 */
 .pattern-insights {
   display: flex;
   gap: 24px;
   font-size: 14px;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(66, 153, 225, 0.05), rgba(49, 130, 206, 0.03));
+  border-radius: 12px;
+  border: 1px solid rgba(66, 153, 225, 0.1);
 }
 
 .insight-item {
   color: #4a5568;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.insight-item::before {
+  content: '📊';
+  font-size: 16px;
 }
 
 .insight-item strong {
   color: #2d3748;
+  font-weight: 700;
 }
 
 .weekly-pattern {
@@ -314,41 +504,168 @@
   display: flex;
   align-items: center;
   gap: 16px;
+  padding: 12px 8px;
+  transition: all 0.3s ease;
+  border-radius: 8px;
+  position: relative;
+}
+
+.pattern-day:hover {
+  transform: translateX(4px);
+  background: rgba(66, 153, 225, 0.05);
+  box-shadow: 0 2px 8px rgba(66, 153, 225, 0.1);
 }
 
 .pattern-day-label {
   font-size: 14px;
   font-weight: 600;
   color: #4a5568;
-  min-width: 20px;
+  min-width: 24px;
+  text-align: center;
 }
 
 .pattern-bar {
   flex: 1;
-  height: 8px;
-  background: #f7fafc;
-  border-radius: 4px;
+  height: 12px;
+  background: rgba(237, 242, 247, 0.8);
+  border-radius: 6px;
   overflow: hidden;
+  border: 1px solid rgba(66, 153, 225, 0.1);
+  position: relative;
+  min-width: 200px;
+}
+
+.pattern-bar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 10px,
+    rgba(66, 153, 225, 0.1) 10px,
+    rgba(66, 153, 225, 0.1) 11px
+  );
+  pointer-events: none;
 }
 
 .pattern-fill {
   height: 100%;
-  border-radius: 4px;
-  transition: all 0.8s ease-out;
+  border-radius: 6px;
+  transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  min-width: 2px;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.3);
+}
+
+.pattern-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, rgba(255,255,255,0.4), transparent 50%, rgba(255,255,255,0.2));
+  border-radius: 6px;
 }
 
 .pattern-count {
-  font-size: 12px;
-  font-weight: 600;
-  color: #718096;
-  min-width: 20px;
-  text-align: right;
+  font-size: 14px;
+  font-weight: 700;
+  color: #3182ce;
+  min-width: 32px;
+  text-align: center;
+  padding: 4px 8px;
+  background: rgba(66, 153, 225, 0.1);
+  border-radius: 6px;
+  border: 1px solid rgba(66, 153, 225, 0.2);
 }
 
-/* 활동 타임라인 */
+.pattern-level {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4a5568;
+  min-width: 80px;
+  text-align: left;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.pattern-day:hover .pattern-level {
+  opacity: 1;
+}
+
+/* 활동 패턴 범례 */
+.pattern-legend {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(66, 153, 225, 0.02);
+  border-radius: 8px;
+  border: 1px solid rgba(66, 153, 225, 0.1);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #4a5568;
+}
+
+.legend-color {
+  width: 16px;
+  height: 8px;
+  border-radius: 4px;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.3);
+}
+
+/* 활동 패턴 통계 */
+.pattern-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.pattern-stat {
+  text-align: center;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  border: 1px solid rgba(66, 153, 225, 0.1);
+}
+
+.pattern-stat-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #3182ce;
+  display: block;
+}
+
+.pattern-stat-label {
+  font-size: 11px;
+  color: #718096;
+  margin-top: 2px;
+}
+
+/* 활동 타임라인 - SideBar와 조화로운 디자인 */
 .activity-summary {
   font-size: 14px;
   color: #718096;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.activity-summary::before {
+  content: '📈';
+  font-size: 16px;
 }
 
 .activity-timeline {
@@ -362,8 +679,9 @@
   left: 24px;
   top: 0;
   bottom: 0;
-  width: 2px;
-  background: linear-gradient(180deg, #4ecdc4, #e2e8f0);
+  width: 3px;
+  background: linear-gradient(180deg, #4299e1, #3182ce, rgba(66, 153, 225, 0.3));
+  border-radius: 2px;
 }
 
 .timeline-item {
@@ -382,21 +700,49 @@
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: white;
+  background: linear-gradient(135deg, #4299e1, #3182ce);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border: 3px solid #4ecdc4;
+  box-shadow: 0 4px 12px rgba(66, 153, 225, 0.3);
+  border: 3px solid white;
+  position: relative;
+  overflow: hidden;
+}
+
+.activity-icon::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg, transparent, rgba(255,255,255,0.3), transparent);
+  transform: rotate(45deg);
+  transition: transform 0.6s ease;
+}
+
+.timeline-item:hover .activity-icon::before {
+  transform: rotate(45deg) translateX(100%);
 }
 
 .timeline-content {
   flex: 1;
-  background: #f7fafc;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(247, 250, 252, 0.95));
   border-radius: 12px;
   padding: 16px;
   margin-top: 8px;
+  border: 1px solid rgba(66, 153, 225, 0.1);
+  transition: all 0.3s ease;
+  position: relative;
+  backdrop-filter: blur(10px);
+}
+
+.timeline-content:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(66, 153, 225, 0.15);
+  border-color: rgba(66, 153, 225, 0.2);
 }
 
 .activity-header {
@@ -418,6 +764,7 @@
   align-items: center;
   gap: 8px;
   font-size: 12px;
+  flex-wrap: wrap;
 }
 
 .activity-badge {
@@ -425,15 +772,23 @@
   border-radius: 6px;
   color: white;
   font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .activity-points {
-  color: #f7b731;
-  font-weight: 600;
+  color: #3182ce;
+  font-weight: 700;
+  background: rgba(66, 153, 225, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 .activity-time {
   color: #a0aec0;
+  font-style: italic;
 }
 
 .activity-description {
@@ -456,22 +811,64 @@
   border-radius: 12px;
   font-weight: 600;
   text-decoration: none;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border: none;
   cursor: pointer;
   font-size: 14px;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.btn:hover::before {
+  left: 100%;
 }
 
 .btn-secondary {
-  background: white;
-  color: #4ecdc4;
-  border: 2px solid #4ecdc4;
+  background: linear-gradient(135deg, #4299e1, #3182ce);
+  color: white;
+  border: 2px solid transparent;
+  box-shadow: 0 4px 12px rgba(66, 153, 225, 0.3);
 }
 
 .btn-secondary:hover {
-  background: #4ecdc4;
-  color: white;
+  background: linear-gradient(135deg, #3182ce, #2b6cb0);
   transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(66, 153, 225, 0.4);
+}
+
+/* 우선순위 표시기 */
+.priority-indicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.priority-indicator.high {
+  background: #3182ce;
+  box-shadow: 0 0 8px rgba(49, 130, 206, 0.5);
+}
+
+.priority-indicator.medium {
+  background: #4299e1;
+  box-shadow: 0 0 6px rgba(66, 153, 225, 0.4);
+}
+
+.priority-indicator.low {
+  background: #a0aec0;
 }
 
 /* 애니메이션 */
@@ -497,6 +894,16 @@
   }
 }
 
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(66, 153, 225, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(66, 153, 225, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(66, 153, 225, 0); }
+}
+
+.stat-card.trending {
+  animation: pulse 2s infinite;
+}
+
 /* 반응형 디자인 */
 @media (max-width: 768px) {
   .activity-dashboard {
@@ -507,6 +914,7 @@
     flex-direction: column;
     gap: 16px;
     text-align: center;
+    padding: 20px;
   }
   
   .header-actions {
@@ -514,6 +922,10 @@
   }
   
   .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .insights-grid {
     grid-template-columns: 1fr;
   }
   
@@ -525,7 +937,7 @@
   
   .pattern-insights {
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
   }
   
   .activity-header {
@@ -536,6 +948,7 @@
   
   .activity-meta {
     flex-wrap: wrap;
+    gap: 4px;
   }
   
   .timeline-item {
@@ -550,5 +963,15 @@
     width: 40px;
     height: 40px;
     font-size: 16px;
+  }
+  
+  .daily-quest-chart {
+    height: 160px;
+    padding: 16px 8px;
+  }
+  
+  .quest-bar-container {
+    width: 24px;
+    height: 100px;
   }
 }

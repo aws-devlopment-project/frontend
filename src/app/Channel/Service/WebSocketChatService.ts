@@ -1,87 +1,80 @@
-import { Injectable, signal, computed } from '@angular/core';
-import { BehaviorSubject, Subject, Observable } from 'rxjs';
-import { ChatMessage } from '../Models/chatMessage';
-import { UserStatus } from '../../Core/Models/user';
+// CorrectedSimpleWebSocketService.ts
+import { Injectable, signal } from '@angular/core';
+import { Subject } from 'rxjs';
 
-export interface TypingUser {
-  userId: string;
-  username: string;
-  channelId: string;
-  timestamp: Date;
+export interface SimpleChatMessage {
+  chatRoomId: string;
+  senderId: string;
+  senderUsername: string;
+  type: 'user' | 'system';
+  event: 'chat' | 'load' | 'image' | 'check';
+  messages: string;
+  timestamp?: number;
 }
 
-export interface WebSocketMessage {
-  type: 'message' | 'user_joined' | 'user_left' | 'typing_start' | 'typing_stop' | 'user_status' | 'channel_users'
-    | 'leave_channel' | 'join_channel' | 'user_info';
-  payload: any;
-  channelId?: string;
-  userId?: string;
-  timestamp?: Date;
+export interface ChatHistory {
+  group: string;
+  club: string;
+  messages: {
+    sender: string;
+    type: 'user' | 'system';
+    event: 'chat' | 'load' | 'image' | 'check';
+    messages: string;
+    timestamp: number;
+  }[];
 }
 
 @Injectable({
   providedIn: 'root'
 })
-export class WebSocketChatService {
+export class WebSocketService {
   private socket: WebSocket | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectInterval = 3000;
-  private pingInterval: any;
-  private typingTimeout: any;
-
-  // Signals for reactive state management
-  connectionStatus = signal<'connecting' | 'connected' | 'disconnected' | 'reconnecting'>('disconnected');
-  currentUser = signal<UserStatus | null>(null);
-  onlineUsers = signal<UserStatus[]>([]);
-  typingUsers = signal<TypingUser[]>([]);
+  private healthCheckInterval: any;
+  private currentRoomId: string = '';
   
-  // Subjects for message streams
-  private messageSubject = new Subject<ChatMessage>();
-  private userJoinedSubject = new Subject<UserStatus>();
-  private userLeftSubject = new Subject<UserStatus>();
+  // 메모리 기반 채팅 이력 저장 (localStorage 대신)
+  private chatHistories = new Map<string, ChatHistory>();
+
+  // Signals
+  connectionStatus = signal<'connecting' | 'connected' | 'disconnected' | 'reconnecting'>('disconnected');
+  
+  // Subjects
+  private messageSubject = new Subject<SimpleChatMessage>();
   private errorSubject = new Subject<string>();
 
-  // Public observables
+  // Observables
   messages$ = this.messageSubject.asObservable();
-  userJoined$ = this.userJoinedSubject.asObservable();
-  userLeft$ = this.userLeftSubject.asObservable();
   errors$ = this.errorSubject.asObservable();
 
-  // Computed properties
-  isConnected = computed(() => this.connectionStatus() === 'connected');
-  typingUsersInChannel = computed(() => {
-    const currentChannel = this.getCurrentChannel();
-    return this.typingUsers().filter(user => user.channelId === currentChannel);
-  });
-
   constructor() {
-    console.log('WebSocketChatService initialized');
+    console.log('CorrectedSimpleWebSocketService initialized');
   }
 
-  // === Connection Management ===
-  connect(user: UserStatus, serverUrl: string = 'ws://localhost:8080/chat'): void {
+  // 연결
+  connect(userId: string, username: string, serverUrl: string = 'ws://localhost:8080/chat'): void {
     if (this.socket?.readyState === WebSocket.OPEN) {
       console.log('Already connected to WebSocket');
       return;
     }
 
     this.connectionStatus.set('connecting');
-    this.currentUser.set(user);
 
     try {
-      this.socket = new WebSocket(`${serverUrl}?userId=${user.id}&username=${encodeURIComponent(user.name)}`);
+      this.socket = new WebSocket(serverUrl);
       this.setupEventListeners();
     } catch (error) {
       console.error('Failed to create WebSocket connection:', error);
       this.connectionStatus.set('disconnected');
-      this.errorSubject.next('WebSocket 연결 생성에 실패했습니다');
+      this.errorSubject.next('WebSocket 연결 생성 실패');
     }
   }
 
+  // 연결 해제
   disconnect(): void {
-    this.clearPingInterval();
-    this.clearTypingTimeout();
+    this.clearHealthCheck();
     
     if (this.socket) {
       this.socket.close(1000, 'User disconnected');
@@ -89,29 +82,83 @@ export class WebSocketChatService {
     }
     
     this.connectionStatus.set('disconnected');
-    this.onlineUsers.set([]);
-    this.typingUsers.set([]);
   }
 
+  // 채팅방 입장
+  joinRoom(roomId: string, userId: string, username: string): void {
+    this.currentRoomId = roomId;
+    
+    // 메모리에서 채팅 이력 로드
+    this.loadChatHistoryFromMemory(roomId);
+    
+    // 서버에 채팅 이력 로드 요청
+    this.sendMessage({
+      chatRoomId: roomId,
+      senderId: userId,
+      senderUsername: username,
+      type: 'user',
+      event: 'load',
+      messages: ''
+    });
+  }
+
+  // 메시지 전송
+  sendChatMessage(roomId: string, userId: string, username: string, message: string): void {
+    this.sendMessage({
+      chatRoomId: roomId,
+      senderId: userId,
+      senderUsername: username,
+      type: 'user',
+      event: 'chat',
+      messages: message
+    });
+  }
+
+  // 이미지 전송
+  sendImageMessage(roomId: string, userId: string, username: string, imageData: string): void {
+    this.sendMessage({
+      chatRoomId: roomId,
+      senderId: userId,
+      senderUsername: username,
+      type: 'user',
+      event: 'image',
+      messages: imageData
+    });
+  }
+
+  // 일반 메시지 전송
+  private sendMessage(message: SimpleChatMessage): void {
+    if (this.socket?.readyState === WebSocket.OPEN) {
+      message.timestamp = Date.now();
+      this.socket.send(JSON.stringify(message));
+      
+      // 메모리에 저장 (자신이 보낸 메시지)
+      if (message.event === 'chat' || message.event === 'image') {
+        this.saveToMemory(message);
+      }
+    } else {
+      console.warn('WebSocket is not connected');
+      this.errorSubject.next('연결이 끊어져 메시지를 보낼 수 없습니다');
+    }
+  }
+
+  // 이벤트 리스너 설정
   private setupEventListeners(): void {
     if (!this.socket) return;
 
-    this.socket.onopen = (event) => {
-      console.log('WebSocket connected:', event);
+    this.socket.onopen = () => {
+      console.log('WebSocket connected');
       this.connectionStatus.set('connected');
       this.reconnectAttempts = 0;
-      this.startPingInterval();
-      
-      // Send user info after connection
-      this.sendUserInfo();
+      this.startHealthCheck();
     };
 
     this.socket.onmessage = (event) => {
       try {
-        const data: WebSocketMessage = JSON.parse(event.data);
-        this.handleMessage(data);
+        const message: SimpleChatMessage = JSON.parse(event.data);
+        this.handleMessage(message);
       } catch (error) {
-        console.error('Failed to parse WebSocket message:', error);
+        console.error('Failed to parse message:', error);
         this.errorSubject.next('메시지 파싱 오류');
       }
     };
@@ -119,7 +166,7 @@ export class WebSocketChatService {
     this.socket.onclose = (event) => {
       console.log('WebSocket disconnected:', event);
       this.connectionStatus.set('disconnected');
-      this.clearPingInterval();
+      this.clearHealthCheck();
       
       if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
         this.attemptReconnect();
@@ -128,242 +175,146 @@ export class WebSocketChatService {
 
     this.socket.onerror = (error) => {
       console.error('WebSocket error:', error);
-      this.errorSubject.next('WebSocket 연결 오류가 발생했습니다');
+      this.errorSubject.next('WebSocket 연결 오류');
     };
   }
 
-  private handleMessage(data: WebSocketMessage): void {
-    switch (data.type) {
-      case 'message':
-        const message: ChatMessage = {
-          ...data.payload,
-          timestamp: new Date(data.payload.timestamp)
-        };
-        this.messageSubject.next(message);
-        break;
-
-      case 'user_joined':
-        const joinedUser: UserStatus = data.payload;
-        this.userJoinedSubject.next(joinedUser);
-        this.updateOnlineUsers(joinedUser, 'add');
-        break;
-
-      case 'user_left':
-        const leftUser: UserStatus = data.payload;
-        this.userLeftSubject.next(leftUser);
-        this.updateOnlineUsers(leftUser, 'remove');
-        break;
-
-      case 'typing_start':
-        this.addTypingUser(data.payload);
-        break;
-
-      case 'typing_stop':
-        this.removeTypingUser(data.payload.userId, data.payload.channelId);
-        break;
-
-      case 'user_status':
-        this.updateUserStatus(data.payload);
-        break;
-
-      case 'channel_users':
-        this.onlineUsers.set(data.payload.users || []);
-        break;
-
-      default:
-        console.warn('Unknown message type:', data.type);
-    }
-  }
-
-  // === Message Sending ===
-  sendMessage(content: string, channelId: string): void {
-    if (!this.isConnected() || !this.currentUser()) return;
-
-    const message: ChatMessage = {
-      id: this.generateMessageId(),
-      userId: this.currentUser()!.id,
-      username: this.currentUser()!.name,
-      avatar: this.currentUser()!.avatar,
-      content: content.trim(),
-      timestamp: new Date(),
-      type: 'text',
-      channelId
-    };
-
-    this.sendWebSocketMessage({
-      type: 'message',
-      payload: message,
-      channelId,
-      userId: this.currentUser()!.id
-    });
-  }
-
-  // === Channel Management ===
-  joinChannel(channelId: string): void {
-    if (!this.isConnected()) return;
-
-    this.sendWebSocketMessage({
-      type: 'join_channel',
-      payload: { channelId },
-      userId: this.currentUser()?.id
-    });
-  }
-
-  leaveChannel(channelId: string): void {
-    if (!this.isConnected()) return;
-
-    this.sendWebSocketMessage({
-      type: 'leave_channel',
-      payload: { channelId },
-      userId: this.currentUser()?.id
-    });
-  }
-
-  // === Typing Indicators ===
-  startTyping(channelId: string): void {
-    if (!this.isConnected()) return;
-
-    this.sendWebSocketMessage({
-      type: 'typing_start',
-      payload: { channelId },
-      userId: this.currentUser()?.id
-    });
-
-    // Auto-stop typing after 3 seconds
-    this.clearTypingTimeout();
-    this.typingTimeout = setTimeout(() => {
-      this.stopTyping(channelId);
-    }, 3000);
-  }
-
-  stopTyping(channelId: string): void {
-    if (!this.isConnected()) return;
-
-    this.sendWebSocketMessage({
-      type: 'typing_stop',
-      payload: { channelId },
-      userId: this.currentUser()?.id
-    });
-
-    this.clearTypingTimeout();
-  }
-
-  // === User Status Management ===
-  updateStatus(status: UserStatus['status']): void {
-    if (!this.isConnected() || !this.currentUser()) return;
-
-    const updatedUser = { ...this.currentUser()!, status };
-    this.currentUser.set(updatedUser);
-
-    this.sendWebSocketMessage({
-      type: 'user_status',
-      payload: { status },
-      userId: this.currentUser()!.id
-    });
-  }
-
-  // === Private Helper Methods ===
-  private sendWebSocketMessage(message: WebSocketMessage): void {
-    if (this.socket?.readyState === WebSocket.OPEN) {
-      this.socket.send(JSON.stringify({
-        ...message,
-        timestamp: new Date()
-      }));
-    } else {
-      console.warn('WebSocket is not connected. Cannot send message:', message);
-      this.errorSubject.next('연결이 끊어져 메시지를 보낼 수 없습니다');
-    }
-  }
-
-  private sendUserInfo(): void {
-    if (!this.currentUser()) return;
-
-    this.sendWebSocketMessage({
-      type: 'user_info',
-      payload: this.currentUser(),
-      userId: this.currentUser()!.id
-    });
-  }
-
-  private updateOnlineUsers(user: UserStatus, action: 'add' | 'remove'): void {
-    const currentUsers = this.onlineUsers();
-    
-    if (action === 'add') {
-      const existingIndex = currentUsers.findIndex(u => u.id === user.id);
-      if (existingIndex >= 0) {
-        currentUsers[existingIndex] = user;
-      } else {
-        currentUsers.push(user);
+  // 메시지 처리
+  private handleMessage(message: SimpleChatMessage): void {
+    if (message.event === 'check') {
+      // Health check 응답 처리
+      if (message.messages === 'ping') {
+        // 서버에서 ping이 오면 pong 응답
+        this.sendMessage({
+          chatRoomId: this.currentRoomId,
+          senderId: 'client',
+          senderUsername: 'Client',
+          type: 'system',
+          event: 'check',
+          messages: 'pong'
+        });
       }
-    } else {
-      const filteredUsers = currentUsers.filter(u => u.id !== user.id);
-      this.onlineUsers.set(filteredUsers);
       return;
     }
-    
-    this.onlineUsers.set([...currentUsers]);
-  }
 
-  private updateUserStatus(payload: { userId: string; status: UserStatus['status'] }): void {
-    const users = this.onlineUsers();
-    const userIndex = users.findIndex(u => u.id === payload.userId);
-    
-    if (userIndex >= 0) {
-      users[userIndex].status = payload.status;
-      this.onlineUsers.set([...users]);
-    }
-  }
-
-  private addTypingUser(payload: { userId: string; username: string; channelId: string }): void {
-    const typingUser: TypingUser = {
-      ...payload,
-      timestamp: new Date()
-    };
-    
-    const currentTyping = this.typingUsers();
-    const existingIndex = currentTyping.findIndex(
-      u => u.userId === payload.userId && u.channelId === payload.channelId
-    );
-    
-    if (existingIndex >= 0) {
-      currentTyping[existingIndex] = typingUser;
-    } else {
-      currentTyping.push(typingUser);
-    }
-    
-    this.typingUsers.set([...currentTyping]);
-  }
-
-  private removeTypingUser(userId: string, channelId: string): void {
-    const currentTyping = this.typingUsers();
-    const filtered = currentTyping.filter(
-      u => !(u.userId === userId && u.channelId === channelId)
-    );
-    this.typingUsers.set(filtered);
-  }
-
-  private startPingInterval(): void {
-    this.pingInterval = setInterval(() => {
-      if (this.socket?.readyState === WebSocket.OPEN) {
-        this.socket.send(JSON.stringify({ type: 'ping' }));
+    if (message.event === 'load' && message.type === 'system') {
+      // 채팅 이력 로드
+      try {
+        const history: SimpleChatMessage[] = JSON.parse(message.messages);
+        history.forEach(msg => {
+          this.messageSubject.next(msg);
+          this.saveToMemory(msg);
+        });
+      } catch (error) {
+        console.error('Failed to parse chat history:', error);
       }
-    }, 30000); // Ping every 30 seconds
-  }
+      return;
+    }
 
-  private clearPingInterval(): void {
-    if (this.pingInterval) {
-      clearInterval(this.pingInterval);
-      this.pingInterval = null;
+    // 일반 메시지 처리
+    this.messageSubject.next(message);
+    
+    // 메모리에 저장 (다른 사용자가 보낸 메시지)
+    if (message.event === 'chat' || message.event === 'image') {
+      this.saveToMemory(message);
     }
   }
 
-  private clearTypingTimeout(): void {
-    if (this.typingTimeout) {
-      clearTimeout(this.typingTimeout);
-      this.typingTimeout = null;
+  // 메모리에 채팅 이력 저장 (localStorage 대신)
+  private saveToMemory(message: SimpleChatMessage): void {
+    try {
+      // 채팅방 ID를 group-club 형식으로 파싱
+      const [group, club] = message.chatRoomId.split('-');
+      if (!group || !club) return;
+
+      const historyKey = `${group}_${club}`;
+      let chatHistory = this.chatHistories.get(historyKey);
+      
+      if (!chatHistory) {
+        chatHistory = {
+          group,
+          club,
+          messages: []
+        };
+      }
+
+      // 새 메시지 추가
+      chatHistory.messages.push({
+        sender: message.senderUsername,
+        type: message.type,
+        event: message.event,
+        messages: message.messages,
+        timestamp: message.timestamp || Date.now()
+      });
+
+      // 최근 30개만 유지
+      if (chatHistory.messages.length > 30) {
+        chatHistory.messages = chatHistory.messages.slice(-30);
+      }
+
+      this.chatHistories.set(historyKey, chatHistory);
+      console.log(`Saved message to memory for ${historyKey}:`, chatHistory.messages.length, 'messages');
+    } catch (error) {
+      console.error('Failed to save to memory:', error);
     }
   }
 
+  // 메모리에서 채팅 이력 로드
+  private loadChatHistoryFromMemory(roomId: string): void {
+    const [group, club] = roomId.split('-');
+    if (!group || !club) return;
+
+    const historyKey = `${group}_${club}`;
+    const chatHistory = this.chatHistories.get(historyKey);
+    
+    if (chatHistory && chatHistory.messages.length > 0) {
+      console.log(`Loading ${chatHistory.messages.length} messages from memory for ${historyKey}`);
+      chatHistory.messages.forEach(msg => {
+        const message: SimpleChatMessage = {
+          chatRoomId: roomId,
+          senderId: msg.sender === 'You' ? 'current-user' : 'other-user',
+          senderUsername: msg.sender,
+          type: msg.type,
+          event: msg.event,
+          messages: msg.messages,
+          timestamp: msg.timestamp
+        };
+        this.messageSubject.next(message);
+      });
+    }
+  }
+
+  // 메모리에서 채팅 이력 가져오기
+  getChatHistory(group: string, club: string): ChatHistory | null {
+    const historyKey = `${group}_${club}`;
+    return this.chatHistories.get(historyKey) || null;
+  }
+
+  // Health Check 시작
+  private startHealthCheck(): void {
+    this.healthCheckInterval = setInterval(() => {
+      if (this.socket?.readyState === WebSocket.OPEN && this.currentRoomId) {
+        this.sendMessage({
+          chatRoomId: this.currentRoomId,
+          senderId: 'client',
+          senderUsername: 'Client',
+          type: 'system',
+          event: 'check',
+          messages: 'ping'
+        });
+      }
+    }, 30000); // 30초마다
+  }
+
+  // Health Check 정리
+  private clearHealthCheck(): void {
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+    }
+  }
+
+  // 재연결 시도
   private attemptReconnect(): void {
     this.reconnectAttempts++;
     this.connectionStatus.set('reconnecting');
@@ -371,36 +322,37 @@ export class WebSocketChatService {
     console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
     
     setTimeout(() => {
-      if (this.currentUser()) {
-        this.connect(this.currentUser()!);
-      }
+      // 기존 연결 정보로 재연결
+      this.connect('user', 'User');
     }, this.reconnectInterval * this.reconnectAttempts);
   }
 
-  private generateMessageId(): string {
-    return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  // 연결 상태 확인
+  isConnected(): boolean {
+    return this.connectionStatus() === 'connected';
   }
 
-  private getCurrentChannel(): string {
-    // This should be integrated with your SharedStateService
-    return 'general'; // Placeholder
+  // 모든 채팅 이력 삭제
+  clearAllChatHistory(): void {
+    this.chatHistories.clear();
+    console.log('All chat history cleared from memory');
   }
 
-  // === Public Getters ===
-  getOnlineUsersCount(): number {
-    return this.onlineUsers().length;
+  // 특정 채널 채팅 이력 삭제
+  clearChatHistory(group: string, club: string): void {
+    const historyKey = `${group}_${club}`;
+    this.chatHistories.delete(historyKey);
+    console.log(`Chat history cleared for ${historyKey}`);
   }
 
-  getTypingUsersText(channelId: string): string {
-    const typing = this.typingUsers().filter(u => u.channelId === channelId);
-    
-    if (typing.length === 0) return '';
-    if (typing.length === 1) return `${typing[0].username}님이 입력 중...`;
-    if (typing.length === 2) return `${typing[0].username}님과 ${typing[1].username}님이 입력 중...`;
-    return `${typing[0].username}님 외 ${typing.length - 1}명이 입력 중...`;
+  // 현재 저장된 모든 채팅방 목록 가져오기
+  getAllChatRooms(): string[] {
+    return Array.from(this.chatHistories.keys());
   }
 
-  isUserOnline(userId: string): boolean {
-    return this.onlineUsers().some(user => user.id === userId && user.status === 'online');
+  // 특정 채팅방의 메시지 수 가져오기
+  getChatMessageCount(group: string, club: string): number {
+    const history = this.getChatHistory(group, club);
+    return history ? history.messages.length : 0;
   }
 }

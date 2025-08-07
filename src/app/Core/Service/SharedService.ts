@@ -1,9 +1,8 @@
 // SharedService.ts - 개선된 버전 (동적 그룹/채널 추가 지원)
 import { Injectable, signal, computed, effect } from '@angular/core';
 import { UserStatus, UserJoinList } from '../Models/user';
-import { ChatMessage } from '../../Channel/Models/chatMessage';
+import { SimpleChatMessage } from '../../Channel/Models/chatMessage';
 import { UserService } from './UserService';
-import { firstValueFrom } from 'rxjs';
 
 // 타입 정의
 type JoinListItem = {
@@ -33,7 +32,7 @@ export class SharedStateService {
     groups: false,
     channels: false
   });
-  private _messages = signal<ChatMessage[]>([]);
+  private _messages = signal<SimpleChatMessage[]>([]);
   private _sidebarExpanded = signal(false);
   private _expandedSections = signal<string[]>([]);
   private _userJoinList = signal<UserJoinList | null>(null);
@@ -617,16 +616,6 @@ export class SharedStateService {
     this._currentUser.set(user);
   }
 
-  addMessage(message: ChatMessage): void {
-    this._messages.update(messages => [...messages, message]);
-    
-    if (message.userId === this.currentUser()?.id) {
-      setTimeout(() => {
-        this.addBotResponse(message.content);
-      }, 1000 + Math.random() * 2000);
-    }
-  }
-
   clearMessages(): void {
     this._messages.set([]);
   }
@@ -661,29 +650,6 @@ export class SharedStateService {
     }
   }
 
-  private addBotResponse(userMessage: string): void {
-    const responses = [
-      '좋은 아이디어네요! 👍',
-      '저도 한번 시도해볼게요!',
-      '정말 유용한 정보 감사합니다!',
-      '함께 도전해봐요! 💪',
-      '멋진 경험이었겠어요!',
-      '더 자세히 알고 싶어요!'
-    ];
-
-    const botMessage: ChatMessage = {
-      id: Date.now().toString(),
-      userId: 'bot',
-      username: '도우미',
-      content: responses[Math.floor(Math.random() * responses.length)],
-      timestamp: new Date(),
-      type: 'text',
-      channelId: this.selectedChannel() || 'general'
-    };
-
-    this._messages.update(messages => [...messages, botMessage]);
-  }
-
   private async loadChannelMessages(channelId: string): Promise<void> {
     setTimeout(() => {
       const demoMessages = this.getDemoMessages(channelId);
@@ -691,7 +657,7 @@ export class SharedStateService {
     }, 300);
   }
 
-  private getDemoMessages(channelId: string): ChatMessage[] {
+  private getDemoMessages(channelId: string): SimpleChatMessage[] {
     return [];
   }
 

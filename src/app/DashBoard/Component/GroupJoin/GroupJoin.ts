@@ -7,6 +7,7 @@ import { SharedStateService } from "../../../Core/Service/SharedService";
 import { GroupService } from "../../../Core/Service/GroupService";
 import { UserService } from "../../../Core/Service/UserService";
 import { matchingGroup } from "../../../../environments/environtment";
+import { Group } from "../../../Core/Models/group";
 
 interface GroupInfo {
   name: string;
@@ -59,55 +60,37 @@ export class GroupJoinComponent implements OnInit {
 
   private async loadAvailableGroups(): Promise<void> {
     try {
-      let groups: string[] | null = await this.groupService.getGroupList();
-      let viewGroups: GroupInfo[] = [];
+      let groups: Group[] | [] = await this.groupService.getGroupList();
+      let viewGroups: GroupInfo[] | null = [];
       
       if (groups) {
         // 비동기 처리를 위해 Promise.all 사용
-        const groupInfoPromises = groups.map(async (group: string, index: number) => {
-          let info = await this.groupService.getGroupInfo(group);
+        const groupInfoPromises: GroupInfo[] = [];
+        groups.forEach((info: Group) => {
           if (info) {
-            return {
+            groupInfoPromises.push({
               name: info.name,
               description: info.description ? info.description : '',
               emoji: info.icon ? info.icon : '👥',
               memberCount: info.memberNum,
               activeToday: info.questSuccessNum ? Math.max(...info.questSuccessNum) : 0,
               tags: info.tag || []
-            };
+            });
           } else {
-            return {
-              name: matchingGroup[index].name,
-              description: matchingGroup[index].description,
-              emoji: matchingGroup[index].emoji,
-              memberCount: matchingGroup[index].memberCount,
-              tags: matchingGroup[index].tags
-            };
+            console.error('[group]: groupList load fail to Server');
           }
         });
         viewGroups = await Promise.all(groupInfoPromises);
       } else {
-        viewGroups = matchingGroup.map((group: any) => ({
-          name: group.name,
-          description: group.description,
-          emoji: group.emoji,
-          memberCount: group.memberCount,
-          tags: group.tags
-        }));
+        viewGroups = null;
       }
       
-      this.availableGroups.set(viewGroups);
+      if (!viewGroups || viewGroups.length === 0) {
+          this.router.navigate(['/'])
+      } else
+        this.availableGroups.set(viewGroups);
     } catch (error) {
       console.error('Error loading available groups:', error);
-      // 실패 시 기본 그룹 목록 사용
-      const viewGroups = matchingGroup.map((group: any) => ({
-        name: group.name,
-        description: group.description,
-        emoji: group.emoji,
-        memberCount: group.memberCount,
-        tags: group.tags
-      }));
-      this.availableGroups.set(viewGroups);
     }
   }
 
