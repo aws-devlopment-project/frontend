@@ -2,9 +2,7 @@
 import { Component, OnInit, OnDestroy, effect, computed } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { Subject } from "rxjs";
-import { takeUntil } from "rxjs/operators";
 import { MatIconModule } from "@angular/material/icon";
-
 import { SideBarComponent } from "../Core/Component/SideBar/SideBar";
 import { HeaderBarComponent } from "../Core/Component/HeaderBar/HeaderBar";
 import { GroupDashboardComponent } from "../DashBoard/Component/GroupDashboard/GroupDashboard";
@@ -15,6 +13,7 @@ import { ActivityDashboardComponent } from "../DashBoard/Component/ActivityDashb
 import { SharedStateService } from "../Core/Service/SharedService";
 import { environment } from "../../environments/environtment";
 import { RouterModule } from "@angular/router";
+import { ChatbotComponent } from "../Core/Component/Chatbot/Chatbot";
 
 @Component({
   selector: 'app-main',
@@ -30,7 +29,8 @@ import { RouterModule } from "@angular/router";
     HomeDashboardComponent,
     MainContainerComponent,
     MemberOptionsComponent,
-    ActivityDashboardComponent
+    ActivityDashboardComponent,
+    ChatbotComponent
   ],
   standalone: true
 })

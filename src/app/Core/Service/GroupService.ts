@@ -4,14 +4,13 @@ import { HttpService } from "./HttpService";
 import { HttpHeaders } from "@angular/common/http";
 import { matchingGroupTable, environment } from "../../../environments/environtment";
 import { Group } from "../Models/group";
-import { UserService } from "./UserService";
 
 @Injectable({
     providedIn: 'root'
 })
 export class GroupService {
 
-    constructor(private httpService: HttpService, private dataService: DataCacheService, private userSerivce: UserService) {}
+    constructor(private httpService: HttpService, private dataService: DataCacheService) {}
 
     table = matchingGroupTable;
     async checkQuestCreateTime(groupname: string) : Promise<boolean> {

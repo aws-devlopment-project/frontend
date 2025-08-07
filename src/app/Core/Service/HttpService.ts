@@ -2,6 +2,7 @@ import { HttpClient, HttpHeaders, HttpErrorResponse } from "@angular/common/http
 import { Injectable } from "@angular/core";
 import { Router } from "@angular/router";
 import { Observable, throwError } from "rxjs";
+import { map } from 'rxjs/operators';
 import { catchError } from 'rxjs/operators';
 import { DataCacheService } from "./DataCacheService";
 import { UserCredentials } from "../Models/user";
@@ -78,7 +79,8 @@ export class HttpService {
         customHeaders.set('Authorization', authHeaders.get('Authorization') || '') : 
         authHeaders;
 
-      return this.http.get<T>(url, { headers }).pipe(
+      return this.http.get<{data: T}>(url, { headers }).pipe(
+        map(response => response.data),
         catchError(error => this.handleError(error, url))
       );
     } catch (error) {
