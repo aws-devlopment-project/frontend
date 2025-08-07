@@ -48,7 +48,7 @@ export class GroupService {
             'Content-Type': 'application/json'
         });
         const response = await this.httpService.get(url, headers).toPromise();
-        const groupList: Group[] | null = JSON.parse(response.data);
+        const groupList: Group[] | null = response.data;
         if (groupList) {
             groupList.forEach((group) => {
                 this.dataService.setCache(group.name, group);
