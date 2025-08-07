@@ -1,0 +1,128 @@
+<!-- 챗봇 플로팅 버튼 -->
+<div class="chatbot-container">
+    @if (!isOpen) {
+    <button 
+        (click)="openChatbot()"
+        class="chatbot-trigger"
+        [class.animate-bounce]="!hasInteracted">
+        <mat-icon>chat</mat-icon>
+    </button>
+    }
+    
+    <!-- 챗봇 윈도우 -->
+    @if (isOpen) {
+    <div class="chatbot-window" [class.minimized]="isMinimized">
+        <!-- 헤더 -->
+        <div class="chatbot-header">
+        <div class="status-indicator">
+            <div class="status-dot"></div>
+            <span class="status-text">AI 도우미</span>
+            <span class="status-online">온라인</span>
+        </div>
+        <div class="header-controls">
+            <button (click)="toggleMinimize()" class="control-btn" [title]="isMinimized ? '확대' : '최소화'">
+            <mat-icon>{{ isMinimized ? 'expand_more' : 'expand_less' }}</mat-icon>
+            </button>
+            <button (click)="closeChatbot()" class="control-btn close-btn" title="닫기">
+            <mat-icon>close</mat-icon>
+            </button>
+        </div>
+        </div>
+
+        @if (!isMinimized) {
+        <!-- 메시지 영역 -->
+        <div class="messages-container" #messagesContainer>
+            @for (message of messages; track message.id) {
+            <div class="message-wrapper" 
+                    [class.user-message]="message.isUser"
+                    [class.bot-message]="!message.isUser"
+                    [class.animate-slide-up]="message.animated">
+                
+                @if (!message.isUser) {
+                <div class="message-avatar bot-avatar">
+                    <mat-icon>smart_toy</mat-icon>
+                </div>
+                }
+                
+                <div class="message-content">
+                @if (!message.isUser) {
+                    <div class="message-meta">
+                    AI 도우미 • {{ formatTime(message.timestamp) }}
+                    </div>
+                }
+                
+                <div class="message-bubble" 
+                        [class.user-bubble]="message.isUser"
+                        [class.bot-bubble]="!message.isUser"
+                        [class.animate-typing]="message.animated">
+                    @if (message.isUser) {
+                    <div class="message-meta user-meta">
+                        {{ userContext?.userName || '나' }} • {{ formatTime(message.timestamp) }}
+                    </div>
+                    }
+                    <div class="message-text">{{ message.text }}</div>
+                </div>
+                </div>
+                
+                @if (message.isUser) {
+                <div class="message-avatar user-avatar">
+                    <mat-icon>person</mat-icon>
+                </div>
+                }
+            </div>
+            }
+            
+            <!-- 타이핑 인디케이터 -->
+            @if (isTyping) {
+            <div class="message-wrapper bot-message animate-fade-in">
+                <div class="message-avatar bot-avatar">
+                <mat-icon>smart_toy</mat-icon>
+                </div>
+                <div class="message-content">
+                <div class="typing-indicator">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+                </div>
+            </div>
+            }
+        </div>
+
+        <!-- 입력 영역 -->
+        <div class="input-container">
+            <!-- 빠른 질문 버튼들 -->
+            <div class="quick-questions">
+            @for (question of quickQuestions; track question) {
+                <button 
+                (click)="sendQuickQuestion(question)"
+                [disabled]="isTyping"
+                class="quick-question-btn">
+                {{ question }}
+                </button>
+            }
+            </div>
+            
+            <!-- 텍스트 입력 -->
+            <div class="input-row">
+            <input 
+                type="text"
+                [(ngModel)]="inputText"
+                (keydown.enter)="sendMessage()"
+                (focus)="markAsInteracted()"
+                placeholder="메시지를 입력하세요..."
+                class="message-input"
+                [disabled]="isTyping"
+                #messageInput>
+            <button 
+                (click)="sendMessage()"
+                [disabled]="!inputText.trim() || isTyping"
+                class="send-btn">
+                <mat-icon>send</mat-icon>
+            </button>
+            </div>
+        </div>
+        }
+    </div>
+    }
+</div>
