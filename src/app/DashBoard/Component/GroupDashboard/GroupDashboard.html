@@ -1,4 +1,105 @@
 <div class="content">
+  <!-- 플로팅 피드백 UI -->
+  @if (showFeedback()) {
+    <div class="floating-feedback-overlay">
+      <div class="floating-feedback-card">
+        <div class="feedback-header">
+          <div class="feedback-icon">🎉</div>
+          <div class="feedback-title">퀘스트 완료!</div>
+          <button class="feedback-close" (click)="closeFeedback()">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+        
+        <div class="feedback-content">
+          <h3>{{ feedbackData()?.questTitle }}</h3>
+          <p>축하합니다! 퀘스트를 성공적으로 완료하셨습니다.</p>
+          <p class="feedback-question">이 퀘스트는 어떠셨나요?</p>
+          
+          <div class="rating-section">
+            <div class="rating-stars">
+              @for (star of [1,2,3,4,5]; track star) {
+                <button 
+                  class="star-button"
+                  [class.active]="feedbackScore() >= star"
+                  [class.selected]="feedbackScore() === star"
+                  (click)="setFeedbackScore(star)"
+                  [disabled]="isSubmittingFeedback()">
+                  <mat-icon>{{ feedbackScore() >= star ? 'star' : 'star_border' }}</mat-icon>
+                </button>
+              }
+            </div>
+            <div class="rating-labels">
+              <span class="rating-label-left">별로예요</span>
+              <span class="rating-label-right">최고예요</span>
+            </div>
+          </div>
+          
+          <div class="feedback-actions">
+            <button 
+              class="btn btn-secondary feedback-btn" 
+              (click)="closeFeedback()"
+              [disabled]="isSubmittingFeedback()">
+              건너뛰기
+            </button>
+            <button 
+              class="btn btn-primary feedback-btn" 
+              [disabled]="feedbackScore() === 0 || isSubmittingFeedback()"
+              (click)="submitFeedback()">
+              @if (isSubmittingFeedback()) {
+                <div class="btn-spinner"></div>
+                전송 중...
+              } @else {
+                <mat-icon>send</mat-icon>
+                피드백 전송
+              }
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- 퀘스트 완료 확인 모달 -->
+  @if (showConfirmModal()) {
+    <div class="confirm-modal-overlay">
+      <div class="confirm-modal-card">
+        <div class="modal-header">
+          <div class="modal-icon">✅</div>
+          <h3>퀘스트 완료 확인</h3>
+        </div>
+        
+        <div class="modal-content">
+          <p>다음 퀘스트들을 완료하시겠습니까?</p>
+          
+          <div class="quest-list">
+            @for (questName of confirmModalData()?.questNames || []; track questName) {
+              <div class="quest-item">
+                <mat-icon>assignment_turned_in</mat-icon>
+                <span>{{ questName }}</span>
+              </div>
+            }
+          </div>
+          
+          <div class="modal-summary">
+            <strong>총 {{ confirmModalData()?.questCount || 0 }}개의 퀘스트</strong>를 완료로 표시합니다.
+          </div>
+        </div>
+        
+        <div class="modal-actions">
+          <button class="btn btn-secondary modal-btn" (click)="cancelQuestCompletion()">
+            <mat-icon>close</mat-icon>
+            취소
+          </button>
+          <button class="btn btn-primary modal-btn" (click)="confirmQuestCompletion()">
+            <mat-icon>check</mat-icon>
+            완료 처리
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
   <!-- 로딩 상태 -->
   @if (isLoading()) {
     <div class="loading-container">
@@ -56,12 +157,20 @@
             <div class="quest-card" 
                  [attr.data-status]="quest.status"
                  [class.selected]="isQuestSelected(quest.id)"
-                 [class.disabled]="quest.status === 'completed'"
+                 [class.disabled]="!isQuestCompletable(quest)"
+                 [class.cache-completed]="isQuestCompletedInCache(quest.id)"
                  (click)="onQuestClick(quest)">
               
               @if (isQuestSelected(quest.id)) {
                 <div class="selection-indicator">
                   <mat-icon>check_circle</mat-icon>
+                </div>
+              }
+              
+              @if (isQuestCompletedInCache(quest.id)) {
+                <div class="completion-badge">
+                  <mat-icon>verified</mat-icon>
+                  <span>완료됨</span>
                 </div>
               }
               
@@ -102,6 +211,13 @@
             <mat-icon>check</mat-icon>
             선택한 퀘스트 완료하기 ({{ selectedQuestIds().size }})
           </button>
+          
+          @if (hasCompletedQuests()) {
+            <div class="completed-quests-info">
+              <mat-icon>info</mat-icon>
+              <span>일부 퀘스트가 이미 완료되었습니다</span>
+            </div>
+          }
         </div>
       } @else {
         <div class="empty-state">

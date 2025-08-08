@@ -1,4 +1,4 @@
-// 최적화된 Chatbot.ts
+// 최적화된 Chatbot.ts - 피드백 모달 제거된 버전
 import { Component, OnInit, OnDestroy, signal, computed, effect, ViewChild, ElementRef, AfterViewChecked, ChangeDetectorRef, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -13,15 +13,6 @@ import { takeUntil } from 'rxjs/operators';
 import { ChatbotService, ChatbotMessage, UserActivityContext } from '../../Service/ChatbotService';
 import { SharedStateService } from '../../Service/SharedService';
 import { LocalActivityService } from '../../../DashBoard/Service/LocalActivityService';
-
-interface QuestFeedback {
-  quest: string;
-  group: string;
-  club: string;
-  createTime: Date;
-  user: string;
-  feedbackScore: number;
-}
 
 interface CacheEntry {
   response: string;
@@ -476,7 +467,7 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.sendMessage(action);
   }
 
-  // === 퀘스트 완료 알림 시스템 (최적화) ===
+  // === 퀘스트 완료 알림 시스템 (간소화) ===
 
   private monitorQuestCompletions(): void {
     // LocalActivityService의 활동을 모니터링 (성능 최적화)
@@ -531,27 +522,11 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   private async processQuestCompletion(completion: any): Promise<void> {
     const questName = completion.context?.questName || completion.title;
-    const groupName = completion.context?.groupName || this.sharedState.selectedGroup() || '';
     
     try {
-      // 피드백 점수 요청 (타임아웃 최적화)
-      const feedbackScore = await this.requestFeedbackOptimized(questName);
-      
-      // 로컬 스토리지에 피드백 저장
-      if (feedbackScore > 0) {
-        this.saveFeedbackToStorage({
-          quest: questName,
-          group: groupName,
-          club: this.sharedState.selectedChannel() || '',
-          createTime: new Date(),
-          user: this.sharedState.currentUser()?.id || '',
-          feedbackScore
-        });
-      }
-
-      // 축하 메시지 추가 (채팅창이 열려있지 않은 경우에만)
+      // 축하 메시지만 추가 (피드백은 그룹 대시보드에서 처리)
       if (!this.isOpen()) {
-        this.addCongratulationMessage(questName, feedbackScore);
+        this.addCongratulationMessage(questName);
       }
 
       // 완료 처리 마킹
@@ -562,158 +537,13 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
-  private async requestFeedbackOptimized(questName: string): Promise<number> {
-    return new Promise((resolve) => {
-      // 모바일이나 성능이 낮은 기기에서는 자동으로 건너뛰기
-      if (this.isLowPerformanceDevice()) {
-        resolve(0);
-        return;
-      }
-
-      const feedbackModal = this.createOptimizedFeedbackModal(questName, (score: number) => {
-        resolve(score);
-        this.removeFeedbackModal(feedbackModal);
-      });
-      
-      document.body.appendChild(feedbackModal);
-      
-      // 7초 후 자동으로 닫히고 0점 반환 (기존 10초에서 단축)
-      setTimeout(() => {
-        if (document.body.contains(feedbackModal)) {
-          this.removeFeedbackModal(feedbackModal);
-          resolve(0);
-        }
-      }, 7000);
-    });
-  }
-
-  private isLowPerformanceDevice(): boolean {
-    // 간단한 성능 체크
-    const memory = (navigator as any).deviceMemory;
-    const hardwareConcurrency = navigator.hardwareConcurrency;
-    
-    return memory && memory < 4 || hardwareConcurrency && hardwareConcurrency < 4;
-  }
-
-  private createOptimizedFeedbackModal(questName: string, onScore: (score: number) => void): HTMLElement {
-    const modal = document.createElement('div');
-    modal.className = 'feedback-modal-overlay';
-    
-    // DOM 구조 최적화 (불필요한 중첩 제거)
-    modal.innerHTML = `
-      <div class="feedback-modal">
-        <div class="feedback-header">
-          <h3>🎉 퀘스트 완료!</h3>
-          <p>"${questName.length > 30 ? questName.substring(0, 30) + '...' : questName}"을 완료하셨습니다!</p>
-        </div>
-        <div class="feedback-content">
-          <p>이 퀘스트는 얼마나 만족스러우셨나요?</p>
-          <div class="star-rating">
-            ${Array(5).fill(0).map((_, i) => 
-              `<button class="star-btn" data-score="${i + 1}" aria-label="${i + 1}점">⭐</button>`
-            ).join('')}
-          </div>
-        </div>
-        <div class="feedback-actions">
-          <button class="skip-btn">건너뛰기 (<span class="countdown">7</span>)</button>
-        </div>
-      </div>
-    `;
-
-    // 카운트다운 타이머
-    let countdown = 7;
-    const countdownElement = modal.querySelector('.countdown');
-    const countdownInterval = setInterval(() => {
-      countdown--;
-      if (countdownElement) {
-        countdownElement.textContent = countdown.toString();
-      }
-      if (countdown <= 0) {
-        clearInterval(countdownInterval);
-      }
-    }, 1000);
-
-    // 이벤트 리스너 최적화 (이벤트 위임 사용)
-    modal.addEventListener('click', (e) => {
-      const target = e.target as HTMLElement;
-      
-      if (target.matches('.star-btn')) {
-        const score = parseInt(target.getAttribute('data-score') || '0');
-        clearInterval(countdownInterval);
-        onScore(score);
-      } else if (target.matches('.skip-btn') || target.matches('.countdown')) {
-        clearInterval(countdownInterval);
-        onScore(0);
-      } else if (target === modal) {
-        clearInterval(countdownInterval);
-        onScore(0);
-      }
-    });
-
-    return modal;
-  }
-
-  private removeFeedbackModal(modal: HTMLElement): void {
-    if (document.body.contains(modal)) {
-      modal.style.opacity = '0';
-      modal.style.transform = 'scale(0.9)';
-      setTimeout(() => {
-        document.body.removeChild(modal);
-      }, 200);
-    }
-  }
-
-  private addCongratulationMessage(questName: string, feedbackScore: number): void {
-    const scoreText = feedbackScore > 0 ? ` (${feedbackScore}⭐)` : '';
-    const congratsMessage = `🎉 "${questName}" 퀘스트 완료를 축하드립니다!${scoreText}`;
+  private addCongratulationMessage(questName: string): void {
+    const congratsMessage = `🎉 "${questName}" 퀘스트 완료를 축하드립니다!`;
     
     this.addMessage(congratsMessage, false, true);
   }
 
-  // === 피드백 저장 및 관리 (최적화) ===
-
-  private saveFeedbackToStorage(feedback: QuestFeedback): void {
-    try {
-      const existingFeedbacks = this.loadFeedbacksFromStorage();
-      existingFeedbacks.push(feedback);
-      
-      // 피드백 개수 제한 (메모리 절약)
-      if (existingFeedbacks.length > 200) {
-        existingFeedbacks.splice(0, existingFeedbacks.length - 200);
-      }
-      
-      localStorage.setItem('quest_feedbacks', JSON.stringify(existingFeedbacks));
-      console.log('Feedback saved:', feedback);
-    } catch (error) {
-      console.error('Error saving feedback:', error);
-      // localStorage 용량 초과 시 오래된 데이터 삭제 후 재시도
-      this.cleanupStorageAndRetry(() => this.saveFeedbackToStorage(feedback));
-    }
-  }
-
-  private cleanupStorageAndRetry(retryFn: () => void): void {
-    try {
-      // 오래된 피드백 절반 삭제
-      const feedbacks = this.loadFeedbacksFromStorage();
-      const recentFeedbacks = feedbacks.slice(-100);
-      localStorage.setItem('quest_feedbacks', JSON.stringify(recentFeedbacks));
-      
-      // 재시도
-      retryFn();
-    } catch (error) {
-      console.error('Storage cleanup failed:', error);
-    }
-  }
-
-  private loadFeedbacksFromStorage(): QuestFeedback[] {
-    try {
-      const stored = localStorage.getItem('quest_feedbacks');
-      return stored ? JSON.parse(stored) : [];
-    } catch (error) {
-      console.error('Error loading feedbacks:', error);
-      return [];
-    }
-  }
+  // === 피드백 관련 메서드는 그룹 대시보드에서 처리하므로 제거 ===
 
   // === 알림 관리 (최적화) ===
 
@@ -810,21 +640,6 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   // === 공개 메서드 (디버깅 및 관리용) ===
 
-  getFeedbackHistory(): QuestFeedback[] {
-    return this.loadFeedbacksFromStorage();
-  }
-
-  clearFeedbackHistory(): void {
-    try {
-      localStorage.removeItem('quest_feedbacks');
-      localStorage.removeItem('processed_completions');
-      this.notificationCount.set(0);
-      console.log('Feedback history cleared');
-    } catch (error) {
-      console.error('Error clearing feedback history:', error);
-    }
-  }
-
   // 성능 통계 조회
   getPerformanceStats(): any {
     return {
@@ -846,7 +661,6 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
   resetChatbot(): void {
     this.allMessages.set([]);
     this.responseCache.clear();
-    this.clearFeedbackHistory();
     this.addWelcomeMessage();
     console.log('Chatbot reset complete');
   }
