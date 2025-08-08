@@ -5,7 +5,7 @@ frontend:
       commands:
         - node --version
         - npm --version
-        - npm ci --no-audit --prefer-offline
+        - npm install
         - npx ng version
         - |
           if [ -z "$COGNITO_USER_POOL_ID" ] || [ -z "$COGNITO_CLIENT_ID" ]; then
