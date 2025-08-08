@@ -31,35 +31,7 @@ export class HomeDashboardService {
     }
 
     async getTodayBoard(): Promise<QuickStat[]> {
-        let stat: QuickStat[] = [
-            {
-                id: '1',
-                title: '오늘 달성률',
-                value: '0',
-                change: this.getGoalRateMessage(0),
-                trend: 0 >= 50 ? 'up' : 'down',
-                icon: 'trending_up',
-                color: '#48bb78'
-            },
-            {
-                id: '2',
-                title: '참여 모임',
-                value: "0",
-                change: '친구들이 선생님을 기다리고 있습니다',
-                trend: 'up',
-                icon: 'group',
-                color: '#4299e1'
-            },
-            {
-                id: '3',
-                title: '연속 달성',
-                value: "0",
-                change: '이만큼이나 하셨군요 훌륭합니다!',
-                trend: 'up',
-                icon: 'repeat',
-                color: '#f6ad55'
-            }
-        ]
+        let stat: QuickStat[] = []
         const userInfo = await this.userService.getUserJoin();
         const userQuestCur = await this.userService.getUserQuestCur();
         const userQuestContinuous = await this.userService.getUserQuestContinuous();
