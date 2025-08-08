@@ -34,7 +34,7 @@ export class LoginService {
                     throw new Error('액세스 토큰을 가져올 수 없습니다.');
                 }
                 
-                // 사용자 속성 가져오기
+                // Cognito 직접 로그인이므로 fetchUserAttributes 사용 가능
                 const userAttributes = await fetchUserAttributes();
                 const displayName = userAttributes['custom:username'] || 
                                   userAttributes.name || 
@@ -87,16 +87,46 @@ export class LoginService {
         }
     }
 
-    // 개선된 사용자 정보 가져오기
+    // 인증 제공자 구분 메서드
+    private async getAuthProvider(): Promise<'cognito' | 'google' | 'unknown'> {
+        try {
+            const session = await fetchAuthSession();
+            
+            if (!session.tokens?.accessToken) {
+                return 'unknown';
+            }
+            
+            const tokenPayload = JSON.parse(atob(session.tokens.accessToken.toString().split('.')[1]));
+            
+            // Google OAuth로 로그인한 경우 identities 필드에 Google 정보가 있음
+            if (tokenPayload.identities && 
+                Array.isArray(tokenPayload.identities) && 
+                tokenPayload.identities.some((identity: any) => identity.providerName === 'Google')) {
+                return 'google';
+            }
+            
+            // aws.cognito.signin.user.admin scope가 있으면 Cognito 직접 로그인
+            if (tokenPayload.scope?.includes('aws.cognito.signin.user.admin')) {
+                return 'cognito';
+            }
+            
+            // token_use가 access이고 cognito user pool에서 발급된 경우
+            if (tokenPayload.token_use === 'access' && tokenPayload.aud) {
+                return 'cognito';
+            }
+            
+            return 'unknown';
+        } catch (error) {
+            console.error('인증 제공자 확인 오류:', error);
+            return 'unknown';
+        }
+    }
+
+    // 개선된 사용자 정보 가져오기 - 인증 방식별 분리
     async getCurrentUserInfo(): Promise<any> {
         try {
-            const [user, session, userAttributes] = await Promise.all([
-                getCurrentUser(),
-                fetchAuthSession(),
-                fetchUserAttributes()
-            ]);
+            const session = await fetchAuthSession();
             
-            // 토큰 유효성 검증
             if (!session.tokens?.accessToken) {
                 throw new Error('유효하지 않은 세션입니다.');
             }
@@ -110,13 +140,60 @@ export class LoginService {
                 throw new Error('세션이 만료되었습니다.');
             }
             
+            // 인증 제공자에 따라 다른 방식으로 사용자 정보 가져오기
+            const authProvider = await this.getAuthProvider();
+            console.log('감지된 인증 제공자:', authProvider);
+            
+            let user, userAttributes;
+            
+            switch (authProvider) {
+                case 'cognito':
+                    // Cognito 직접 로그인: fetchUserAttributes() 사용
+                    console.log('Cognito 직접 로그인 - fetchUserAttributes 사용');
+                    [user, userAttributes] = await Promise.all([
+                        getCurrentUser(),
+                        fetchUserAttributes()
+                    ]);
+                    break;
+                    
+                case 'google':
+                    // Google OAuth: ID Token에서 정보 추출
+                    console.log('Google OAuth 로그인 - ID Token에서 정보 추출');
+                    if (!session.tokens?.idToken) {
+                        throw new Error('ID 토큰을 찾을 수 없습니다.');
+                    }
+                    
+                    const idTokenPayload = JSON.parse(atob(session.tokens.idToken.toString().split('.')[1]));
+                    console.log('Google ID Token 정보:', idTokenPayload);
+                    
+                    user = {
+                        userId: idTokenPayload.sub,
+                        username: idTokenPayload.email
+                    };
+                    
+                    userAttributes = {
+                        email: idTokenPayload.email,
+                        name: idTokenPayload.name,
+                        given_name: idTokenPayload.given_name,
+                        family_name: idTokenPayload.family_name,
+                        picture: idTokenPayload.picture,
+                        // custom:username은 name이나 email에서 추출
+                        'custom:username': idTokenPayload.name || idTokenPayload.email?.split('@')[0]
+                    };
+                    break;
+                    
+                default:
+                    throw new Error(`지원하지 않는 인증 방식입니다: ${authProvider}`);
+            }
+            
             return {
                 user,
                 userAttributes,
                 accessToken: accessToken.toString(),
                 idToken: session.tokens?.idToken?.toString(),
                 isAuthenticated: true,
-                expiresAt: new Date(tokenPayload.exp * 1000)
+                expiresAt: new Date(tokenPayload.exp * 1000),
+                authProvider // 디버깅용
             };
         } catch (error: any) {
             console.error('사용자 정보 가져오기 오류:', error);
@@ -127,10 +204,9 @@ export class LoginService {
     // 개선된 인증 상태 확인
     async checkAuthState(): Promise<boolean> {
         try {
-            const user = await getCurrentUser();
             const session = await fetchAuthSession();
             
-            // 토큰 존재 및 유효성 확인
+            // 토큰 존재 확인
             if (!session.tokens?.accessToken) {
                 return false;
             }
