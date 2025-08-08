@@ -93,7 +93,7 @@ export class UserService {
             }
 
             // 캐시 확인
-            const cache: UserJoin | null = this.cacheService.getCache('userJoinList');
+            const cache: UserJoin | null = this.cacheService.getCache('userJoin');
             if (cache && cache.id === id) {
                 return cache;
             }
@@ -107,11 +107,11 @@ export class UserService {
                     tap(data => {
                         // ID 정보 추가하여 캐시
                         const dataWithId = { ...data, id };
-                        this.cacheService.setCache('userJoinList', dataWithId);
+                        this.cacheService.setCache('userJoin', dataWithId);
                     }),
                     catchError(error => {
                         console.error('[API] getUserJoin error:', error);
-                        this.cacheService.removeCache('userJoinList');
+                        this.cacheService.removeCache('userJoin');
                         return throwError(error);
                     })
                 )
@@ -673,20 +673,20 @@ export class UserService {
         updateFn: (joinList: UserJoin) => UserJoin
     ): Promise<void> {
         try {
-            let userJoinList: UserJoin | null = this.cacheService.getCache('userJoinList');
+            let userJoin: UserJoin | null = this.cacheService.getCache('userJoin');
             
-            if (!userJoinList || userJoinList.id !== id) {
-                userJoinList = await this.getUserJoin(id);
+            if (!userJoin || userJoin.id !== id) {
+                userJoin = await this.getUserJoin(id);
             }
 
-            if (userJoinList) {
-                const updatedJoinList = updateFn(userJoinList);
-                this.cacheService.setCache('userJoinList', updatedJoinList);
+            if (userJoin) {
+                const updatedJoinList = updateFn(userJoin);
+                this.cacheService.setCache('userJoin', updatedJoinList);
             }
         } catch (error) {
             console.error('Error updating join list cache:', error);
             // 캐시 업데이트 실패 시 캐시 무효화
-            this.cacheService.removeCache('userJoinList');
+            this.cacheService.removeCache('userJoin');
         }
     }
 
@@ -694,7 +694,7 @@ export class UserService {
         console.warn('Authentication failed, clearing session and redirecting');
         this.cacheService.removeCache('user');
         this.cacheService.removeCache('userStatus');
-        this.cacheService.removeCache('userJoinList');
+        this.cacheService.removeCache('userJoin');
         this.router.navigate(['/']);
     }
 
@@ -702,7 +702,7 @@ export class UserService {
     clearUserCache(): void {
         this.cacheService.removeCache('user');
         this.cacheService.removeCache('userStatus');
-        this.cacheService.removeCache('userJoinList');
+        this.cacheService.removeCache('userJoin');
         this.cacheService.removeCache('userQuestCur');
         this.cacheService.removeCache('userQuestContinuous');
         this.cacheService.removeCache('userQuestPrev');
@@ -761,7 +761,7 @@ export class UserService {
                typeof status.name === 'string';
     }
 
-    isValidUserJoinList(joinList: any): joinList is UserJoin {
+    isValidUserJoin(joinList: any): joinList is UserJoin {
         return joinList && 
                Array.isArray(joinList.joinList) &&
                joinList.joinList.every((item: any) => 

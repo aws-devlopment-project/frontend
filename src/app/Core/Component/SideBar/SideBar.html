@@ -44,8 +44,8 @@
         </div>
 
         <!-- Dynamic Group Containers -->
-        @if (userJoinList?.joinList) {
-            @for (group of userJoinList?.joinList; track group.groupname) {
+        @if (userJoin?.joinList) {
+            @for (group of userJoin?.joinList; track group.groupname) {
                 <div class="toggleBarContainer">
                     <div class="toggleBar" 
                          (click)="toggleSection(group.groupname)"
@@ -72,7 +72,7 @@
         }
 
         <!-- 데이터가 로딩 중이거나 없을 때 표시할 내용 -->
-        @if (!userJoinList) {
+        @if (!userJoin) {
             <div class="toggleBarContainer">
                 <div class="toggleBar">
                     <mat-icon>hourglass_empty</mat-icon>
@@ -82,7 +82,7 @@
         }
 
         <!-- 가입한 그룹이 없을 때 -->
-        @if (userJoinList?.joinList && userJoinList?.joinList?.length === 0) {
+        @if (userJoin?.joinList && userJoin?.joinList?.length === 0) {
             <div class="toggleBarContainer">
                 <div class="toggleBar">
                     <mat-icon>info</mat-icon>

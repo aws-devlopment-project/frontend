@@ -6,6 +6,7 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   overflow: hidden;
   position: relative;
+  z-index: auto;
 }
 
 .main-area {

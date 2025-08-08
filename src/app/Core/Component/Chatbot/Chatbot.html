@@ -1,128 +1,206 @@
-<!-- 챗봇 플로팅 버튼 -->
+<!-- 최적화된 Chatbot.html - 성능 개선된 템플릿 -->
 <div class="chatbot-container">
-    @if (!isOpen) {
-    <button 
-        (click)="openChatbot()"
-        class="chatbot-trigger"
-        [class.animate-bounce]="!hasInteracted">
-        <mat-icon>chat</mat-icon>
-    </button>
-    }
+  <!-- 챗봇 토글 버튼 -->
+  <button 
+    class="chatbot-toggle" 
+    [class.minimized]="isMinimized()"
+    [class.has-notifications]="hasNotifications()"
+    [matBadge]="notificationCount()"
+    [matBadgeHidden]="!hasNotifications()"
+    matBadgeColor="warn"
+    matBadgeSize="small"
+    matBadgePosition="above before"
+    (click)="toggleChatbot()"
+    [attr.aria-label]="'챗봇 ' + (isOpen() ? '닫기' : '열기')"
+    type="button">
     
-    <!-- 챗봇 윈도우 -->
-    @if (isOpen) {
-    <div class="chatbot-window" [class.minimized]="isMinimized">
-        <!-- 헤더 -->
-        <div class="chatbot-header">
-        <div class="status-indicator">
-            <div class="status-dot"></div>
-            <span class="status-text">AI 도우미</span>
-            <span class="status-online">온라인</span>
-        </div>
-        <div class="header-controls">
-            <button (click)="toggleMinimize()" class="control-btn" [title]="isMinimized ? '확대' : '최소화'">
-            <mat-icon>{{ isMinimized ? 'expand_more' : 'expand_less' }}</mat-icon>
-            </button>
-            <button (click)="closeChatbot()" class="control-btn close-btn" title="닫기">
-            <mat-icon>close</mat-icon>
-            </button>
-        </div>
-        </div>
-
-        @if (!isMinimized) {
-        <!-- 메시지 영역 -->
-        <div class="messages-container" #messagesContainer>
-            @for (message of messages; track message.id) {
-            <div class="message-wrapper" 
-                    [class.user-message]="message.isUser"
-                    [class.bot-message]="!message.isUser"
-                    [class.animate-slide-up]="message.animated">
-                
-                @if (!message.isUser) {
-                <div class="message-avatar bot-avatar">
-                    <mat-icon>smart_toy</mat-icon>
-                </div>
-                }
-                
-                <div class="message-content">
-                @if (!message.isUser) {
-                    <div class="message-meta">
-                    AI 도우미 • {{ formatTime(message.timestamp) }}
-                    </div>
-                }
-                
-                <div class="message-bubble" 
-                        [class.user-bubble]="message.isUser"
-                        [class.bot-bubble]="!message.isUser"
-                        [class.animate-typing]="message.animated">
-                    @if (message.isUser) {
-                    <div class="message-meta user-meta">
-                        {{ userContext?.userName || '나' }} • {{ formatTime(message.timestamp) }}
-                    </div>
-                    }
-                    <div class="message-text">{{ message.text }}</div>
-                </div>
-                </div>
-                
-                @if (message.isUser) {
-                <div class="message-avatar user-avatar">
-                    <mat-icon>person</mat-icon>
-                </div>
-                }
-            </div>
-            }
-            
-            <!-- 타이핑 인디케이터 -->
-            @if (isTyping) {
-            <div class="message-wrapper bot-message animate-fade-in">
-                <div class="message-avatar bot-avatar">
-                <mat-icon>smart_toy</mat-icon>
-                </div>
-                <div class="message-content">
-                <div class="typing-indicator">
-                    <div class="typing-dot"></div>
-                    <div class="typing-dot"></div>
-                    <div class="typing-dot"></div>
-                </div>
-                </div>
-            </div>
-            }
-        </div>
-
-        <!-- 입력 영역 -->
-        <div class="input-container">
-            <!-- 빠른 질문 버튼들 -->
-            <div class="quick-questions">
-            @for (question of quickQuestions; track question) {
-                <button 
-                (click)="sendQuickQuestion(question)"
-                [disabled]="isTyping"
-                class="quick-question-btn">
-                {{ question }}
-                </button>
-            }
-            </div>
-            
-            <!-- 텍스트 입력 -->
-            <div class="input-row">
-            <input 
-                type="text"
-                [(ngModel)]="inputText"
-                (keydown.enter)="sendMessage()"
-                (focus)="markAsInteracted()"
-                placeholder="메시지를 입력하세요..."
-                class="message-input"
-                [disabled]="isTyping"
-                #messageInput>
-            <button 
-                (click)="sendMessage()"
-                [disabled]="!inputText.trim() || isTyping"
-                class="send-btn">
-                <mat-icon>send</mat-icon>
-            </button>
-            </div>
-        </div>
-        }
-    </div>
+    @if (isMinimized()) {
+      <mat-icon aria-hidden="true">chat_bubble</mat-icon>
+    } @else {
+      <mat-icon aria-hidden="true">smart_toy</mat-icon>
     }
+  </button>
+
+  <!-- 챗봇 창 -->
+  @if (isOpen()) {
+    <div class="chatbot-window" role="dialog" aria-labelledby="chatbot-title" aria-modal="false">
+      <!-- 헤더 -->
+      <header class="chatbot-header">
+        <div class="header-info">
+          <div class="bot-avatar" aria-hidden="true">🤖</div>
+          <div class="bot-details">
+            <h2 id="chatbot-title" class="bot-name">AI 어시스턴트</h2>
+            <span class="bot-status" aria-label="상태: 온라인">● 온라인</span>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button 
+            class="header-btn" 
+            (click)="minimize()" 
+            aria-label="최소화"
+            type="button">
+            <mat-icon aria-hidden="true">remove</mat-icon>
+          </button>
+          <button 
+            class="header-btn" 
+            (click)="closeChatbot()" 
+            aria-label="채팅 닫기"
+            type="button">
+            <mat-icon aria-hidden="true">close</mat-icon>
+          </button>
+        </div>
+      </header>
+
+      <!-- 메시지 영역 -->
+      <main 
+        class="chatbot-messages" 
+        #chatMessages
+        role="log" 
+        aria-label="채팅 메시지"
+        aria-live="polite"
+        tabindex="0">
+        
+        @if (isEmpty()) {
+          <!-- 빈 상태 -->
+          <div class="empty-chat" role="status">
+            <div class="welcome-icon" aria-hidden="true">💬</div>
+            <p>채팅을 시작해보세요!</p>
+            
+            <!-- 빠른 액션 버튼들 -->
+            <nav class="quick-actions" aria-label="빠른 액션">
+              @for (action of quickActions(); track action) {
+                <button 
+                  class="quick-action-btn" 
+                  (click)="onQuickAction(action)"
+                  type="button">
+                  {{ action }}
+                </button>
+              }
+            </nav>
+          </div>
+        } @else {
+          <!-- 메시지 리스트 - trackBy 함수 적용으로 성능 최적화 -->
+          @for (message of messages(); track trackByMessageId($index, message)) {
+            <article 
+              class="message-wrapper" 
+              [class.user-message]="message.isUser"
+              [class.bot-message]="!message.isUser"
+              [attr.data-message-id]="message.id">
+              
+              <div class="message-content">
+                <div 
+                  class="message-bubble" 
+                  [class.user-bubble]="message.isUser"
+                  [class.bot-bubble]="!message.isUser"
+                  role="group"
+                  [attr.aria-label]="message.isUser ? '사용자 메시지' : '봇 응답'">
+                  
+                  <!-- 메시지 텍스트 -->
+                  <p 
+                    [attr.data-username]="message.isUser ? '당신' : ''"
+                    [innerHTML]="message.text"
+                    class="message-text">
+                  </p>
+                  
+                  <!-- 타임스탬프 -->
+                  <time 
+                    class="message-time"
+                    [attr.datetime]="message.timestamp | date:'yyyy-MM-ddTHH:mm:ss'"
+                    [title]="message.timestamp | date:'yyyy년 MM월 dd일 HH:mm:ss'">
+                    {{ message.timestamp | date:'HH:mm' }}
+                  </time>
+                </div>
+              </div>
+            </article>
+          }
+        }
+
+        <!-- 타이핑 인디케이터 -->
+        @if (isTyping()) {
+          <div 
+            class="message-wrapper bot-message" 
+            role="status" 
+            aria-label="봇이 입력 중입니다">
+            <div class="message-content">
+              <div class="message-bubble bot-bubble">
+                <div class="typing-indicator" aria-hidden="true">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+                <span class="sr-only">입력 중...</span>
+              </div>
+            </div>
+          </div>
+        }
+      </main>
+
+      <!-- 입력 영역 -->
+      <footer class="chatbot-input">
+        <form class="input-container" (ngSubmit)="sendMessage()" novalidate>
+          <label for="chat-input" class="sr-only">메시지 입력</label>
+          <input 
+            #userInputRef
+            id="chat-input"
+            class="native-input"
+            placeholder="메시지 보내기..."
+            [value]="userInputValue()"
+            (input)="userInputValue.set($any($event.target).value)"
+            (keydown)="onInputKeyPress($event)"
+            [disabled]="isTyping()"
+            [attr.aria-describedby]="isTyping() ? 'typing-status' : null"
+            maxlength="500"
+            autocomplete="off"
+            spellcheck="true"
+            type="text">
+          
+          <!-- 숨김 상태 표시 -->
+          @if (isTyping()) {
+            <div id="typing-status" class="sr-only" aria-live="polite">
+              봇이 응답을 생성하고 있습니다
+            </div>
+          }
+          
+          <button 
+            class="send-button"
+            [disabled]="!canSend()"
+            type="submit"
+            [attr.aria-label]="canSend() ? '메시지 보내기' : '메시지를 입력해주세요'">
+            <mat-icon aria-hidden="true">send</mat-icon>
+          </button>
+        </form>
+
+        <!-- 빠른 액션 (메시지가 적을 때만 표시) -->
+        @if (messages().length <= 1) {
+          <nav class="input-quick-actions" aria-label="빠른 질문">
+            @for (action of quickActions().slice(0, 3); track action) {
+              <button 
+                class="quick-action-chip" 
+                (click)="onQuickAction(action)"
+                [disabled]="isTyping()"
+                type="button"
+                [attr.aria-label]="'빠른 질문: ' + action">
+                {{ action }}
+              </button>
+            }
+          </nav>
+        }
+      </footer>
+    </div>
+  }
 </div>
+
+<!-- 스크린 리더용 숨김 텍스트를 위한 스타일 -->
+<style>
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+</style>

@@ -47,7 +47,7 @@ export class GroupService {
             'Content-Type': 'application/json'
         });
         const response = await this.httpService.get(url, headers).toPromise();
-        const groupList: Group[] | null = response.data;
+        const groupList: Group[] | null = response;
         if (groupList) {
             groupList.forEach((group) => {
                 this.dataService.setCache(group.name, group);
@@ -66,21 +66,6 @@ export class GroupService {
         let cacheGroup: Group | null = await this.dataService.getCache(group);
         if (cacheGroup) {
             cacheGroup.memberNum += 1;
-        }
-        this.dataService.setCache(group, cacheGroup);
-        return true;
-    }
-
-    async departUser(group: string, user: string): Promise<boolean> {
-        const url = environment.apiUrl + '/api/group/departUser';
-        const headers: HttpHeaders = new HttpHeaders({
-            'Content-Type': 'application/json'
-        });
-        const body = JSON.stringify({user: user, group: group});
-        await this.httpService.post(url, body, headers).toPromise();
-        let cacheGroup: Group | null = await this.dataService.getCache(group);
-        if (cacheGroup) {
-            cacheGroup.memberNum -= 1;
         }
         this.dataService.setCache(group, cacheGroup);
         return true;

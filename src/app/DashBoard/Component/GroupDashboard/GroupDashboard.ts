@@ -1,11 +1,25 @@
-import { Component, signal, OnInit } from "@angular/core";
+// GroupDashboard.ts - 퀘스트 완료 알림 연동 버전
+import { Component, signal, OnInit, OnDestroy, effect } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { MatIconModule } from "@angular/material/icon";
 import { Router } from "@angular/router";
+import { Subject } from "rxjs";
+import { takeUntil } from "rxjs/operators";
+
 import { GroupDashboardService } from "../../Service/GroupDashboard";
 import { Quest, Stat } from "../../Models/GroupDashboardModels";
 import { SharedStateService } from "../../../Core/Service/SharedService";
 import { UserService } from "../../../Core/Service/UserService";
+import { LocalActivityService } from "../../Service/LocalActivityService";
+
+interface QuestCompletionEvent {
+  questId: string;
+  questTitle: string;
+  groupName: string;
+  channelName: string;
+  userId: string;
+  completedAt: Date;
+}
 
 @Component({
   selector: 'app-group-dashboard',
@@ -15,7 +29,10 @@ import { UserService } from "../../../Core/Service/UserService";
   providers: [GroupDashboardService],
   standalone: true
 })
-export class GroupDashboardComponent implements OnInit {
+export class GroupDashboardComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
+  private completedQuestIds = new Set<string>(); // 이미 처리된 퀘스트 추적
+
   // 데이터 signals
   title = signal<string>("");
   quests = signal<Quest[]>([]);
@@ -26,7 +43,7 @@ export class GroupDashboardComponent implements OnInit {
     { id: '3', label: '소모임 수', value: 0, icon: 'star', unit: '개' }
   ]);
 
-  // 상태 signals - 명시적으로 선언
+  // 상태 signals
   readonly isLoading = signal<boolean>(true);
   readonly error = signal<string | null>(null);
 
@@ -34,15 +51,110 @@ export class GroupDashboardComponent implements OnInit {
     private groupDashboardService: GroupDashboardService,
     private shared: SharedStateService,
     private router: Router,
-    private userService: UserService
-  ) {}
+    private userService: UserService,
+    private activityService: LocalActivityService
+  ) {
+    // 퀘스트 상태 변화 모니터링
+    this.monitorQuestChanges();
+  }
 
   async ngOnInit(): Promise<void> {
-    // 그룹 선택 상태 확인 및 처리
-    console.log("group pass");
+    console.log("GroupDashboard initialized");
     await this.ensureGroupSelected();
     await this.loadGroupData();
   }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  // === 퀘스트 변화 모니터링 ===
+  
+  private monitorQuestChanges(): void {
+    // quests signal 변화 감지
+    effect(() => {
+      const currentQuests = this.quests();
+      const completedQuests = currentQuests.filter(quest => quest.status === 'completed');
+      
+      // 새로 완료된 퀘스트들 찾기
+      const newlyCompleted = completedQuests.filter(quest => 
+        !this.completedQuestIds.has(quest.id)
+      );
+
+      if (newlyCompleted.length > 0) {
+        console.log('New quest completions detected:', newlyCompleted.length);
+        this.handleQuestCompletions(newlyCompleted);
+        
+        // 완료된 퀘스트 ID 추가
+        newlyCompleted.forEach(quest => {
+          this.completedQuestIds.add(quest.id);
+        });
+      }
+    });
+  }
+
+  private async handleQuestCompletions(completedQuests: Quest[]): Promise<void> {
+    const groupName = this.shared.selectedGroup();
+    const channelName = this.shared.selectedChannel();
+    const userId = this.shared.currentUser()?.id;
+
+    if (!groupName || !userId) {
+      console.warn('Missing group or user information for quest completion');
+      return;
+    }
+
+    for (const quest of completedQuests) {
+      // LocalActivityService를 통해 퀘스트 완료 추적
+      await this.activityService.trackQuestCompletion(
+        groupName, 
+        [quest.title]
+      );
+
+      // 퀘스트 완료 이벤트 생성
+      const completionEvent: QuestCompletionEvent = {
+        questId: quest.id,
+        questTitle: quest.title,
+        groupName,
+        channelName: channelName || '',
+        userId,
+        completedAt: new Date()
+      };
+
+      console.log('Quest completion event:', completionEvent);
+
+      // 축하 메시지 표시 (선택사항)
+      this.showQuestCompletionToast(quest.title);
+    }
+  }
+
+  private showQuestCompletionToast(questTitle: string): void {
+    // 간단한 토스트 알림 (실제로는 더 정교한 토스트 서비스 사용 권장)
+    const toast = document.createElement('div');
+    toast.className = 'quest-completion-toast';
+    toast.innerHTML = `
+      <div class="toast-content">
+        <div class="toast-icon">🎉</div>
+        <div class="toast-message">
+          <strong>"${questTitle}"</strong> 퀘스트를 완료했습니다!
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // 애니메이션 후 제거
+    setTimeout(() => {
+      toast.classList.add('fade-out');
+      setTimeout(() => {
+        if (document.body.contains(toast)) {
+          document.body.removeChild(toast);
+        }
+      }, 300);
+    }, 3000);
+  }
+
+  // === 기존 메서드들 (수정된 부분만 표시) ===
 
   private async ensureGroupSelected(): Promise<void> {
     let selectedGroup = this.shared.selectedGroup();
@@ -50,16 +162,12 @@ export class GroupDashboardComponent implements OnInit {
     if (!selectedGroup) {
       console.log('선택된 그룹이 없음. 자동 선택 시도...');
       
-      // 1. localStorage에서 참여한 그룹 확인
       const joinedGroups = await this.getJoinedGroups();
       if (joinedGroups.length > 0) {
-        // 첫 번째 그룹 자동 선택
         const firstGroup = joinedGroups[0];
         console.log('자동 그룹 선택:', firstGroup);
-        
         this.shared.setSelectedGroup(firstGroup);
       } else {
-        // 참여한 그룹이 없으면 그룹 참여 페이지로 리다이렉트
         console.log('참여한 그룹이 없음. 그룹 참여 페이지로 이동');
         this.navigateToGroupJoin();
         return;
@@ -71,9 +179,8 @@ export class GroupDashboardComponent implements OnInit {
 
   private async getJoinedGroups(): Promise<string[]> {
     try {
-      const userJoinList = await this.userService.getUserJoin(this.shared.currentUser()?.name);
-      const joinedGroups = userJoinList ? userJoinList.joinList.map(join => join.groupname) : [];
-      return joinedGroups ? joinedGroups : [];
+      const userJoin = await this.userService.getUserJoin(this.shared.currentUser()?.id);
+      return userJoin ? userJoin.joinList.map(join => join.groupname) : [];
     } catch (error) {
       console.error('참여 그룹 조회 실패:', error);
       return [];
@@ -106,16 +213,38 @@ export class GroupDashboardComponent implements OnInit {
 
       // 데이터 설정
       this.title.set(group.name);
-      this.quests.set(this.groupDashboardService.processingQuest(group));
+      
+      // 기존 완료된 퀘스트 상태 유지
+      const newQuests = this.groupDashboardService.processingQuest(group);
+      const currentQuests = this.quests();
+      
+      // 이전에 완료된 퀘스트들의 상태 복원
+      const updatedQuests = newQuests.map(newQuest => {
+        const existingQuest = currentQuests.find(q => q.id === newQuest.id);
+        if (existingQuest && existingQuest.status === 'completed') {
+          return { ...newQuest, status: 'completed' as const };
+        }
+        return newQuest;
+      });
+
+      this.quests.set(updatedQuests);
       this.stats.set(this.groupDashboardService.processingStat(group));
+
+      // 완료된 퀘스트 ID 재설정
+      this.completedQuestIds.clear();
+      updatedQuests.forEach(quest => {
+        if (quest.status === 'completed') {
+          this.completedQuestIds.add(quest.id);
+        }
+      });
 
       console.log('그룹 데이터 로딩 완료:', {
         title: this.title(),
         questsCount: this.quests().length,
+        completedQuests: Array.from(this.completedQuestIds),
         statsCount: this.stats().length
       });
 
-      // 진행률 애니메이션 시작
       setTimeout(() => this.animateProgress(), 500);
 
     } catch (error) {
@@ -126,11 +255,11 @@ export class GroupDashboardComponent implements OnInit {
     }
   }
 
-  // === 퀘스트 관련 메서드 ===
+  // === 퀘스트 관련 메서드 (기존 유지) ===
   
   onQuestClick(quest: Quest): void {
     if (quest.status === 'completed') {
-      return; // 완료된 퀘스트는 선택할 수 없음
+      return;
     }
     
     const currentSelected = this.selectedQuestIds();
@@ -162,12 +291,18 @@ export class GroupDashboardComponent implements OnInit {
       return;
     }
 
-    // 선택된 퀘스트들을 순차적으로 완료 처리
-    selectedQuests.forEach((quest, index) => {
-      setTimeout(() => {
-        this.completeQuest(quest.id);
-      }, index * 300);
-    });
+    // 확인 대화상자
+    const questNames = selectedQuests.map(q => q.title).join(', ');
+    const confirmMessage = `선택한 퀘스트들을 완료하시겠습니까?\n\n${questNames}`;
+    
+    if (confirm(confirmMessage)) {
+      // 선택된 퀘스트들을 순차적으로 완료 처리
+      selectedQuests.forEach((quest, index) => {
+        setTimeout(() => {
+          this.completeQuest(quest.id);
+        }, index * 300);
+      });
+    }
   }
 
   private completeQuest(questId: string): void {
@@ -176,15 +311,21 @@ export class GroupDashboardComponent implements OnInit {
       if (quest.id === questId) {
         return {
           ...quest,
-          status: 'completed' as const
+          status: 'completed' as const,
+          progress: 100 // 완료 시 100%로 설정
         };
       }
-
       return quest;
     });
-    let id = this.shared.currentUser()?.id;
-    if (id)
-      this.groupDashboardService.questClear(id, this.shared.selectedGroup(), updatedQuests);
+
+    // 서버에 퀘스트 완료 상태 업데이트
+    const userId = this.shared.currentUser()?.id;
+    const groupName = this.shared.selectedGroup();
+    
+    if (userId && groupName) {
+      this.groupDashboardService.questClear(userId, groupName, updatedQuests);
+    }
+
     this.quests.set(updatedQuests);
     
     // 선택 목록에서 제거
@@ -199,7 +340,7 @@ export class GroupDashboardComponent implements OnInit {
     console.log(`Quest ${questId} completed!`);
   }
 
-  // === 상태 관련 메서드 ===
+  // === 기존 메서드들 (변경 없음) ===
 
   getStatusColor(status: string): string {
     switch (status) {
@@ -218,8 +359,6 @@ export class GroupDashboardComponent implements OnInit {
       default: return '알 수 없음';
     }
   }
-
-  // === 통계 관련 메서드 ===
 
   getTodayAchievementRate(): number {
     const statsList = this.stats();
@@ -269,5 +408,16 @@ export class GroupDashboardComponent implements OnInit {
 
   refreshData(): void {
     this.loadGroupData();
+  }
+
+  // === 디버깅 메서드 ===
+
+  getCompletedQuestIds(): string[] {
+    return Array.from(this.completedQuestIds);
+  }
+
+  resetQuestCompletions(): void {
+    this.completedQuestIds.clear();
+    console.log('Quest completion tracking reset');
   }
 }
