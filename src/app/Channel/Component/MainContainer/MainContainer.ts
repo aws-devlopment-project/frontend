@@ -128,7 +128,7 @@ export class MainContainerComponent implements OnInit, OnDestroy {
     // 개발 환경에서는 localhost, 프로덕션에서는 실제 서버 주소 사용
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.hostname === 'localhost' ? 'localhost' : window.location.hostname;
-    const port = window.location.hostname === 'localhost' ? ':8080' : '';
+    const port = window.location.hostname === 'localhost' ? ':8081' : '';
     
     return `${protocol}//${host}${port}/chat`;
   }
