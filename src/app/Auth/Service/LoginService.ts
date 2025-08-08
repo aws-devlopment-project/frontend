@@ -330,7 +330,12 @@ export class LoginService {
             });
             
             console.log('이메일 인증 완료:', { isSignUpComplete, userId, nextStep });
-            return { status: 200, username: username, isSignUpComplete };
+            return { 
+                status: 200, 
+                username: username, 
+                isSignUpComplete,
+                nextStep // nextStep 정보도 반환
+            };
         } catch (error: any) {
             console.error('이메일 인증 오류:', error);
             
