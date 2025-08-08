@@ -78,7 +78,7 @@ frontend:
             },
             aws_cognito_username_attributes: ['email'],
             aws_cognito_social_providers: ['GOOGLE'],
-            aws_cognito_signup_attributes: ['EMAIL'],
+            aws_cognito_signup_attributes: ['EMAIL', 'CUSTOM:USERNAME'],
             aws_cognito_mfa_configuration: 'OPTIONAL',
             aws_cognito_password_protection_settings: {
               passwordPolicyMinLength: 8,
@@ -90,6 +90,12 @@ frontend:
               ]
             },
             aws_cognito_verification_mechanisms: ['EMAIL'],
+            // Custom attributes 설정 추가
+            aws_cognito_user_attributes: [
+              'email',
+              'name',
+              'custom:username'
+            ],
             API: {
               endpoints: [
                 {
@@ -109,6 +115,18 @@ frontend:
                   username: false,
                   email: true,
                   phone: false
+                },
+                // 사용자 속성 설정 추가
+                userAttributes: {
+                  email: {
+                    required: true
+                  },
+                  name: {
+                    required: false
+                  },
+                  'custom:username': {
+                    required: true
+                  }
                 }
               }
             }
