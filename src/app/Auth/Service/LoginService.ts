@@ -93,28 +93,68 @@ export class LoginService {
             const session = await fetchAuthSession();
             
             if (!session.tokens?.accessToken) {
+                console.log('Access Token이 없습니다.');
                 return 'unknown';
             }
             
             const tokenPayload = JSON.parse(atob(session.tokens.accessToken.toString().split('.')[1]));
+            console.log('Access Token Payload:', tokenPayload);
             
-            // Google OAuth로 로그인한 경우 identities 필드에 Google 정보가 있음
-            if (tokenPayload.identities && 
-                Array.isArray(tokenPayload.identities) && 
-                tokenPayload.identities.some((identity: any) => identity.providerName === 'Google')) {
+            // ID Token도 확인 (Google OAuth의 경우 여기에 정보가 있을 수 있음)
+            if (session.tokens?.idToken) {
+                const idTokenPayload = JSON.parse(atob(session.tokens.idToken.toString().split('.')[1]));
+                console.log('ID Token Payload:', idTokenPayload);
+            }
+            
+            // Google OAuth 감지 방법들 (여러 패턴 확인)
+            
+            // 1. identities 필드 확인
+            if (tokenPayload.identities && Array.isArray(tokenPayload.identities)) {
+                console.log('Identities 필드 발견:', tokenPayload.identities);
+                if (tokenPayload.identities.some((identity: any) => 
+                    identity.providerName === 'Google' || 
+                    identity.providerType === 'Google' ||
+                    identity.provider === 'Google'
+                )) {
+                    return 'google';
+                }
+            }
+            
+            // 2. iss (issuer) 확인 - Google의 경우 특정 형식을 가짐
+            if (tokenPayload.iss && tokenPayload.iss.includes('cognito-idp') && 
+                tokenPayload.identities) {
                 return 'google';
             }
             
-            // aws.cognito.signin.user.admin scope가 있으면 Cognito 직접 로그인
+            // 3. token_use와 auth_time 조합으로 확인
+            if (tokenPayload.token_use === 'access' && 
+                tokenPayload.identities !== undefined) {
+                return 'google';
+            }
+            
+            // 4. scope에 aws.cognito.signin.user.admin이 있으면 Cognito 직접 로그인
             if (tokenPayload.scope?.includes('aws.cognito.signin.user.admin')) {
+                console.log('Cognito 직접 로그인 - scope에서 감지');
                 return 'cognito';
             }
             
-            // token_use가 access이고 cognito user pool에서 발급된 경우
-            if (tokenPayload.token_use === 'access' && tokenPayload.aud) {
+            // 5. token_use가 access이고 identities가 없으면 Cognito 직접 로그인
+            if (tokenPayload.token_use === 'access' && 
+                !tokenPayload.identities && 
+                tokenPayload.aud) {
+                console.log('Cognito 직접 로그인 - identities 없음으로 감지');
                 return 'cognito';
             }
             
+            // 6. username이 이메일 형식이고 event가 있으면 Cognito 직접 로그인
+            if (tokenPayload.username && 
+                tokenPayload.username.includes('@') && 
+                tokenPayload.event_id) {
+                console.log('Cognito 직접 로그인 - username 패턴으로 감지');
+                return 'cognito';
+            }
+            
+            console.log('알 수 없는 토큰 패턴입니다.');
             return 'unknown';
         } catch (error) {
             console.error('인증 제공자 확인 오류:', error);
@@ -182,8 +222,42 @@ export class LoginService {
                     };
                     break;
                     
+                case 'unknown':
                 default:
-                    throw new Error(`지원하지 않는 인증 방식입니다: ${authProvider}`);
+                    // unknown인 경우 ID Token이 있으면 Google OAuth로 간주
+                    console.log('인증 방식 unknown - ID Token 확인 중...');
+                    if (session.tokens?.idToken) {
+                        console.log('ID Token이 있으므로 Google OAuth로 처리');
+                        const idTokenPayload = JSON.parse(atob(session.tokens.idToken.toString().split('.')[1]));
+                        console.log('ID Token 정보:', idTokenPayload);
+                        
+                        user = {
+                            userId: idTokenPayload.sub,
+                            username: idTokenPayload.email
+                        };
+                        
+                        userAttributes = {
+                            email: idTokenPayload.email,
+                            name: idTokenPayload.name,
+                            given_name: idTokenPayload.given_name,
+                            family_name: idTokenPayload.family_name,
+                            picture: idTokenPayload.picture,
+                            'custom:username': idTokenPayload.name || idTokenPayload.email?.split('@')[0]
+                        };
+                    } else {
+                        // ID Token도 없으면 Cognito 직접 로그인으로 시도
+                        console.log('ID Token이 없으므로 Cognito 직접 로그인으로 시도');
+                        try {
+                            [user, userAttributes] = await Promise.all([
+                                getCurrentUser(),
+                                fetchUserAttributes()
+                            ]);
+                        } catch (error) {
+                            console.error('Cognito fetchUserAttributes 실패:', error);
+                            throw new Error(`지원하지 않는 인증 방식이거나 토큰이 유효하지 않습니다: ${authProvider}`);
+                        }
+                    }
+                    break;
             }
             
             return {
