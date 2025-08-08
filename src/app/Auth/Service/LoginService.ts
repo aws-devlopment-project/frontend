@@ -106,30 +106,29 @@ export class LoginService {
                 console.log('ID Token Payload:', idTokenPayload);
             }
             
-            // Google OAuth 감지 방법들 (여러 패턴 확인)
+            // Google OAuth 감지 방법들
             
-            // 1. identities 필드 확인
-            if (tokenPayload.identities && Array.isArray(tokenPayload.identities)) {
-                console.log('Identities 필드 발견:', tokenPayload.identities);
-                if (tokenPayload.identities.some((identity: any) => 
-                    identity.providerName === 'Google' || 
-                    identity.providerType === 'Google' ||
-                    identity.provider === 'Google'
-                )) {
+            // 1. cognito:groups에 Google이 포함된 경우 (가장 확실한 방법)
+            if (tokenPayload['cognito:groups'] && 
+                Array.isArray(tokenPayload['cognito:groups']) && 
+                tokenPayload['cognito:groups'].some((group: string) => group.includes('Google'))) {
+                console.log('Google OAuth 감지 - cognito:groups에서 확인');
+                return 'google';
+            }
+            
+            // 2. username이 "google_"로 시작하는 경우
+            if (tokenPayload.username && tokenPayload.username.startsWith('google_')) {
+                console.log('Google OAuth 감지 - username 패턴에서 확인');
+                return 'google';
+            }
+            
+            // 3. ID Token에 identities 필드가 있는 경우
+            if (session.tokens?.idToken) {
+                const idTokenPayload = JSON.parse(atob(session.tokens.idToken.toString().split('.')[1]));
+                if (idTokenPayload.identities && Array.isArray(idTokenPayload.identities)) {
+                    console.log('Google OAuth 감지 - ID Token identities에서 확인');
                     return 'google';
                 }
-            }
-            
-            // 2. iss (issuer) 확인 - Google의 경우 특정 형식을 가짐
-            if (tokenPayload.iss && tokenPayload.iss.includes('cognito-idp') && 
-                tokenPayload.identities) {
-                return 'google';
-            }
-            
-            // 3. token_use와 auth_time 조합으로 확인
-            if (tokenPayload.token_use === 'access' && 
-                tokenPayload.identities !== undefined) {
-                return 'google';
             }
             
             // 4. scope에 aws.cognito.signin.user.admin이 있으면 Cognito 직접 로그인
@@ -138,19 +137,9 @@ export class LoginService {
                 return 'cognito';
             }
             
-            // 5. token_use가 access이고 identities가 없으면 Cognito 직접 로그인
-            if (tokenPayload.token_use === 'access' && 
-                !tokenPayload.identities && 
-                tokenPayload.aud) {
-                console.log('Cognito 직접 로그인 - identities 없음으로 감지');
-                return 'cognito';
-            }
-            
-            // 6. username이 이메일 형식이고 event가 있으면 Cognito 직접 로그인
-            if (tokenPayload.username && 
-                tokenPayload.username.includes('@') && 
-                tokenPayload.event_id) {
-                console.log('Cognito 직접 로그인 - username 패턴으로 감지');
+            // 5. 위 조건들에 해당하지 않으면 Cognito 직접 로그인으로 간주
+            if (tokenPayload.token_use === 'access' && tokenPayload.aud) {
+                console.log('Cognito 직접 로그인 - 기본값으로 감지');
                 return 'cognito';
             }
             
