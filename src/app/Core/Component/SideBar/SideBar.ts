@@ -17,7 +17,7 @@ export class SideBarComponent implements OnInit {
     navigationChange = output<string>();
     groupSelect = output<string>();
     channelSelect = output<{ groupId: string, channelId: string }>();
-    userJoinList: any;
+    userJoin: any;
 
     constructor(
         public sharedState: SharedStateService, 
@@ -30,8 +30,8 @@ export class SideBarComponent implements OnInit {
     async ngOnInit(): Promise<void> {
         try {
             // 컴포넌트 초기화 시 사용자 가입 목록 로드
-            this.userJoinList = await this.userService.getUserJoin();
-            console.log('User join list loaded:', this.userJoinList);
+            this.userJoin = await this.userService.getUserJoin();
+            console.log('User join list loaded:', this.userJoin);
         } catch (error) {
             console.error('Error loading user join list:', error);
         }
@@ -84,16 +84,16 @@ export class SideBarComponent implements OnInit {
     }
 
     private async getCurrentGroupForChannel(channelId: string): Promise<string | null> {
-        // 이미 로드된 userJoinList가 없다면 다시 로드
-        if (!this.userJoinList) {
-            this.userJoinList = await this.userService.getUserJoin();
+        // 이미 로드된 userJoin가 없다면 다시 로드
+        if (!this.userJoin) {
+            this.userJoin = await this.userService.getUserJoin();
         }
 
-        // UserJoinList 인터페이스에 맞게 수정
-        if (!this.userJoinList) return null;
+        // UserJoin 인터페이스에 맞게 수정
+        if (!this.userJoin) return null;
 
         // 채널 ID를 기반으로 어느 그룹에 속하는지 판단
-        for (const join of this.userJoinList.joinList) {
+        for (const join of this.userJoin.joinList) {
             if (join.clubList.includes(channelId)) {
                 return join.groupname;
             }
@@ -110,10 +110,10 @@ export class SideBarComponent implements OnInit {
     }
 
     // === Data Refresh ===
-    async refreshUserJoinList(): Promise<void> {
+    async refreshUserJoin(): Promise<void> {
         try {
-            this.userJoinList = await this.userService.getUserJoin();
-            console.log('User join list refreshed:', this.userJoinList);
+            this.userJoin = await this.userService.getUserJoin();
+            console.log('User join list refreshed:', this.userJoin);
         } catch (error) {
             console.error('Error refreshing user join list:', error);
         }

@@ -16,7 +16,7 @@ interface SearchResult {
   providedIn: 'root'
 })
 export class SearchService {
-  private userJoinList: UserJoin | null = null;
+  private userJoin: UserJoin | null = null;
 
   constructor(private userService: UserService) {
     this.initializeData();
@@ -24,7 +24,7 @@ export class SearchService {
 
   private async initializeData(): Promise<void> {
     try {
-      this.userJoinList = await this.userService.getUserJoin();
+      this.userJoin = await this.userService.getUserJoin();
     } catch (error) {
       console.error('Error loading user join list in SearchService:', error);
     }
@@ -35,12 +35,12 @@ export class SearchService {
       return [];
     }
 
-    // userJoinList가 없으면 다시 로드 시도
-    if (!this.userJoinList) {
+    // userJoin가 없으면 다시 로드 시도
+    if (!this.userJoin) {
       await this.initializeData();
     }
 
-    if (!this.userJoinList) {
+    if (!this.userJoin) {
       return [];
     }
 
@@ -48,7 +48,7 @@ export class SearchService {
     const queryLower = query.toLowerCase().trim();
 
     // 그룹 검색
-    this.userJoinList.joinList.forEach((group, groupIndex) => {
+    this.userJoin.joinList.forEach((group, groupIndex) => {
       if (group.groupname.toLowerCase().includes(queryLower)) {
         results.push({
           id: `group_${groupIndex}_${group.groupname}`, // 고유한 ID 생성

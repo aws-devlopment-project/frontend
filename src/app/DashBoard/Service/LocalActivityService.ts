@@ -87,7 +87,7 @@ export class LocalActivityService {
     }
   }
 
-  // 그룹 가입 추적 (실제 UserJoinList 업데이트와 연동)
+  // 그룹 가입 추적 (실제 UserJoin 업데이트와 연동)
   async trackGroupJoin(groupName: string): Promise<void> {
     const userCreds = await this.userService.getUserCredentials();
     if (!userCreds) return;
@@ -110,7 +110,7 @@ export class LocalActivityService {
     }
   }
 
-  // 클럽 가입 추적 (실제 UserJoinList 업데이트와 연동)
+  // 클럽 가입 추적 (실제 UserJoin 업데이트와 연동)
   async trackClubJoin(groupName: string, clubList: string[]): Promise<void> {
     const userCreds = await this.userService.getUserCredentials();
     if (!userCreds) return;

@@ -12,7 +12,7 @@ type JoinListItem = {
 
 export interface LoadingState {
   user: boolean;
-  userJoinList: boolean;
+  userJoin: boolean;
   groups: boolean;
   channels: boolean;
 }
@@ -28,14 +28,14 @@ export class SharedStateService {
   private _currentUser = signal<UserStatus | null>(null);
   private _loadingState = signal<LoadingState>({
     user: false,
-    userJoinList: false,
+    userJoin: false,
     groups: false,
     channels: false
   });
   private _messages = signal<SimpleChatMessage[]>([]);
   private _sidebarExpanded = signal(false);
   private _expandedSections = signal<string[]>([]);
-  private _userJoinList = signal<UserJoin | null>(null);
+  private _userJoin = signal<UserJoin | null>(null);
   private _initialized = signal(false);
   private _error = signal<string | null>(null);
 
@@ -48,14 +48,14 @@ export class SharedStateService {
   readonly messages = this._messages.asReadonly();
   readonly sidebarExpanded = this._sidebarExpanded.asReadonly();
   readonly expandedSections = this._expandedSections.asReadonly();
-  readonly userJoinList = this._userJoinList.asReadonly();
+  readonly userJoin = this._userJoin.asReadonly();
   readonly initialized = this._initialized.asReadonly();
   readonly error = this._error.asReadonly();
 
   // === Computed Signals ===
   readonly isLoading = computed(() => {
     const state = this.loadingState();
-    return state.user || state.userJoinList || state.groups || state.channels;
+    return state.user || state.userJoin || state.groups || state.channels;
   });
 
   readonly isChannelSelected = computed(() => 
@@ -67,7 +67,7 @@ export class SharedStateService {
   );
 
   readonly availableGroups = computed(() => {
-    return this.userJoinList()?.joinList || [];
+    return this.userJoin()?.joinList || [];
   });
 
   readonly currentPageTitle = computed(() => {
@@ -107,12 +107,12 @@ export class SharedStateService {
   });
 
   readonly hasValidData = computed(() => {
-    return this.initialized() && this.currentUser() !== null && this.userJoinList() !== null;
+    return this.initialized() && this.currentUser() !== null && this.userJoin() !== null;
   });
 
   // 새로 추가: 빈 목록인지 확인
   readonly hasJoinedGroups = computed(() => {
-    const joinList = this.userJoinList();
+    const joinList = this.userJoin();
     return joinList ? joinList.joinList.length > 0 : false;
   });
 
@@ -139,12 +139,12 @@ export class SharedStateService {
     try {
       this.setError(null);
       this.setLoadingState('user', true);
-      this.setLoadingState('userJoinList', true);
+      this.setLoadingState('userJoin', true);
 
       // 병렬로 데이터 로드
       const [user, joinList] = await Promise.allSettled([
         this.loadUserStatus(),
-        this.loadUserJoinList()
+        this.loadUserJoin()
       ]);
 
       // 사용자 상태 처리
@@ -158,7 +158,7 @@ export class SharedStateService {
       // 가입 목록 처리 - 빈 목록도 허용
       if (joinList.status === 'fulfilled') {
         const joinListData = joinList.value || { id: '', name: '', joinList: [] };
-        this._userJoinList.set(joinListData);
+        this._userJoin.set(joinListData);
         
         // 가입한 그룹이 있는 경우에만 기본 선택 설정
         if (joinListData.joinList.length > 0) {
@@ -169,7 +169,7 @@ export class SharedStateService {
       } else if (joinList.status === 'rejected') {
         console.error('Failed to load user join list:', joinList.reason);
         // 빈 목록으로 초기화 (에러로 처리하지 않음)
-        this._userJoinList.set({ id: '', joinList: [] });
+        this._userJoin.set({ id: '', joinList: [] });
         console.log('Initialized with empty join list due to error');
       }
 
@@ -184,7 +184,7 @@ export class SharedStateService {
       this.setError('초기화 중 오류가 발생했습니다.');
     } finally {
       this.setLoadingState('user', false);
-      this.setLoadingState('userJoinList', false);
+      this.setLoadingState('userJoin', false);
     }
   }
 
@@ -197,7 +197,7 @@ export class SharedStateService {
     }
   }
 
-  private async loadUserJoinList(): Promise<UserJoin | null> {
+  private async loadUserJoin(): Promise<UserJoin | null> {
     try {
       return await this.userService.getUserJoin() || null;
     } catch (error) {
@@ -231,7 +231,7 @@ export class SharedStateService {
    * 새로운 그룹을 사용자 가입 목록에 추가
    */
   addUserGroup(groupName: string): void {
-    const currentJoinList = this._userJoinList();
+    const currentJoinList = this._userJoin();
     
     if (!currentJoinList) {
       console.error('Cannot add group - no join list initialized');
@@ -256,7 +256,7 @@ export class SharedStateService {
       joinList: [...currentJoinList.joinList, newGroupItem]
     };
 
-    this._userJoinList.set(updatedJoinList);
+    this._userJoin.set(updatedJoinList);
     
     // 확장된 섹션에 추가 (중복 방지)
     this._expandedSections.update(sections => {
@@ -276,7 +276,7 @@ export class SharedStateService {
    * 그룹에 새로운 채널들을 추가
    */
   addUserChannels(groupName: string, channelNames: string[]): void {
-    const currentJoinList = this._userJoinList();
+    const currentJoinList = this._userJoin();
     
     if (!currentJoinList) {
       console.error('Cannot add channels - no join list initialized');
@@ -306,7 +306,7 @@ export class SharedStateService {
     targetGroup.clubList = Array.from(newChannelSet);
     updatedJoinList.joinList[groupIndex] = targetGroup;
     
-    this._userJoinList.set(updatedJoinList);
+    this._userJoin.set(updatedJoinList);
     
     console.log('Channels added to group:', { groupName, newChannels, totalChannels: targetGroup.clubList.length });
 
@@ -325,7 +325,7 @@ export class SharedStateService {
   addUserGroupWithChannels(groupName: string, channelNames: string[]): void {
     console.log('Adding group with channels:', { groupName, channelNames });
     
-    const currentJoinList = this._userJoinList();
+    const currentJoinList = this._userJoin();
     
     if (!currentJoinList) {
       console.error('Cannot add group with channels - no join list initialized');
@@ -353,7 +353,7 @@ export class SharedStateService {
         joinList: [...currentJoinList.joinList, newGroupItem]
       };
 
-      this._userJoinList.set(updatedJoinList);
+      this._userJoin.set(updatedJoinList);
       
       // 확장된 섹션에 추가 (중복 방지)
       this._expandedSections.update(sections => {
@@ -383,7 +383,7 @@ export class SharedStateService {
    * 그룹 제거 (탈퇴 시 사용)
    */
   removeUserGroup(groupName: string): void {
-    const currentJoinList = this._userJoinList();
+    const currentJoinList = this._userJoin();
     
     if (!currentJoinList) {
       console.error('Cannot remove group - no join list initialized');
@@ -395,7 +395,7 @@ export class SharedStateService {
       joinList: currentJoinList.joinList.filter(item => item.groupname !== groupName)
     };
 
-    this._userJoinList.set(updatedJoinList);
+    this._userJoin.set(updatedJoinList);
     
     // 확장된 섹션에서 제거
     this._expandedSections.update(sections => sections.filter(section => section !== groupName));
@@ -414,7 +414,7 @@ export class SharedStateService {
    * 특정 채널 제거 (채널 탈퇴 시 사용)
    */
   removeUserChannel(groupName: string, channelName: string): void {
-    const currentJoinList = this._userJoinList();
+    const currentJoinList = this._userJoin();
     
     if (!currentJoinList) {
       console.error('Cannot remove channel - no join list initialized');
@@ -433,7 +433,7 @@ export class SharedStateService {
     targetGroup.clubList = targetGroup.clubList.filter(channel => channel !== channelName);
     updatedJoinList.joinList[groupIndex] = targetGroup;
     
-    this._userJoinList.set(updatedJoinList);
+    this._userJoin.set(updatedJoinList);
     
     // 현재 선택된 채널이라면 선택 해제
     if (this.selectedChannel() === channelName && this.selectedGroup() === groupName) {
@@ -445,26 +445,26 @@ export class SharedStateService {
   }
 
   // === 기존 메서드들 ===
-  async refreshUserJoinList(): Promise<void> {
-    this.setLoadingState('userJoinList', true);
+  async refreshUserJoin(): Promise<void> {
+    this.setLoadingState('userJoin', true);
     try {
-      this.userService['cacheService']?.removeCache('userJoinList');
+      this.userService['cacheService']?.removeCache('userJoin');
       
-      const joinList = await this.loadUserJoinList();
+      const joinList = await this.loadUserJoin();
       if (joinList) {
-        this._userJoinList.set(joinList);
+        this._userJoin.set(joinList);
         console.log('User join list refreshed successfully');
         this.validateCurrentSelections();
       } else {
         // API에서 빈 결과가 왔을 때 빈 목록으로 설정
-        this._userJoinList.set({ id: '', joinList: [] });
+        this._userJoin.set({ id: '', joinList: [] });
         console.log('User join list refreshed with empty result');
       }
     } catch (error) {
       console.error('Error refreshing user join list:', error);
       this.setError('가입 목록 새로고침에 실패했습니다.');
     } finally {
-      this.setLoadingState('userJoinList', false);
+      this.setLoadingState('userJoin', false);
     }
   }
 
@@ -487,7 +487,7 @@ export class SharedStateService {
   }
 
   private validateCurrentSelections(): void {
-    const joinList = this._userJoinList();
+    const joinList = this._userJoin();
     if (!joinList) return;
 
     const selectedGroup = this._selectedGroup();
@@ -586,13 +586,13 @@ export class SharedStateService {
 
   private isValidGroup(groupId: string | null): boolean {
     if (!groupId) return true;
-    const joinList = this._userJoinList();
+    const joinList = this._userJoin();
     return joinList?.joinList.some(g => g.groupname === groupId) || false;
   }
 
   private isValidChannel(channelId: string | null, groupId: string | null): boolean {
     if (!channelId || !groupId) return true;
-    const joinList = this._userJoinList();
+    const joinList = this._userJoin();
     const group = joinList?.joinList.find(g => g.groupname === groupId);
     return group?.clubList.includes(channelId) || false;
   }
@@ -672,7 +672,7 @@ export class SharedStateService {
   }
 
   private getGroupTitle(groupName: string): string {
-    const joinList = this._userJoinList();
+    const joinList = this._userJoin();
     const group = joinList?.joinList.find(g => g.groupname === groupName);
     return group?.groupname || groupName;
   }
@@ -690,13 +690,13 @@ export class SharedStateService {
   }
 
   getGroupChannels(groupName: string): string[] {
-    const joinList = this._userJoinList();
+    const joinList = this._userJoin();
     const group = joinList?.joinList.find(g => g.groupname === groupName);
     return group?.clubList || [];
   }
 
   findGroupForChannel(channelId: string): string | null {
-    const joinList = this._userJoinList();
+    const joinList = this._userJoin();
     if (!joinList) return null;
 
     for (const group of joinList.joinList) {
@@ -735,14 +735,14 @@ export class SharedStateService {
     this._currentUser.set(null);
     this._loadingState.set({
       user: false,
-      userJoinList: false,
+      userJoin: false,
       groups: false,
       channels: false
     });
     this._messages.set([]);
     this._sidebarExpanded.set(false);
     this._expandedSections.set([]);
-    this._userJoinList.set(null);
+    this._userJoin.set(null);
     this._initialized.set(false);
     this._error.set(null);
     console.log('SharedStateService reset completed');

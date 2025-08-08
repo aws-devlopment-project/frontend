@@ -200,7 +200,7 @@ export class MainComponent implements OnInit, OnDestroy {
       this.retryUserDataLoad();
     }
 
-    if (!this.sharedState.userJoinList()) {
+    if (!this.sharedState.userJoin()) {
       console.log('Missing join list data');
       this.retryJoinListLoad();
     }
@@ -218,7 +218,7 @@ export class MainComponent implements OnInit, OnDestroy {
   private async retryJoinListLoad(): Promise<void> {
     try {
       console.log('Retrying join list data load...');
-      await this.sharedState.refreshUserJoinList();
+      await this.sharedState.refreshUserJoin();
     } catch (error) {
       console.error('Failed to retry join list data load:', error);
       // 가입 목록 로드 실패는 새 사용자로 처리
@@ -333,7 +333,7 @@ export class MainComponent implements OnInit, OnDestroy {
       this.sharedState.clearError();
       await Promise.all([
         this.sharedState.refreshUserStatus(),
-        this.sharedState.refreshUserJoinList()
+        this.sharedState.refreshUserJoin()
       ]);
       console.log('Data refresh completed');
     } catch (error) {
@@ -356,7 +356,7 @@ export class MainComponent implements OnInit, OnDestroy {
     const loadingState = this.sharedState.loadingState();
     
     if (loadingState.user) return '사용자 정보를 불러오는 중...';
-    if (loadingState.userJoinList) return '가입 목록을 불러오는 중...';
+    if (loadingState.userJoin) return '가입 목록을 불러오는 중...';
     if (loadingState.groups) return '그룹 정보를 불러오는 중...';
     if (loadingState.channels) return '채널 정보를 불러오는 중...';
     
@@ -410,7 +410,7 @@ export class MainComponent implements OnInit, OnDestroy {
     console.log('Selected Channel:', this.sharedState.selectedChannel());
     console.log('Available Groups:', this.sharedState.availableGroups());
     console.log('Current User:', this.sharedState.currentUser());
-    console.log('User Join List:', this.sharedState.userJoinList());
+    console.log('User Join List:', this.sharedState.userJoin());
     console.log('=================');
   }
 
