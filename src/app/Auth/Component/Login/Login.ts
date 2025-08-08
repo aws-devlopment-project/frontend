@@ -213,7 +213,7 @@ export class LoginComponent implements OnInit {
             //     status: 200,
             //     id: "wnwo@wefwef.wefwefwef",
             //     username: "철수",
-            //     accessToken: "1234"
+            //     accessToken: "1234"fwefwef
             // }
             const res = await this.auth.signInUser(email, password);
 
