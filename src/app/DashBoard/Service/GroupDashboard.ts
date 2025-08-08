@@ -3,6 +3,7 @@ import { GroupService } from "../../Core/Service/GroupService";
 import { Group } from "../../Core/Models/group";
 import { Quest, Stat } from "../Models/GroupDashboardModels";
 import { UserService } from "../../Core/Service/UserService";
+import { UserQuestCur } from "../../Core/Models/user";
 
 @Injectable({
     providedIn: 'platform'
@@ -14,6 +15,11 @@ export class GroupDashboardService {
     async getGroupData(groupname: string): Promise<Group | undefined> {
         const group = await this.groupService.getGroupInfo(groupname);
         return group;
+    }
+
+    async getUserQuestData(username: string): Promise<UserQuestCur | null> {
+        const user = await this.userService.getUserQuestCur(username);
+        return user;
     }
 
     processingQuest(group: Group | undefined): Quest[] {
