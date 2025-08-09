@@ -61,10 +61,10 @@ export class SearchService {
 
       // 채널(클럽) 검색
       group.clubList.forEach((club, clubIndex) => {
-        if (club.toLowerCase().includes(queryLower)) {
+        if (club.name.toLowerCase().includes(queryLower)) {
           results.push({
             id: `club_${groupIndex}_${clubIndex}_${club}`, // 고유한 ID 생성
-            title: club,
+            title: club.name,
             description: `${group.groupname} 그룹의 채널`,
             type: 'club',
             icon: 'tag',

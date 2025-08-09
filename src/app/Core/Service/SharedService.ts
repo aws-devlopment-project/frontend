@@ -6,9 +6,17 @@ import { UserService } from './UserService';
 
 // 타입 정의
 type JoinListItem = {
+  groupId: number;
   groupname: string;
-  clubList: string[];
-};
+  clubList: Club[];
+}
+
+type Club = {
+  clubId: number;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export interface LoadingState {
   user: boolean;
@@ -32,10 +40,11 @@ export class SharedStateService {
     groups: false,
     channels: false
   });
-  private _messages = signal<SimpleChatMessage[]>([]);
   private _sidebarExpanded = signal(false);
   private _expandedSections = signal<string[]>([]);
   private _userJoin = signal<UserJoin | null>(null);
+  private _groupList = signal<{id: number, name: string}[]>([]);
+  private _clubList = signal<({id: number, name: string, groupId: number}[])>([]);
   private _initialized = signal(false);
   private _error = signal<string | null>(null);
 
@@ -43,9 +52,10 @@ export class SharedStateService {
   readonly activeTab = this._activeTab.asReadonly();
   readonly selectedGroup = this._selectedGroup.asReadonly();
   readonly selectedChannel = this._selectedChannel.asReadonly();
+  readonly groupList = this._groupList.asReadonly();
+  readonly clubList = this._clubList.asReadonly();
   readonly currentUser = this._currentUser.asReadonly();
   readonly loadingState = this._loadingState.asReadonly();
-  readonly messages = this._messages.asReadonly();
   readonly sidebarExpanded = this._sidebarExpanded.asReadonly();
   readonly expandedSections = this._expandedSections.asReadonly();
   readonly userJoin = this._userJoin.asReadonly();
@@ -219,7 +229,7 @@ export class SharedStateService {
         
         // 첫 번째 채널도 자동 선택
         if (firstGroup.clubList.length > 0) {
-          this.setSelectedChannel(firstGroup.clubList[0], firstGroup.groupname);
+          this.setSelectedChannel(firstGroup.clubList[0].name, firstGroup.groupname);
         }
       }
     }
@@ -230,7 +240,7 @@ export class SharedStateService {
   /**
    * 새로운 그룹을 사용자 가입 목록에 추가
    */
-  addUserGroup(groupName: string): void {
+  addUserGroup(groupid: number, groupName: string): void {
     const currentJoinList = this._userJoin();
     
     if (!currentJoinList) {
@@ -247,6 +257,7 @@ export class SharedStateService {
 
     // 새 그룹 추가
     const newGroupItem: JoinListItem = {
+      groupId: groupid,
       groupname: groupName,
       clubList: []
     };
@@ -275,7 +286,7 @@ export class SharedStateService {
   /**
    * 그룹에 새로운 채널들을 추가
    */
-  addUserChannels(groupName: string, channelNames: string[]): void {
+  addUserChannels(groupName: string, clubs: Club[]): void {
     const currentJoinList = this._userJoin();
     
     if (!currentJoinList) {
@@ -294,7 +305,7 @@ export class SharedStateService {
     
     // Set을 사용하여 중복 제거
     const existingChannelSet = new Set(targetGroup.clubList);
-    const newChannelSet = new Set([...existingChannelSet, ...channelNames]);
+    const newChannelSet = new Set([...existingChannelSet, ...clubs]);
     const newChannels = Array.from(newChannelSet).filter(channel => !existingChannelSet.has(channel));
     
     if (newChannels.length === 0) {
@@ -315,15 +326,18 @@ export class SharedStateService {
         this.selectedGroup() === groupName && 
         !this.selectedChannel() &&
         newChannels.length > 0) {
-      this.setSelectedChannel(newChannels[0], groupName);
+      this.setSelectedChannel(newChannels[0].name, groupName);
     }
   }
 
   /**
    * 그룹과 채널을 한번에 추가 (GroupJoin에서 사용)
    */
-  addUserGroupWithChannels(groupName: string, channelNames: string[]): void {
-    console.log('Adding group with channels:', { groupName, channelNames });
+  addUserGroupWithChannels(groupId: number, groupName: string, clubs: Club[]): void {
+    const clubsName = clubs.map((club: Club) => {
+      return club.name;
+    })
+    console.log('Adding group with channels:', { groupName, clubsName });
     
     const currentJoinList = this._userJoin();
     
@@ -338,12 +352,13 @@ export class SharedStateService {
     if (existingGroupNames.has(groupName)) {
       // 기존 그룹에 채널만 추가 (중복 제거)
       console.log('Group exists, adding channels only:', groupName);
-      this.addUserChannels(groupName, channelNames);
+      this.addUserChannels(groupName, clubs);
     } else {
       // 새 그룹을 채널과 함께 추가 (채널 목록도 중복 제거)
-      const uniqueChannels = Array.from(new Set(channelNames));
+      const uniqueChannels = Array.from(new Set(clubs));
       
       const newGroupItem: JoinListItem = {
+        groupId: groupId,
         groupname: groupName,
         clubList: uniqueChannels
       };
@@ -364,7 +379,7 @@ export class SharedStateService {
       console.log('New group with channels added:', { 
         groupName, 
         uniqueChannels, 
-        originalChannelCount: channelNames.length,
+        originalChannelCount: clubsName.length,
         finalChannelCount: uniqueChannels.length 
       });
 
@@ -373,7 +388,7 @@ export class SharedStateService {
           this.activeTab() === 'group') {
         this.setSelectedGroup(groupName);
         if (uniqueChannels.length > 0) {
-          this.setSelectedChannel(uniqueChannels[0], groupName);
+          this.setSelectedChannel(uniqueChannels[0].name, groupName);
         }
       }
     }
@@ -404,7 +419,6 @@ export class SharedStateService {
     if (this.selectedGroup() === groupName) {
       this._selectedGroup.set(null);
       this._selectedChannel.set(null);
-      this.clearMessages();
     }
     
     console.log('Group removed from join list:', groupName);
@@ -413,7 +427,7 @@ export class SharedStateService {
   /**
    * 특정 채널 제거 (채널 탈퇴 시 사용)
    */
-  removeUserChannel(groupName: string, channelName: string): void {
+  removeUserChannel(groupName: string, clubName: string): void {
     const currentJoinList = this._userJoin();
     
     if (!currentJoinList) {
@@ -430,18 +444,17 @@ export class SharedStateService {
     const updatedJoinList = { ...currentJoinList };
     const targetGroup = { ...updatedJoinList.joinList[groupIndex] };
     
-    targetGroup.clubList = targetGroup.clubList.filter(channel => channel !== channelName);
+    targetGroup.clubList = targetGroup.clubList.filter(channel => channel.name !== clubName);
     updatedJoinList.joinList[groupIndex] = targetGroup;
     
     this._userJoin.set(updatedJoinList);
     
     // 현재 선택된 채널이라면 선택 해제
-    if (this.selectedChannel() === channelName && this.selectedGroup() === groupName) {
+    if (this.selectedChannel() === clubName && this.selectedGroup() === groupName) {
       this._selectedChannel.set(null);
-      this.clearMessages();
     }
     
-    console.log('Channel removed from group:', { groupName, channelName });
+    console.log('Channel removed from group:', { groupName, clubName });
   }
 
   // === 기존 메서드들 ===
@@ -502,7 +515,7 @@ export class SharedStateService {
         return;
       }
 
-      if (selectedChannel && !group.clubList.includes(selectedChannel)) {
+      if (selectedChannel && !group.clubList.some(club => club.name === selectedChannel)) {
         console.log('Selected channel no longer exists, clearing channel selection');
         this._selectedChannel.set(null);
       }
@@ -522,7 +535,7 @@ export class SharedStateService {
         this.setSelectedGroup(firstGroup.groupname);
         
         if (firstGroup.clubList.length > 0) {
-          this.setSelectedChannel(firstGroup.clubList[0], firstGroup.groupname);
+          this.setSelectedChannel(firstGroup.clubList[0].name, firstGroup.groupname);
         }
       }
     } else {
@@ -546,7 +559,6 @@ export class SharedStateService {
     const previousGroup = this._selectedGroup();
     this._selectedGroup.set(groupId);
     this._selectedChannel.set(null);
-    this.clearMessages();
     
     if (groupId && !this._expandedSections().includes(groupId)) {
       this._expandedSections.update(sections => {
@@ -575,7 +587,6 @@ export class SharedStateService {
       this._selectedGroup.set(groupId);
     }
     this._selectedChannel.set(channelId);
-    this.clearMessages();
     
     if (channelId) {
       this.loadChannelMessages(channelId);
@@ -590,11 +601,11 @@ export class SharedStateService {
     return joinList?.joinList.some(g => g.groupname === groupId) || false;
   }
 
-  private isValidChannel(channelId: string | null, groupId: string | null): boolean {
-    if (!channelId || !groupId) return true;
+  private isValidChannel(clubName: string | null, groupName: string | null): boolean {
+    if (!clubName || !groupName) return true;
     const joinList = this._userJoin();
-    const group = joinList?.joinList.find(g => g.groupname === groupId);
-    return group?.clubList.includes(channelId) || false;
+    const group = joinList?.joinList.find(g => g.groupname === groupName);
+    return group?.clubList.some(club => club.name === clubName) || false;
   }
 
   private setLoadingState(key: keyof LoadingState, loading: boolean): void {
@@ -614,10 +625,6 @@ export class SharedStateService {
 
   setCurrentUser(user: UserStatus | null): void {
     this._currentUser.set(user);
-  }
-
-  clearMessages(): void {
-    this._messages.set([]);
   }
 
   toggleSidebar(): void {
@@ -653,7 +660,6 @@ export class SharedStateService {
   private async loadChannelMessages(channelId: string): Promise<void> {
     setTimeout(() => {
       const demoMessages = this.getDemoMessages(channelId);
-      this._messages.set(demoMessages);
     }, 300);
   }
 
@@ -692,15 +698,35 @@ export class SharedStateService {
   getGroupChannels(groupName: string): string[] {
     const joinList = this._userJoin();
     const group = joinList?.joinList.find(g => g.groupname === groupName);
-    return group?.clubList || [];
+    
+    if (!group) return [];
+    
+    // Handle both string and Club object formats
+    return group.clubList.map((club) => {
+      if (typeof club === 'string') {
+        return club;
+      } else if (club && typeof club === 'object' && club.name) {
+        return club.name;
+      }
+      return 'Unknown Channel';
+    });
   }
 
-  findGroupForChannel(channelId: string): string | null {
+  findGroupForChannel(clubName: string): string | null {
     const joinList = this._userJoin();
     if (!joinList) return null;
 
     for (const group of joinList.joinList) {
-      if (group.clubList.includes(channelId)) {
+      const hasChannel = group.clubList.some(club => {
+        if (typeof club === 'string') {
+          return club === clubName;
+        } else if (club && typeof club === 'object' && club.name) {
+          return club.name === clubName;
+        }
+        return false;
+      });
+      
+      if (hasChannel) {
         return group.groupname;
       }
     }
@@ -739,12 +765,48 @@ export class SharedStateService {
       groups: false,
       channels: false
     });
-    this._messages.set([]);
     this._sidebarExpanded.set(false);
     this._expandedSections.set([]);
     this._userJoin.set(null);
     this._initialized.set(false);
     this._error.set(null);
     console.log('SharedStateService reset completed');
+  }
+
+  addListGroup(groupId: number, groupName: string) {
+    const existingGroupNames = new Set(this._groupList().map((group: {id: number, name: string}) => group.name));
+    if (existingGroupNames.has(groupName)) {
+      console.log('Group already exists in total list:', groupName);
+      return;
+    }
+
+    // 새 그룹 추가
+    const newGroupItem: {id: number, name: string} = {
+      id: groupId,
+      name: groupName
+    };
+
+    const updatedGroupList: {id: number, name: string}[] = [...this._groupList(), newGroupItem];
+
+    this._groupList.set(updatedGroupList); 
+  }
+
+  addListClub(clubId: number, clubName: string, groupId: number) {
+    const existingClubNames = new Set(this._clubList().map(club => club.name));
+    if (existingClubNames.has(clubName)) {
+      console.log('Club already exists in total list:', clubName);
+      return;
+    }
+
+    // 새 클럽 추가
+    const newGroupItem: {id: number, name: string, groupId: number} = {
+      id: clubId,
+      name: clubName,
+      groupId: groupId
+    };
+
+    const updatedClubList: {id: number, name: string, groupId: number}[] = [...this._clubList(), newGroupItem];
+
+    this._clubList.set(updatedClubList);
   }
 }

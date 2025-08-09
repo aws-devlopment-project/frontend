@@ -7,8 +7,14 @@ export interface UserCredentials {
 export interface UserJoin {
     id: string,
     joinList: {
+        groupId: number,
         groupname: string,
-        clubList: string[],
+        clubList: {
+            clubId: number,
+            name: string,
+            createdAt: Date,
+            updatedAt: Date,
+        }[],
     }[]
 }
 
@@ -17,6 +23,7 @@ export interface UserQuestCur {
     curQuestTotalList: {
         quest: string,
         group: string,
+        club: string,
         tag?: [],
         descriptions?: string
         isSuccess: boolean

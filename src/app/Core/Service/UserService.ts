@@ -1,13 +1,14 @@
 import { Injectable } from "@angular/core";
 import { HttpService } from "./HttpService";
 import { HttpHeaders } from "@angular/common/http";
-import { environment } from "../../../environments/environtment";
 import { DataCacheService } from "./DataCacheService";
 import { UserCredentials, UserJoin, UserStatus } from "../Models/user";
 import { UserQuestContinuous, UserQuestCur, UserQuestPrev, UserQuestWeekly } from "../Models/user";
 import { Router } from "@angular/router";
 import { firstValueFrom, throwError } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
+import { Group } from "../Models/group";
+import { LoginService } from "../../Auth/Service/LoginService";
 
 @Injectable({
     providedIn: 'root'
@@ -17,7 +18,8 @@ export class UserService {
     constructor(
         private httpService: HttpService,
         private cacheService: DataCacheService,
-        private router: Router
+        private router: Router,
+        private loginService: LoginService
     ) {}
 
     // === 개선된 사용자 인증 정보 조회 ===
@@ -57,7 +59,7 @@ export class UserService {
             }
 
             // API 호출
-            const url = `${environment.apiUrl}/api/user/getUserStatus?email=${id}`;
+            const url = `/api/user/getUserStatus?email=${id}`;
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
             
             const response = await firstValueFrom(
@@ -99,7 +101,7 @@ export class UserService {
             }
 
             // API 호출  
-            const url = `${environment.apiUrl}/api/user/getUserJoin?email=${id}`;
+            const url = `/api/user/getUserJoin?email=${id}`;
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
             const response = await firstValueFrom(
@@ -138,7 +140,7 @@ export class UserService {
                 return cache;
             }
 
-            const url = `${environment.apiUrl}/api/user/getUserQuestCur?email=${id}`;
+            const url = `/api/user/getUserQuestCur?email=${id}`;
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
             const response = await firstValueFrom(
@@ -173,7 +175,7 @@ export class UserService {
                 return cache;
             }
 
-            const url = `${environment.apiUrl}/api/user/getUserQuestContinuous?email=${id}`;
+            const url = `/api/user/getUserQuestContinuous?email=${id}`;
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
             const response = await firstValueFrom(
@@ -208,7 +210,7 @@ export class UserService {
                 return cache;
             }
 
-            const url = `${environment.apiUrl}/api/user/getUserQuestPrev?email=${id}`;
+            const url = `/api/user/getUserQuestPrev?email=${id}`;
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
             const response = await firstValueFrom(
@@ -243,7 +245,7 @@ export class UserService {
                 return cache;
             }
 
-            const url = `${environment.apiUrl}/api/user/getUserQuestWeekly?email=${id}`;
+            const url = `/api/user/getUserQuestWeekly?email=${id}`;
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
             const response = await firstValueFrom(
@@ -287,7 +289,7 @@ export class UserService {
                 isSuccess: userQuest.includes(quest.quest) ? true : quest.isSuccess
             }));
 
-            const url = `${environment.apiUrl}/api/user/setUserQuestRecord`;
+            const url = `/api/user/setUserQuestRecord`;
             const body = { user: id, group: group, quest: userQuest };
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
@@ -318,7 +320,7 @@ export class UserService {
                 id = user.id;
             }
 
-            const url = `${environment.apiUrl}/api/user/setUserStatus`;
+            const url = `/api/user/setUserStatus`;
             const body = { user: id, status: userStatus };
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
@@ -349,7 +351,7 @@ export class UserService {
                 id = user.id;
             }
 
-            const url = `${environment.apiUrl}/api/user/setUsername`;
+            const url = `/api/user/setUsername`;
             const body = { user: id, username: username };
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
@@ -383,7 +385,7 @@ export class UserService {
     }
 
     // === 개선된 그룹/클럽 관리 메서드들 ===
-    async joinGroup(id: string = "", group: string): Promise<boolean> {
+    async joinGroup(id: string = "", groupId: number, group: string): Promise<boolean> {
         try {
             if (!id) {
                 const user = await this.getUserCredentials();
@@ -391,7 +393,7 @@ export class UserService {
                 id = user.id;
             }
 
-            const url = `${environment.apiUrl}/api/user/joinGroup`;
+            const url = `/api/user/joinGroup`;
             const body = { user: id, group: group };
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
@@ -408,7 +410,7 @@ export class UserService {
             await this.updateJoinListCache(id, (joinList) => {
                 const groupExists = joinList.joinList.some(join => join.groupname === group);
                 if (!groupExists) {
-                    joinList.joinList.push({ groupname: group, clubList: [] });
+                    joinList.joinList.push({ groupId: groupId, groupname: group, clubList: [] });
                 }
                 return joinList;
             });
@@ -428,7 +430,7 @@ export class UserService {
                 id = user.id;
             }
 
-            const url = `${environment.apiUrl}/api/user/leaveGroup`;
+            const url = `/api/user/leaveGroup`;
             const body = { user: id, group: group };
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
@@ -462,7 +464,7 @@ export class UserService {
                 id = user.id;
             }
 
-            const url = `${environment.apiUrl}/api/user/joinClub`;
+            const url = `/api/user/joinClub`;
             const body = { user: id, group: group, clubList: clubList };
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
@@ -481,8 +483,14 @@ export class UserService {
                 if (groupIndex !== -1) {
                     // 중복 제거하여 추가
                     const existingClubs = joinList.joinList[groupIndex].clubList;
-                    const newClubs = clubList.filter(club => !existingClubs.includes(club));
-                    joinList.joinList[groupIndex].clubList.push(...newClubs);
+                    const newClubs = clubList.filter(club => !existingClubs.some(clubF => clubF.name === club));
+                    const groupInfo: Group | null = this.cacheService.getCache(group);
+                    if (groupInfo) {
+                        const newClubInfo = groupInfo.clubList.filter(club => newClubs.includes(club.name));
+                        newClubInfo.forEach(club => {
+                            joinList.joinList[groupIndex].clubList.push({createdAt: new Date(), updatedAt: new Date(), clubId: club.clubId, name: club.name});
+                        });
+                    }
                 }
                 return joinList;
             });
@@ -502,7 +510,7 @@ export class UserService {
                 id = user.id;
             }
 
-            const url = `${environment.apiUrl}/api/user/leaveClub`;
+            const url = `/api/user/leaveClub`;
             const body = { user: id, group: group, club: club };
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
@@ -520,7 +528,7 @@ export class UserService {
                 const groupIndex = joinList.joinList.findIndex(join => join.groupname === group);
                 if (groupIndex !== -1) {
                     joinList.joinList[groupIndex].clubList = 
-                        joinList.joinList[groupIndex].clubList.filter(clubName => clubName !== club);
+                        joinList.joinList[groupIndex].clubList.filter(clubs => clubs.name !== club);
                 }
                 return joinList;
             });
@@ -543,7 +551,7 @@ export class UserService {
             // base64 헤더 제거 (data:image/jpeg;base64, 부분)
             const base64Data = imageData.includes(',') ? imageData.split(',')[1] : imageData;
 
-            const url = `${environment.apiUrl}/api/user/setUserAvatar`;
+            const url = `/api/user/setUserAvatar`;
             const payload = {
                 user: id,
                 avatar: base64Data
@@ -582,7 +590,7 @@ export class UserService {
                 id = user.id;
             }
 
-            const url = `${environment.apiUrl}/api/user/resetUserAvatar`;
+            const url = `/api/user/resetUserAvatar`;
             const payload = { user: id };
 
             await firstValueFrom(
@@ -744,6 +752,30 @@ export class UserService {
         } catch (error) {
             console.error('Error refreshing all user data:', error);
             return { credentials: null, status: null, joinList: null };
+        }
+    }
+
+    async departUser(id: string) {
+        try {
+            const url = `/api/user?email=${id}`;
+            const val = await this.loginService.deleteCurrentUser();
+
+            if (val) {
+                await firstValueFrom(
+                    this.httpService.delete(url
+                    ).pipe(
+                        catchError(error => {
+                            console.error('[API] departUser error:', error);
+                            return throwError(error);
+                        })
+                    )
+                );
+            }
+
+            this.clearUserCache();
+            this.router.navigate(['/']);
+        } catch (error) {
+            console.error('[API] departUser failed:', error);
         }
     }
 

@@ -7,6 +7,34 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <script>
+    // SockJS와 STOMP를 위한 폴리필 - 모든 모듈보다 먼저 실행
+    window.global = window;
+    
+    if (typeof window.process === 'undefined') {
+      window.process = {
+        env: {},
+        browser: true,
+        nextTick: function(fn) { setTimeout(fn, 0); }
+      };
+    }
+    
+    if (typeof window.Buffer === 'undefined') {
+      window.Buffer = {
+        isBuffer: function() { return false; }
+      };
+    }
+    
+    // require 함수 폴리필 (SockJS가 필요할 수 있음)
+    if (typeof window.require === 'undefined') {
+      window.require = function(module) {
+        console.warn('Module ' + module + ' not available in browser');
+        return {};
+      };
+    }
+    
+    console.log('SockJS polyfills loaded successfully');
+  </script>
 </head>
 <body>
   <app-root></app-root>

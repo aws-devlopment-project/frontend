@@ -58,9 +58,9 @@
                         <div class="channel-list">
                             @for (channel of group.clubList; track channel) {
                                 <div class="clubBar" 
-                                     [class.active]="isActiveChannel(channel)"
+                                     [class.active]="isActiveChannel(getChannelName(channel))"
                                      (click)="selectChannel(channel)">
-                                    {{ channel }}
+                                    {{ getChannelName(channel) }}
                                     <!-- 읽지 않은 메시지 수가 있다면 표시 (선택사항) -->
                                     <!-- <span class="unread-indicator">3</span> -->
                                 </div>

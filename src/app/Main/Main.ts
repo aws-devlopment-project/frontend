@@ -415,14 +415,6 @@ export class MainComponent implements OnInit, OnDestroy {
   }
 
   // 테스트용 메서드들 (개발 환경에서만 사용)
-  
-  simulateGroupJoin(): void {
-    if (!environment.production) {
-      console.log('Simulating group join for testing');
-      this.sharedState.addUserGroupWithChannels('테스트 그룹', ['테스트 채널1', '테스트 채널2']);
-    }
-  }
-
   simulateGroupLeave(): void {
     if (!environment.production && this.sharedState.hasJoinedGroups()) {
       const firstGroup = this.sharedState.availableGroups()[0];

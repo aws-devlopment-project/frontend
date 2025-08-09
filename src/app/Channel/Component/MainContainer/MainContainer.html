@@ -1,4 +1,4 @@
-<!-- CorrectedMainContainer.html -->
+<!-- UpdatedMainContainer.html - 백엔드 예시에 맞춘 STOMP 기반 템플릿 -->
 <div class="chat-container">
   <!-- 채팅 헤더 -->
   <div class="chat-header">
@@ -7,14 +7,14 @@
       <div class="channel-status">
         <p>{{ channelInfo()?.description || getChannelDescription(currentChannel()) }}</p>
         <div class="connection-status" [class]="getConnectionStatusClass()">
-          <mat-icon class="status-icon">xw
+          <mat-icon class="status-icon">
             {{ connectionStatus() === 'connected' ? 'wifi' : 
                connectionStatus() === 'connecting' ? 'wifi_tethering' : 
                connectionStatus() === 'reconnecting' ? 'sync' : 'wifi_off' }}
           </mat-icon>
           <span>{{ getConnectionStatusText() }}</span>
-          @if (connectionStatus() === 'connected' && chatRoomId()) {
-            <span class="room-id">• {{ chatRoomId() }}</span>
+          @if (connectionStatus() === 'connected' && chatRoomId() !== -1) {
+            <span class="room-id">• Club {{ chatRoomId() }}</span>
           }
         </div>
       </div>
@@ -110,13 +110,13 @@
                 <span class="timestamp">{{ formatTime(message.timestamp) }}</span>
               </div>
               
-              <!-- 텍스트 메시지 -->
-              @if (message.event === 'chat') {
+              <!-- 일반 채팅 메시지 -->
+              @if (message.messageType === 'CHAT') {
                 <div class="message-text">{{ message.content }}</div>
               }
               
               <!-- 이미지/파일 메시지 -->
-              @if (message.event === 'image') {
+              @if (message.messageType === 'IMAGE') {
                 <div class="message-file">
                   @if (getImageData(message)?.type?.startsWith('image/')) {
                     <div class="image-preview" (click)="previewImage(message)">
@@ -141,11 +141,11 @@
                 </div>
               }
               
-              <!-- 로드/체크 메시지 (일반적으로 표시되지 않음) -->
-              @if (message.event === 'load' || message.event === 'check') {
-                <div class="message-text system-debug">
-                  <mat-icon>{{ message.event === 'load' ? 'history' : 'network_check' }}</mat-icon>
-                  {{ message.event === 'load' ? '채팅 이력 로드됨' : '연결 상태 확인' }}
+              <!-- 입장/퇴장 메시지 -->
+              @if (message.messageType === 'JOIN' || message.messageType === 'LEAVE') {
+                <div class="message-text system-notice">
+                  <mat-icon>{{ message.messageType === 'JOIN' ? 'login' : 'logout' }}</mat-icon>
+                  {{ message.content }}
                 </div>
               }
             </div>
@@ -202,7 +202,7 @@
     <div class="input-hints">
       @if (connectionStatus() === 'connected') {
         <span><strong>Enter</strong>로 전송, <strong>Shift + Enter</strong>로 줄바꿈</span>
-        <span class="storage-info">• 메모리에 최근 30개 메시지 저장 중</span>
+        <span class="storage-info">• 메모리에 최근 50개 메시지 저장 중 (Club ID: {{ chatRoomId() }})</span>
       } @else {
         <span class="connection-hint">{{ getConnectionStatusText() }} - 메시지를 보낼 수 없습니다</span>
       }

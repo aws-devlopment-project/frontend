@@ -2,6 +2,7 @@ import { Injectable, signal } from '@angular/core';
 import { DataCacheService } from '../../Core/Service/DataCacheService';
 import { UserService } from '../../Core/Service/UserService';
 import { GroupService } from '../../Core/Service/GroupService';
+import { SharedStateService } from '../../Core/Service/SharedService';
 import { UserCredentials, UserStatus, UserJoin, UserQuestCur, UserQuestPrev, UserQuestWeekly } from '../../Core/Models/user'
 import { Group } from '../../Core/Models/group';
 import { Club } from '../../Core/Models/club';
@@ -52,7 +53,8 @@ export class LocalActivityService {
   constructor(
     private cacheService: DataCacheService,
     private userService: UserService,
-    private groupService: GroupService
+    private groupService: GroupService,
+    private shared: SharedStateService
   ) {
     this.loadFromStorage();
     this.initializeStreakData();
@@ -92,7 +94,8 @@ export class LocalActivityService {
     const userCreds = await this.userService.getUserCredentials();
     if (!userCreds) return;
 
-    const success = await this.userService.joinGroup(userCreds.id, groupName);
+    const group = this.shared.groupList().filter((group) => group.name === groupName);
+    const success = await this.userService.joinGroup(userCreds.id, group[0].id, groupName);
     
     if (success) {
       // 그룹 정보 가져오기
