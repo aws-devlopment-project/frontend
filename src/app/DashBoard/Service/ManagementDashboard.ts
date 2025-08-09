@@ -5,7 +5,6 @@ import { LoginService } from "../../Auth/Service/LoginService";
 import { UserJoin } from "../../Core/Models/user";
 import { HttpHeaders } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { environment } from "../../../environments/environtment";
 import { HttpService } from "../../Core/Service/HttpService";
 import { DataCacheService } from "../../Core/Service/DataCacheService";
 import { Router } from "@angular/router";
@@ -127,7 +126,7 @@ export class ManagementDashboardService {
         };
 
         const response = await firstValueFrom(
-        this.httpService.post(`${environment.apiUrl}/api/user/setUserAvatar`, payload, 
+        this.httpService.post(`/api/user/setUserAvatar`, payload, 
             new HttpHeaders({ 'Content-Type': 'application/json' })
         )
         );
@@ -193,7 +192,7 @@ export class ManagementDashboardService {
             const userId = user ? user.id : "";
 
             await firstValueFrom(
-                this.httpService.post(`${environment.apiUrl}/api/user/resetUserAvatar`, 
+                this.httpService.post(`/api/user/resetUserAvatar`, 
                     { user: userId },
                     new HttpHeaders({ 'Content-Type': 'application/json' })
                 )
@@ -236,7 +235,7 @@ export class ManagementDashboardService {
             
             // 채널 탈퇴 API 호출
             await firstValueFrom(
-                this.httpService.post(environment.apiUrl + '/api/user/leaveClub', {
+                this.httpService.post('/api/user/leaveClub', {
                     user: userId,
                     group: groupId,
                     clubList: [channelId]

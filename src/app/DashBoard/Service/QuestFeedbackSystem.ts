@@ -1,431 +1,514 @@
-// QuestFeedbackService.ts - 퀘스트 피드백 저장 및 관리 서비스
 import { Injectable } from '@angular/core';
 
 export interface QuestFeedback {
+  id: string;
   quest: string;
   group: string;
   club: string;
-  createTime: Date;
   user: string;
-  feedbackScore: number;
-  id?: string; // 자동 생성되는 고유 ID
-}
-
-export interface FeedbackStats {
-  totalFeedbacks: number;
-  averageScore: number;
-  scoreDistribution: { [score: number]: number };
-  topRatedQuests: { quest: string; group: string; averageScore: number; count: number }[];
-  recentFeedbacks: QuestFeedback[];
+  feedbackScore: number; // 기존 호환성을 위해 유지 (좋아요=1, 싫어요=0, 점수피드백=1-5)
+  feedbackText?: string; // 텍스트 피드백 필드
+  isLike?: boolean; // 좋아요/싫어요 정보 (true=좋아요, false=싫어요)
+  createTime: Date;
+  metadata?: {
+    source?: string;
+    version?: string;
+    questCount?: number;
+    submissionMethod?: 'rating' | 'text' | 'like_text'; // 피드백 방식 구분
+    sentiment?: 'positive' | 'negative' | 'neutral'; // 감정 분석
+    isLike?: boolean; // metadata에도 isLike 추가 (백업용)
+    originalScore?: number; // 원본 점수 (변환 전)
+  };
 }
 
 @Injectable({
   providedIn: 'root'
 })
 export class QuestFeedbackService {
-  private readonly STORAGE_KEY = 'quest_feedbacks';
-  private readonly MAX_FEEDBACKS = 1000; // 최대 저장할 피드백 수
+  private readonly STORAGE_KEY = 'quest_feedback_data';
+  private readonly MAX_FEEDBACK_ITEMS = 1000;
 
   constructor() {
     this.initializeStorage();
   }
 
-  // === 초기화 ===
-  
   private initializeStorage(): void {
-    try {
-      const existing = localStorage.getItem(this.STORAGE_KEY);
-      if (!existing) {
-        localStorage.setItem(this.STORAGE_KEY, JSON.stringify([]));
-        console.log('Quest feedback storage initialized');
-      }
-    } catch (error) {
-      console.error('Error initializing quest feedback storage:', error);
+    if (!localStorage.getItem(this.STORAGE_KEY)) {
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify([]));
     }
   }
 
-  // === 피드백 저장 ===
-
+  // 피드백 저장 (좋아요/싫어요 + 텍스트 피드백 지원)
   saveFeedback(feedback: Omit<QuestFeedback, 'id' | 'createTime'>): string | null {
     try {
-      const feedbackWithMeta: QuestFeedback = {
-        ...feedback,
-        id: this.generateId(),
-        createTime: new Date()
-      };
-
-      const existingFeedbacks = this.loadFeedbacks();
-      existingFeedbacks.push(feedbackWithMeta);
-
-      // 최대 개수 제한
-      if (existingFeedbacks.length > this.MAX_FEEDBACKS) {
-        existingFeedbacks.splice(0, existingFeedbacks.length - this.MAX_FEEDBACKS);
+      const id = this.generateId();
+      const now = new Date();
+      
+      // 피드백 유형 결정
+      let submissionMethod: 'rating' | 'text' | 'like_text' = 'rating';
+      let sentiment: 'positive' | 'negative' | 'neutral' = 'neutral';
+      
+      if (feedback.isLike !== undefined && feedback.feedbackText && feedback.feedbackText.trim().length > 0) {
+        submissionMethod = 'like_text';
+        sentiment = feedback.isLike ? 'positive' : 'negative';
+      } else if (feedback.feedbackText && feedback.feedbackText.trim().length > 0) {
+        submissionMethod = 'text';
+        sentiment = this.analyzeSentiment(feedback.feedbackText);
+      } else if (feedback.feedbackScore > 0) {
+        submissionMethod = 'rating';
+        sentiment = feedback.feedbackScore >= 4 ? 'positive' : 
+                   feedback.feedbackScore <= 2 ? 'negative' : 'neutral';
       }
 
-      this.saveFeedbacks(existingFeedbacks);
+      const newFeedback: QuestFeedback = {
+        ...feedback,
+        id,
+        createTime: now,
+        isLike: feedback.isLike, // 루트 레벨에 명시적으로 설정
+        metadata: {
+          source: 'group_dashboard',
+          version: '2.0',
+          submissionMethod,
+          sentiment,
+          isLike: feedback.isLike, // metadata에도 백업
+          ...feedback.metadata
+        }
+      };
+
+      // 기존 피드백 목록 가져오기
+      const existingFeedbacks = this.getAllFeedbacks();
       
-      console.log('Quest feedback saved:', {
-        id: feedbackWithMeta.id,
+      // 새 피드백 추가 (최신순)
+      const updatedFeedbacks = [newFeedback, ...existingFeedbacks]
+        .slice(0, this.MAX_FEEDBACK_ITEMS);
+
+      // 저장
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(updatedFeedbacks));
+      
+      console.log('Feedback saved successfully:', {
+        id,
         quest: feedback.quest,
+        submissionMethod,
+        sentiment,
+        isLike: feedback.isLike,
+        textLength: feedback.feedbackText?.length || 0,
         score: feedback.feedbackScore
       });
 
-      return feedbackWithMeta.id!;
+      return id;
+
     } catch (error) {
-      console.error('Error saving quest feedback:', error);
+      console.error('Error saving feedback:', error);
       return null;
     }
   }
 
-  // === 피드백 조회 ===
+  // 간단한 감정 분석 (키워드 기반)
+  private analyzeSentiment(text: string): 'positive' | 'negative' | 'neutral' {
+    const positiveWords = [
+      '좋', '훌륭', '완벽', '최고', '만족', '감사', '성공', '달성', 
+      '즐거', '재미', '쉬운', '명확', '도움', '유용', '효과', '뿌듯'
+    ];
+    
+    const negativeWords = [
+      '나쁜', '어려', '힘든', '복잡', '불만', '실망', '아쉬', '부족',
+      '문제', '오류', '실패', '포기', '짜증', '불편', '애매', '모호'
+    ];
+    
+    const lowerText = text.toLowerCase();
+    
+    const positiveCount = positiveWords.filter(word => lowerText.includes(word)).length;
+    const negativeCount = negativeWords.filter(word => lowerText.includes(word)).length;
+    
+    if (positiveCount > negativeCount) return 'positive';
+    if (negativeCount > positiveCount) return 'negative';
+    return 'neutral';
+  }
 
+  // 모든 피드백 조회
   getAllFeedbacks(): QuestFeedback[] {
-    return this.loadFeedbacks();
-  }
-
-  getFeedbackById(id: string): QuestFeedback | null {
-    const feedbacks = this.loadFeedbacks();
-    return feedbacks.find(feedback => feedback.id === id) || null;
-  }
-
-  getFeedbacksByUser(userId: string): QuestFeedback[] {
-    const feedbacks = this.loadFeedbacks();
-    return feedbacks.filter(feedback => feedback.user === userId);
-  }
-
-  getFeedbacksByGroup(groupName: string): QuestFeedback[] {
-    const feedbacks = this.loadFeedbacks();
-    return feedbacks.filter(feedback => feedback.group === groupName);
-  }
-
-  getFeedbacksByQuest(questName: string, groupName?: string): QuestFeedback[] {
-    const feedbacks = this.loadFeedbacks();
-    return feedbacks.filter(feedback => {
-      const questMatch = feedback.quest === questName;
-      const groupMatch = !groupName || feedback.group === groupName;
-      return questMatch && groupMatch;
-    });
-  }
-
-  getRecentFeedbacks(limit: number = 10): QuestFeedback[] {
-    const feedbacks = this.loadFeedbacks();
-    return feedbacks
-      .sort((a, b) => new Date(b.createTime).getTime() - new Date(a.createTime).getTime())
-      .slice(0, limit);
-  }
-
-  // === 피드백 통계 ===
-
-  getFeedbackStats(userId?: string, groupName?: string): FeedbackStats {
-    let feedbacks = this.loadFeedbacks();
-
-    // 필터 적용
-    if (userId) {
-      feedbacks = feedbacks.filter(f => f.user === userId);
-    }
-    if (groupName) {
-      feedbacks = feedbacks.filter(f => f.group === groupName);
-    }
-
-    if (feedbacks.length === 0) {
-      return {
-        totalFeedbacks: 0,
-        averageScore: 0,
-        scoreDistribution: {},
-        topRatedQuests: [],
-        recentFeedbacks: []
-      };
-    }
-
-    // 기본 통계
-    const totalFeedbacks = feedbacks.length;
-    const totalScore = feedbacks.reduce((sum, f) => sum + f.feedbackScore, 0);
-    const averageScore = Math.round((totalScore / totalFeedbacks) * 10) / 10;
-
-    // 점수 분포
-    const scoreDistribution: { [score: number]: number } = {};
-    feedbacks.forEach(feedback => {
-      const score = feedback.feedbackScore;
-      scoreDistribution[score] = (scoreDistribution[score] || 0) + 1;
-    });
-
-    // 상위 평가 퀘스트
-    const questScores: { [key: string]: { total: number; count: number; group: string } } = {};
-    feedbacks.forEach(feedback => {
-      const key = `${feedback.quest}|${feedback.group}`;
-      if (!questScores[key]) {
-        questScores[key] = { total: 0, count: 0, group: feedback.group };
-      }
-      questScores[key].total += feedback.feedbackScore;
-      questScores[key].count += 1;
-    });
-
-    const topRatedQuests = Object.entries(questScores)
-      .map(([key, data]) => {
-        const [quest] = key.split('|');
-        return {
-          quest,
-          group: data.group,
-          averageScore: Math.round((data.total / data.count) * 10) / 10,
-          count: data.count
-        };
-      })
-      .sort((a, b) => b.averageScore - a.averageScore)
-      .slice(0, 10);
-
-    // 최근 피드백
-    const recentFeedbacks = feedbacks
-      .sort((a, b) => new Date(b.createTime).getTime() - new Date(a.createTime).getTime())
-      .slice(0, 5);
-
-    return {
-      totalFeedbacks,
-      averageScore,
-      scoreDistribution,
-      topRatedQuests,
-      recentFeedbacks
-    };
-  }
-
-  // === 데이터 분석 메서드 ===
-
-  getQuestAverageScore(questName: string, groupName?: string): number {
-    const feedbacks = this.getFeedbacksByQuest(questName, groupName);
-    if (feedbacks.length === 0) return 0;
-    
-    const total = feedbacks.reduce((sum, f) => sum + f.feedbackScore, 0);
-    return Math.round((total / feedbacks.length) * 10) / 10;
-  }
-
-  getUserAverageScore(userId: string): number {
-    const feedbacks = this.getFeedbacksByUser(userId);
-    if (feedbacks.length === 0) return 0;
-    
-    const total = feedbacks.reduce((sum, f) => sum + f.feedbackScore, 0);
-    return Math.round((total / feedbacks.length) * 10) / 10;
-  }
-
-  getGroupAverageScore(groupName: string): number {
-    const feedbacks = this.getFeedbacksByGroup(groupName);
-    if (feedbacks.length === 0) return 0;
-    
-    const total = feedbacks.reduce((sum, f) => sum + f.feedbackScore, 0);
-    return Math.round((total / feedbacks.length) * 10) / 10;
-  }
-
-  // === 피드백 관리 ===
-
-  updateFeedback(id: string, updates: Partial<QuestFeedback>): boolean {
-    try {
-      const feedbacks = this.loadFeedbacks();
-      const index = feedbacks.findIndex(f => f.id === id);
-      
-      if (index === -1) {
-        console.warn('Feedback not found for update:', id);
-        return false;
-      }
-
-      feedbacks[index] = { ...feedbacks[index], ...updates };
-      this.saveFeedbacks(feedbacks);
-      
-      console.log('Feedback updated:', id);
-      return true;
-    } catch (error) {
-      console.error('Error updating feedback:', error);
-      return false;
-    }
-  }
-
-  deleteFeedback(id: string): boolean {
-    try {
-      const feedbacks = this.loadFeedbacks();
-      const filteredFeedbacks = feedbacks.filter(f => f.id !== id);
-      
-      if (filteredFeedbacks.length === feedbacks.length) {
-        console.warn('Feedback not found for deletion:', id);
-        return false;
-      }
-
-      this.saveFeedbacks(filteredFeedbacks);
-      console.log('Feedback deleted:', id);
-      return true;
-    } catch (error) {
-      console.error('Error deleting feedback:', error);
-      return false;
-    }
-  }
-
-  clearAllFeedbacks(): boolean {
-    try {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify([]));
-      console.log('All feedbacks cleared');
-      return true;
-    } catch (error) {
-      console.error('Error clearing feedbacks:', error);
-      return false;
-    }
-  }
-
-  clearUserFeedbacks(userId: string): number {
-    try {
-      const feedbacks = this.loadFeedbacks();
-      const filteredFeedbacks = feedbacks.filter(f => f.user !== userId);
-      const deletedCount = feedbacks.length - filteredFeedbacks.length;
-      
-      this.saveFeedbacks(filteredFeedbacks);
-      console.log(`${deletedCount} user feedbacks cleared for user:`, userId);
-      return deletedCount;
-    } catch (error) {
-      console.error('Error clearing user feedbacks:', error);
-      return 0;
-    }
-  }
-
-  // === 데이터 가져오기/내보내기 ===
-
-  exportFeedbacks(): string {
-    try {
-      const feedbacks = this.loadFeedbacks();
-      return JSON.stringify(feedbacks, null, 2);
-    } catch (error) {
-      console.error('Error exporting feedbacks:', error);
-      return '[]';
-    }
-  }
-
-  importFeedbacks(jsonData: string): { success: boolean; imported: number; errors: number } {
-    try {
-      const importedData = JSON.parse(jsonData) as QuestFeedback[];
-      
-      if (!Array.isArray(importedData)) {
-        throw new Error('Invalid data format');
-      }
-
-      const existingFeedbacks = this.loadFeedbacks();
-      let imported = 0;
-      let errors = 0;
-
-      importedData.forEach(feedback => {
-        try {
-          if (this.validateFeedback(feedback)) {
-            existingFeedbacks.push({
-              ...feedback,
-              id: feedback.id || this.generateId(),
-              createTime: new Date(feedback.createTime)
-            });
-            imported++;
-          } else {
-            errors++;
-          }
-        } catch {
-          errors++;
-        }
-      });
-
-      // 최대 개수 제한 적용
-      if (existingFeedbacks.length > this.MAX_FEEDBACKS) {
-        existingFeedbacks.splice(0, existingFeedbacks.length - this.MAX_FEEDBACKS);
-      }
-
-      this.saveFeedbacks(existingFeedbacks);
-      console.log(`Feedbacks imported: ${imported}, errors: ${errors}`);
-      
-      return { success: true, imported, errors };
-    } catch (error) {
-      console.error('Error importing feedbacks:', error);
-      return { success: false, imported: 0, errors: 0 };
-    }
-  }
-
-  // === 내부 유틸리티 메서드 ===
-
-  private loadFeedbacks(): QuestFeedback[] {
     try {
       const stored = localStorage.getItem(this.STORAGE_KEY);
       if (!stored) return [];
+
+      const feedbacks = JSON.parse(stored);
       
-      const parsed = JSON.parse(stored);
-      // Date 객체 복원
-      return parsed.map((feedback: any) => ({
+      // createTime을 Date 객체로 변환
+      return feedbacks.map((feedback: any) => ({
         ...feedback,
         createTime: new Date(feedback.createTime)
       }));
+
     } catch (error) {
       console.error('Error loading feedbacks:', error);
       return [];
     }
   }
 
-  private saveFeedbacks(feedbacks: QuestFeedback[]): void {
+  // 특정 그룹의 피드백 조회
+  getFeedbacksByGroup(groupName: string): QuestFeedback[] {
+    return this.getAllFeedbacks().filter(feedback => feedback.group === groupName);
+  }
+
+  // 특정 퀘스트의 피드백 조회
+  getFeedbacksByQuest(questName: string, groupName?: string): QuestFeedback[] {
+    const allFeedbacks = this.getAllFeedbacks();
+    
+    return allFeedbacks.filter(feedback => {
+      const questMatch = feedback.quest === questName;
+      const groupMatch = !groupName || feedback.group === groupName;
+      return questMatch && groupMatch;
+    });
+  }
+
+  // 사용자별 피드백 조회
+  getFeedbacksByUser(userId: string, groupName?: string): QuestFeedback[] {
+    const allFeedbacks = this.getAllFeedbacks();
+    
+    return allFeedbacks.filter(feedback => {
+      const userMatch = feedback.user === userId;
+      const groupMatch = !groupName || feedback.group === groupName;
+      return userMatch && groupMatch;
+    });
+  }
+
+  // 좋아요 피드백만 조회
+  getLikeFeedbacks(groupName?: string): QuestFeedback[] {
+    return this.getAllFeedbacks().filter(feedback => {
+      const isLike = feedback.isLike === true;
+      const groupMatch = !groupName || feedback.group === groupName;
+      return isLike && groupMatch;
+    });
+  }
+
+  // 싫어요 피드백만 조회
+  getDislikeFeedbacks(groupName?: string): QuestFeedback[] {
+    return this.getAllFeedbacks().filter(feedback => {
+      const isDislike = feedback.isLike === false;
+      const groupMatch = !groupName || feedback.group === groupName;
+      return isDislike && groupMatch;
+    });
+  }
+
+  // 좋아요/싫어요 피드백 조회 (텍스트 포함)
+  getLikeDislikeFeedbacks(groupName?: string): QuestFeedback[] {
+    return this.getAllFeedbacks().filter(feedback => {
+      const hasLikeDislike = feedback.isLike !== undefined;
+      const groupMatch = !groupName || feedback.group === groupName;
+      return hasLikeDislike && groupMatch;
+    });
+  }
+
+  // 감정별 피드백 조회
+  getFeedbacksBySentiment(sentiment: 'positive' | 'negative' | 'neutral', groupName?: string): QuestFeedback[] {
+    return this.getAllFeedbacks().filter(feedback => {
+      const sentimentMatch = feedback.metadata?.sentiment === sentiment;
+      const groupMatch = !groupName || feedback.group === groupName;
+      return sentimentMatch && groupMatch;
+    });
+  }
+
+  // 텍스트 피드백만 조회
+  getTextFeedbacks(groupName?: string): QuestFeedback[] {
+    return this.getAllFeedbacks().filter(feedback => {
+      const hasText = feedback.feedbackText && feedback.feedbackText.trim().length > 0;
+      const groupMatch = !groupName || feedback.group === groupName;
+      return hasText && groupMatch;
+    });
+  }
+
+  // 피드백 통계 생성 (좋아요/싫어요 포함)
+  getFeedbackStats(groupName?: string): {
+    total: number;
+    textFeedbacks: number;
+    ratingFeedbacks: number;
+    likeFeedbacks: number;
+    dislikeFeedbacks: number;
+    averageRating: number;
+    likeRatio: number;
+    recentFeedbacks: number; // 최근 7일
+    sentimentDistribution: {
+      positive: number;
+      negative: number;
+      neutral: number;
+    };
+    questFeedbackCounts: { [questName: string]: number };
+    userParticipation: { [userId: string]: number };
+  } {
+    const feedbacks = groupName 
+      ? this.getFeedbacksByGroup(groupName)
+      : this.getAllFeedbacks();
+
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    const textFeedbacks = feedbacks.filter(f => 
+      f.feedbackText && f.feedbackText.trim().length > 0
+    );
+
+    const ratingFeedbacks = feedbacks.filter(f => 
+      f.feedbackScore > 0 && f.metadata?.submissionMethod === 'rating'
+    );
+
+    const likeFeedbacks = feedbacks.filter(f => f.isLike === true);
+    const dislikeFeedbacks = feedbacks.filter(f => f.isLike === false);
+
+    const recentFeedbacks = feedbacks.filter(f => f.createTime >= sevenDaysAgo);
+
+    const questCounts: { [questName: string]: number } = {};
+    const userCounts: { [userId: string]: number } = {};
+
+    feedbacks.forEach(feedback => {
+      questCounts[feedback.quest] = (questCounts[feedback.quest] || 0) + 1;
+      userCounts[feedback.user] = (userCounts[feedback.user] || 0) + 1;
+    });
+
+    const ratingSum = ratingFeedbacks.reduce((sum, f) => sum + f.feedbackScore, 0);
+    const averageRating = ratingFeedbacks.length > 0 
+      ? Math.round((ratingSum / ratingFeedbacks.length) * 10) / 10 
+      : 0;
+
+    const totalLikeDislike = likeFeedbacks.length + dislikeFeedbacks.length;
+    const likeRatio = totalLikeDislike > 0 
+      ? Math.round((likeFeedbacks.length / totalLikeDislike) * 100) 
+      : 0;
+
+    // 감정 분포 계산
+    const sentimentDistribution = {
+      positive: feedbacks.filter(f => f.metadata?.sentiment === 'positive').length,
+      negative: feedbacks.filter(f => f.metadata?.sentiment === 'negative').length,
+      neutral: feedbacks.filter(f => f.metadata?.sentiment === 'neutral').length
+    };
+
+    return {
+      total: feedbacks.length,
+      textFeedbacks: textFeedbacks.length,
+      ratingFeedbacks: ratingFeedbacks.length,
+      likeFeedbacks: likeFeedbacks.length,
+      dislikeFeedbacks: dislikeFeedbacks.length,
+      averageRating,
+      likeRatio,
+      recentFeedbacks: recentFeedbacks.length,
+      sentimentDistribution,
+      questFeedbackCounts: questCounts,
+      userParticipation: userCounts
+    };
+  }
+
+  // 최근 피드백 조회 (최신 N개)
+  getRecentFeedbacks(limit: number = 10, groupName?: string): QuestFeedback[] {
+    const feedbacks = groupName 
+      ? this.getFeedbacksByGroup(groupName)
+      : this.getAllFeedbacks();
+
+    return feedbacks
+      .sort((a, b) => b.createTime.getTime() - a.createTime.getTime())
+      .slice(0, limit);
+  }
+
+  // 피드백 삭제
+  deleteFeedback(feedbackId: string): boolean {
     try {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(feedbacks));
+      const feedbacks = this.getAllFeedbacks();
+      const updatedFeedbacks = feedbacks.filter(f => f.id !== feedbackId);
+      
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(updatedFeedbacks));
+      
+      console.log('Feedback deleted:', feedbackId);
+      return true;
+
     } catch (error) {
-      console.error('Error saving feedbacks:', error);
+      console.error('Error deleting feedback:', error);
+      return false;
     }
   }
 
-  private validateFeedback(feedback: any): feedback is QuestFeedback {
-    return feedback &&
-           typeof feedback.quest === 'string' &&
-           typeof feedback.group === 'string' &&
-           typeof feedback.club === 'string' &&
-           typeof feedback.user === 'string' &&
-           typeof feedback.feedbackScore === 'number' &&
-           feedback.feedbackScore >= 1 &&
-           feedback.feedbackScore <= 5 &&
-           feedback.createTime;
-  }
-
-  private generateId(): string {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
-  }
-
-  // === 디버깅 메서드 ===
-
-  getStorageInfo(): { 
-    totalFeedbacks: number; 
-    storageSize: number; 
-    oldestFeedback?: Date; 
-    newestFeedback?: Date; 
-  } {
+  // 특정 조건의 피드백 삭제 (예: 오래된 피드백 정리)
+  cleanupOldFeedbacks(daysOld: number = 90): number {
     try {
-      const feedbacks = this.loadFeedbacks();
-      const storedData = localStorage.getItem(this.STORAGE_KEY) || '';
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+
+      const feedbacks = this.getAllFeedbacks();
+      const recentFeedbacks = feedbacks.filter(f => f.createTime >= cutoffDate);
       
-      const dates = feedbacks.map(f => new Date(f.createTime));
-      const oldestFeedback = dates.length > 0 ? new Date(Math.min(...dates.map(d => d.getTime()))) : undefined;
-      const newestFeedback = dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))) : undefined;
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(recentFeedbacks));
+      
+      const deletedCount = feedbacks.length - recentFeedbacks.length;
+      console.log(`Cleaned up ${deletedCount} old feedbacks (older than ${daysOld} days)`);
+      
+      return deletedCount;
+
+    } catch (error) {
+      console.error('Error cleaning up old feedbacks:', error);
+      return 0;
+    }
+  }
+
+  // 피드백 데이터 내보내기 (JSON)
+  exportFeedbacks(groupName?: string): string {
+    const feedbacks = groupName 
+      ? this.getFeedbacksByGroup(groupName)
+      : this.getAllFeedbacks();
+
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      groupName: groupName || 'all',
+      feedbackCount: feedbacks.length,
+      feedbacks: feedbacks
+    };
+
+    return JSON.stringify(exportData, null, 2);
+  }
+
+  // 피드백 데이터 가져오기
+  importFeedbacks(jsonData: string): { success: boolean; imported: number; errors: string[] } {
+    try {
+      const data = JSON.parse(jsonData);
+      const errors: string[] = [];
+      let imported = 0;
+
+      if (!data.feedbacks || !Array.isArray(data.feedbacks)) {
+        throw new Error('Invalid import data format');
+      }
+
+      const existingFeedbacks = this.getAllFeedbacks();
+      const existingIds = new Set(existingFeedbacks.map(f => f.id));
+
+      for (const feedbackData of data.feedbacks) {
+        try {
+          // ID 중복 체크
+          if (existingIds.has(feedbackData.id)) {
+            errors.push(`Duplicate feedback ID: ${feedbackData.id}`);
+            continue;
+          }
+
+          // 필수 필드 체크
+          if (!feedbackData.quest || !feedbackData.group || !feedbackData.user) {
+            errors.push(`Missing required fields in feedback: ${feedbackData.id}`);
+            continue;
+          }
+
+          // 날짜 변환
+          const feedback: QuestFeedback = {
+            ...feedbackData,
+            createTime: new Date(feedbackData.createTime)
+          };
+
+          existingFeedbacks.push(feedback);
+          imported++;
+
+        } catch (error) {
+          errors.push(`Error processing feedback ${feedbackData.id}: ${error}`);
+        }
+      }
+
+      // 정렬 및 제한
+      const sortedFeedbacks = existingFeedbacks
+        .sort((a, b) => b.createTime.getTime() - a.createTime.getTime())
+        .slice(0, this.MAX_FEEDBACK_ITEMS);
+
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(sortedFeedbacks));
 
       return {
-        totalFeedbacks: feedbacks.length,
-        storageSize: new Blob([storedData]).size,
-        oldestFeedback,
-        newestFeedback
+        success: true,
+        imported,
+        errors
       };
+
     } catch (error) {
-      console.error('Error getting storage info:', error);
-      return { totalFeedbacks: 0, storageSize: 0 };
+      return {
+        success: false,
+        imported: 0,
+        errors: [error instanceof Error ? error.message : 'Unknown import error']
+      };
     }
   }
 
-  logFeedbackStats(): void {
-    console.group('=== Quest Feedback Statistics ===');
-    
-    const stats = this.getFeedbackStats();
-    console.log('Total Feedbacks:', stats.totalFeedbacks);
-    console.log('Average Score:', stats.averageScore);
-    console.log('Score Distribution:', stats.scoreDistribution);
-    console.log('Top Rated Quests:', stats.topRatedQuests.slice(0, 3));
-    
-    const storageInfo = this.getStorageInfo();
-    console.log('Storage Size:', `${Math.round(storageInfo.storageSize / 1024)}KB`);
-    
-    if (storageInfo.oldestFeedback && storageInfo.newestFeedback) {
-      console.log('Date Range:', 
-        `${storageInfo.oldestFeedback.toLocaleDateString()} - ${storageInfo.newestFeedback.toLocaleDateString()}`
-      );
+  // 유틸리티: ID 생성
+  private generateId(): string {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+  }
+
+  // 점수 피드백만 조회 (기존 호환성)
+  getRatingFeedbacks(groupName?: string): QuestFeedback[] {
+    return this.getAllFeedbacks().filter(feedback => {
+      const hasRating = feedback.feedbackScore > 0;
+      const isRatingOnly = feedback.metadata?.submissionMethod === 'rating';
+      const groupMatch = !groupName || feedback.group === groupName;
+      return hasRating && isRatingOnly && groupMatch;
+    });
+  }
+
+  // 피드백 유효성 검사 (좋아요/싫어요 지원)
+  validateFeedback(feedback: Partial<QuestFeedback>): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (!feedback.quest || feedback.quest.trim().length === 0) {
+      errors.push('퀘스트 이름이 필요합니다.');
     }
+
+    if (!feedback.group || feedback.group.trim().length === 0) {
+      errors.push('그룹 이름이 필요합니다.');
+    }
+
+    if (!feedback.user || feedback.user.trim().length === 0) {
+      errors.push('사용자 ID가 필요합니다.');
+    }
+
+    // 피드백 내용 체크 (점수, 텍스트, 좋아요/싫어요 중 하나는 있어야 함)
+    const hasRating = feedback.feedbackScore && feedback.feedbackScore > 0;
+    const hasText = feedback.feedbackText && feedback.feedbackText.trim().length > 0;
+    const hasLikeDislike = feedback.isLike !== undefined;
+
+    if (!hasRating && !hasText && !hasLikeDislike) {
+      errors.push('피드백 점수, 텍스트, 또는 좋아요/싫어요 중 하나는 입력해야 합니다.');
+    }
+
+    // 좋아요/싫어요 + 텍스트 조합 체크
+    if (hasLikeDislike && !hasText) {
+      errors.push('좋아요/싫어요를 선택한 경우 텍스트 피드백도 함께 작성해야 합니다.');
+    }
+
+    // 텍스트 길이 체크
+    if (feedback.feedbackText) {
+      const textLength = feedback.feedbackText.trim().length;
+      if (textLength > 0 && textLength < 5) {
+        errors.push('피드백 텍스트는 최소 5자 이상이어야 합니다.');
+      }
+      if (textLength > 200) {
+        errors.push('피드백 텍스트는 최대 200자까지 입력 가능합니다.');
+      }
+    }
+
+    // 점수 범위 체크
+    if (hasRating && (feedback.feedbackScore! < 1 || feedback.feedbackScore! > 5)) {
+      errors.push('피드백 점수는 1-5 범위여야 합니다.');
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  }
+
+  // 피드백 통계 로깅 (좋아요/싫어요 포함)
+  logFeedbackStats(groupName?: string): void {
+    const stats = this.getFeedbackStats(groupName);
     
+    console.group('=== Feedback Statistics ===');
+    console.log('Group:', groupName || 'All');
+    console.log('Total Feedbacks:', stats.total);
+    console.log('Text Feedbacks:', stats.textFeedbacks);
+    console.log('Rating Feedbacks:', stats.ratingFeedbacks);
+    console.log('Like Feedbacks:', stats.likeFeedbacks);
+    console.log('Dislike Feedbacks:', stats.dislikeFeedbacks);
+    console.log('Like Ratio:', stats.likeRatio + '%');
+    console.log('Average Rating:', stats.averageRating);
+    console.log('Recent Feedbacks (7 days):', stats.recentFeedbacks);
+    console.log('Sentiment Distribution:', stats.sentimentDistribution);
+    console.log('Quest Feedback Counts:', stats.questFeedbackCounts);
+    console.log('User Participation:', stats.userParticipation);
     console.groupEnd();
   }
 }

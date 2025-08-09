@@ -1,5 +1,5 @@
 <div class="content">
-  <!-- 플로팅 피드백 UI -->
+  <!-- 플로팅 피드백 UI (텍스트 입력으로 변경) -->
   @if (showFeedback()) {
     <div class="floating-feedback-overlay">
       <div class="floating-feedback-card">
@@ -12,27 +12,69 @@
         </div>
         
         <div class="feedback-content">
-          <h3>{{ feedbackData()?.questTitle }}</h3>
+          <h3>{{ feedbackDataTitle() }}</h3>
           <p>축하합니다! 퀘스트를 성공적으로 완료하셨습니다.</p>
           <p class="feedback-question">이 퀘스트는 어떠셨나요?</p>
           
-          <div class="rating-section">
-            <div class="rating-stars">
-              @for (star of [1,2,3,4,5]; track star) {
-                <button 
-                  class="star-button"
-                  [class.active]="feedbackScore() >= star"
-                  [class.selected]="feedbackScore() === star"
-                  (click)="setFeedbackScore(star)"
-                  [disabled]="isSubmittingFeedback()">
-                  <mat-icon>{{ feedbackScore() >= star ? 'star' : 'star_border' }}</mat-icon>
-                </button>
+          <!-- 좋아요/싫어요 선택 -->
+          <div class="like-dislike-section">
+            <div class="like-dislike-buttons">
+              <button 
+                class="like-btn"
+                [class.selected]="feedbackLike() === true"
+                (click)="setFeedbackLike(true)"
+                [disabled]="isSubmittingFeedback()">
+                <mat-icon>thumb_up</mat-icon>
+                <span>좋았어요</span>
+              </button>
+              <button 
+                class="dislike-btn"
+                [class.selected]="feedbackLike() === false"
+                (click)="setFeedbackLike(false)"
+                [disabled]="isSubmittingFeedback()">
+                <mat-icon>thumb_down</mat-icon>
+                <span>아쉬워요</span>
+              </button>
+            </div>
+            @if (feedbackLike() !== null) {
+              <div class="selection-feedback">
+                {{ feedbackLike() ? '👍 좋은 경험이셨군요!' : '👎 개선할 점을 알려주세요!' }}
+              </div>
+            }
+          </div>
+          
+          <!-- 텍스트 피드백 입력 -->
+          <div class="feedback-input-section">
+            <mat-form-field appearance="outline" class="feedback-textarea">
+              <mat-label>
+                {{ feedbackLike() === true ? '어떤 점이 좋았는지 알려주세요' : 
+                   feedbackLike() === false ? '어떤 점이 아쉬웠는지 알려주세요' : 
+                   '퀘스트에 대한 소감을 알려주세요' }}
+              </mat-label>
+              <textarea 
+                matInput 
+                rows="4"
+                maxlength="200"
+                [placeholder]="feedbackLike() === true ? 
+                  '예: 목표가 명확해서 실행하기 쉬웠어요. 성취감도 느낄 수 있었습니다!' :
+                  feedbackLike() === false ?
+                  '예: 목표가 너무 어려웠어요. 좀 더 단계적인 접근이 필요할 것 같습니다.' :
+                  '이 퀘스트를 완료하면서 느낀 점이나 개선 사항 등을 자유롭게 작성해주세요...'"
+                [value]="feedbackText()"
+                (input)="onFeedbackTextChange($event)"
+                [disabled]="isSubmittingFeedback()">
+              </textarea>
+              <mat-hint>{{ feedbackTextLength() }}/200자</mat-hint>
+              @if (!isFeedbackValid() && (feedbackTextLength() > 0 || feedbackLike() !== null)) {
+                <mat-error>
+                  @if (feedbackLike() === null) {
+                    좋아요/싫어요를 선택해주세요
+                  } @else if (feedbackTextLength() < 5) {
+                    최소 5자 이상 입력해주세요
+                  }
+                </mat-error>
               }
-            </div>
-            <div class="rating-labels">
-              <span class="rating-label-left">별로예요</span>
-              <span class="rating-label-right">최고예요</span>
-            </div>
+            </mat-form-field>
           </div>
           
           <div class="feedback-actions">
@@ -44,7 +86,7 @@
             </button>
             <button 
               class="btn btn-primary feedback-btn" 
-              [disabled]="feedbackScore() === 0 || isSubmittingFeedback()"
+              [disabled]="!isFeedbackValid() || isSubmittingFeedback()"
               (click)="submitFeedback()">
               @if (isSubmittingFeedback()) {
                 <div class="btn-spinner"></div>
@@ -253,50 +295,114 @@
       </div>
     </div>
 
-    <!-- 최근 활동 섹션 -->
+    <!-- 향상된 최근 활동 섹션 -->
     <div class="section-card">
       <div class="section-header">
         <h2 class="section-title">
-          <mat-icon>history</mat-icon>
-          최근 활동
+          <mat-icon>timeline</mat-icon>
+          최근 그룹 활동
         </h2>
-        <p class="section-subtitle">최근 그룹 활동 현황</p>
+        <p class="section-subtitle">실시간 활동 현황과 성과를 확인하세요</p>
+        <button class="refresh-btn" (click)="refreshData()" title="새로고침">
+          <mat-icon>refresh</mat-icon>
+        </button>
       </div>
       
-      <div class="activity-feed">
-        <div class="activity-item">
-          <div class="activity-avatar">🏃</div>
-          <div class="activity-content">
-            <div class="activity-text">
-              <strong>김철수</strong>님이 운동 챌린지를 완료했습니다
+      @if (recentActivities().length > 0) {
+        <div class="enhanced-activity-feed">
+          @for (activity of recentActivities(); track activity.id) {
+            <div class="enhanced-activity-item" [attr.data-type]="activity.type">
+              <div class="activity-avatar-enhanced">
+                <span class="avatar-emoji">{{ getActivityIcon(activity) }}</span>
+              </div>
+              
+              <div class="activity-content-enhanced">
+                <div class="activity-header">
+                  <div class="activity-title">{{ activity.title }}</div>
+                  <div class="activity-time">{{ getTimeAgo(activity.timestamp) }}</div>
+                </div>
+                
+                <div class="activity-description">{{ activity.description }}</div>
+                
+                @if (activity.user) {
+                  <div class="activity-user">
+                    <mat-icon>person</mat-icon>
+                    <span>{{ activity.user }}</span>
+                  </div>
+                }
+                
+                @if (activity.metadata) {
+                  <div class="activity-metadata">
+                    @if (activity.metadata.streakDays) {
+                      <div class="metadata-item streak">
+                        <mat-icon>local_fire_department</mat-icon>
+                        <span>{{ activity.metadata.streakDays }}일 연속</span>
+                      </div>
+                    }
+                    @if (activity.metadata.questTitle) {
+                      <div class="metadata-item quest">
+                        <mat-icon>task_alt</mat-icon>
+                        <span>{{ activity.metadata.questTitle }}</span>
+                      </div>
+                    }
+                    @if (activity.metadata.achievementLevel) {
+                      <div class="metadata-item achievement">
+                        <mat-icon>military_tech</mat-icon>
+                        <span>레벨 {{ activity.metadata.achievementLevel }}</span>
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+              
+              @if (activity.badge) {
+                <div class="activity-badge-enhanced" [class]="getActivityBadgeClass(activity.badge.type)">
+                  {{ activity.badge.text }}
+                </div>
+              }
             </div>
-            <div class="activity-time">5분 전</div>
-          </div>
-          <div class="activity-badge success">완료</div>
+          }
         </div>
         
-        <div class="activity-item">
-          <div class="activity-avatar">📚</div>
-          <div class="activity-content">
-            <div class="activity-text">
-              <strong>이영희</strong>님이 독서 인증을 업로드했습니다
+        <!-- 활동 요약 카드 -->
+        <div class="activity-summary-cards">
+          <div class="summary-card">
+            <div class="summary-icon">🎯</div>
+            <div class="summary-content">
+              <div class="summary-number">{{ recentQuestCompletions() }}</div>
+              <div class="summary-label">최근 완료한 퀘스트</div>
             </div>
-            <div class="activity-time">12분 전</div>
           </div>
-          <div class="activity-badge in-progress">인증</div>
-        </div>
-        
-        <div class="activity-item">
-          <div class="activity-avatar">💧</div>
-          <div class="activity-content">
-            <div class="activity-text">
-              <strong>박민수</strong>님이 물 마시기 목표를 달성했습니다
+          
+          <div class="summary-card">
+            <div class="summary-icon">🔥</div>
+            <div class="summary-content">
+              <div class="summary-number">{{ currentStreak() }}</div>
+              <div class="summary-label">현재 연속 기록</div>
             </div>
-            <div class="activity-time">25분 전</div>
           </div>
-          <div class="activity-badge success">달성</div>
+          
+          <div class="summary-card">
+            <div class="summary-icon">👥</div>
+            <div class="summary-content">
+              <div class="summary-number">{{ recentNewMembers() }}</div>
+              <div class="summary-label">새로운 멤버</div>
+            </div>
+          </div>
         </div>
-      </div>
+      } @else {
+        <div class="empty-activity-state">
+          <div class="empty-activity-icon">
+            <mat-icon>timeline</mat-icon>
+          </div>
+          <h4>최근 활동이 없습니다</h4>
+          <p>퀘스트를 완료하거나 새로운 활동을 시작해보세요!</p>
+          <button class="btn btn-primary" (click)="refreshData()">
+            <mat-icon>refresh</mat-icon>
+            새로고침
+          </button>
+        </div>
+      }
     </div>
   }
 </div>

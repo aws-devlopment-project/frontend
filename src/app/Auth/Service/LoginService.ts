@@ -49,7 +49,6 @@ export class LoginService {
                 return {status: 400, username: '', accessToken: ''};
             }
         } catch (error: any) {
-            console.error('로그인 오류:', error);
             
             // 에러 타입별 처리
             if (error.name === 'UserNotFoundException') {
@@ -75,7 +74,6 @@ export class LoginService {
                 provider: "Google"
             });
         } catch (error: any) {
-            console.error('Google 로그인 오류:', error);
 
             if (error.name === 'OAuthError') {
                 throw new Error('Google 인증 중 오류가 발생했습니다. 다시 시도해주세요.');
@@ -93,17 +91,14 @@ export class LoginService {
             const session = await fetchAuthSession();
             
             if (!session.tokens?.accessToken) {
-                console.log('Access Token이 없습니다.');
                 return 'unknown';
             }
             
             const tokenPayload = JSON.parse(atob(session.tokens.accessToken.toString().split('.')[1]));
-            console.log('Access Token Payload:', tokenPayload);
             
             // ID Token도 확인 (Google OAuth의 경우 여기에 정보가 있을 수 있음)
             if (session.tokens?.idToken) {
                 const idTokenPayload = JSON.parse(atob(session.tokens.idToken.toString().split('.')[1]));
-                console.log('ID Token Payload:', idTokenPayload);
             }
             
             // Google OAuth 감지 방법들

@@ -1,20 +1,20 @@
-// CorrectedMainContainer.ts
+// FixedMainContainer.ts - 백엔드 예시에 맞춘 수정
 import { Component, signal, computed, effect, OnInit, OnDestroy, ViewChild, ElementRef } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { MatIconModule } from "@angular/material/icon";
 import { FormsModule } from "@angular/forms";
 import { Subscription } from "rxjs";
 import { SharedStateService } from "../../../Core/Service/SharedService";
-import { WebSocketService, SimpleChatMessage } from '../../Service/WebSocketChatService'
+import { StompWebSocketService, ChatMessageDto } from "../../Service/WebSocketChatService";
 
 interface DisplayMessage {
   id: string;
-  senderId: string;
+  senderEmail: string;
   senderUsername: string;
   content: string;
   timestamp: Date;
   type: 'user' | 'system';
-  event: 'chat' | 'load' | 'image' | 'check';
+  messageType: 'CHAT' | 'JOIN' | 'LEAVE' | 'IMAGE';
   isOwn: boolean;
 }
 
@@ -38,17 +38,27 @@ export class MainContainerComponent implements OnInit, OnDestroy {
   
   // Computed properties
   channelInfo = computed(() => this.sharedState.channelInfo());
-  currentUserId = computed(() => this.sharedState.currentUser()?.id || '');
+  currentUserEmail = computed(() => this.sharedState.currentUser()?.id || '');
   currentUsername = computed(() => this.sharedState.currentUser()?.name || '');
   currentChannel = computed(() => this.sharedState.selectedChannel() || '');
   currentGroup = computed(() => this.sharedState.selectedGroup() || '');
-  connectionStatus = computed(() => this.webSocketService.connectionStatus());
+  connectionStatus = computed(() => this.stompWebSocketService.connectionStatus());
   
-  // 채팅방 ID 생성
+  // 채팅방 ID 생성 (clubId를 숫자로 변환)
   chatRoomId = computed(() => {
     const group = this.currentGroup();
     const channel = this.currentChannel();
-    return group && channel ? `${group}-${channel}` : '';
+    if (!group || !channel) return -1;
+    
+    // group과 channel을 기반으로 숫자 ID 생성 (간단한 해시)
+    const combined = `${group}-${channel}`;
+    let hash = 0;
+    for (let i = 0; i < combined.length; i++) {
+      const char = combined.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // 32bit 정수로 변환
+    }
+    return Math.abs(hash);
   });
 
   // 저장된 메시지 통계
@@ -58,8 +68,8 @@ export class MainContainerComponent implements OnInit, OnDestroy {
     if (!group || !channel) return { count: 0, rooms: [] };
     
     return {
-      count: this.webSocketService.getChatMessageCount(group, channel),
-      rooms: this.webSocketService.getAllChatRooms()
+      count: this.stompWebSocketService.getChatMessageCount(group, channel),
+      rooms: this.stompWebSocketService.getAllChatRooms()
     };
   });
 
@@ -68,9 +78,9 @@ export class MainContainerComponent implements OnInit, OnDestroy {
 
   constructor(
     public sharedState: SharedStateService,
-    private webSocketService: WebSocketService
+    private stompWebSocketService: StompWebSocketService
   ) {
-    console.log('CorrectedMainContainerComponent initialized');
+    console.log('Fixed MainContainerComponent initialized with STOMP (Backend Compatible)');
     
     // 메시지가 업데이트되면 스크롤을 맨 아래로
     effect(() => {
@@ -81,66 +91,60 @@ export class MainContainerComponent implements OnInit, OnDestroy {
 
     // 채널 변경 감지
     effect(() => {
-      const roomId = this.chatRoomId();
-      const userId = this.currentUserId();
+      const clubId = this.chatRoomId();
+      const userEmail = this.currentUserEmail();
       const username = this.currentUsername();
       
-      if (roomId && userId && username) {
+      if (clubId !== -1 && userEmail && username) {
         this.loadChannelMessages();
-        this.webSocketService.joinRoom(roomId, userId, username);
+        this.stompWebSocketService.joinRoom(clubId, userEmail, username);
       }
     });
 
     // 연결 상태 변경 감지
     effect(() => {
       const status = this.connectionStatus();
-      console.log('WebSocket connection status:', status);
+      console.log('STOMP connection status:', status);
       
       if (status === 'connected') {
-        this.addSystemMessage('WebSocket 서버에 연결되었습니다.');
+        this.addSystemMessage('STOMP 서버에 연결되었습니다.');
       } else if (status === 'disconnected') {
-        this.addSystemMessage('WebSocket 서버와의 연결이 끊어졌습니다.');
+        this.addSystemMessage('STOMP 서버와의 연결이 끊어졌습니다.');
       }
     });
   }
 
   ngOnInit(): void {
-    this.initializeWebSocket();
+    this.initializeStompConnection();
     this.setupMessageSubscriptions();
   }
 
   ngOnDestroy(): void {
-    this.webSocketService.disconnect();
+    this.stompWebSocketService.disconnect();
     this.subscriptions.forEach(sub => sub.unsubscribe());
   }
 
-  // WebSocket 초기화
-  private initializeWebSocket(): void {
+  // STOMP 연결 초기화
+  private initializeStompConnection(): void {
     const user = this.sharedState.currentUser();
-    if (user) {
-      // WebSocket 서버 URL
-      const wsUrl = this.getWebSocketUrl();
-      this.webSocketService.connect(user.id, user.name, wsUrl);
+    if (user && user.id) {
+      const serverUrl = this.getServerUrl();
+      this.stompWebSocketService.connect(user.id, user.name, serverUrl);
     }
   }
 
-  private getWebSocketUrl(): string {
-    // 개발 환경에서는 localhost, 프로덕션에서는 실제 서버 주소 사용
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.hostname === 'localhost' ? 'localhost' : window.location.hostname;
-    const port = window.location.hostname === 'localhost' ? ':8081' : '';
-    
-    return `${protocol}//${host}${port}/chat`;
+  private getServerUrl(): string {
+    return 'http://localhost:9001'; // 백엔드 예시와 동일한 포트
   }
 
   // 메시지 구독 설정
   private setupMessageSubscriptions(): void {
-    const messagesSub = this.webSocketService.messages$.subscribe(message => {
+    const messagesSub = this.stompWebSocketService.messages$.subscribe((message: ChatMessageDto) => {
       this.addDisplayMessage(message);
     });
 
-    const errorsSub = this.webSocketService.errors$.subscribe(error => {
-      console.error('WebSocket error:', error);
+    const errorsSub = this.stompWebSocketService.errors$.subscribe((error: string) => {
+      console.error('STOMP error:', error);
       this.addSystemMessage(`오류: ${error}`);
     });
 
@@ -150,64 +154,70 @@ export class MainContainerComponent implements OnInit, OnDestroy {
   // 채널 메시지 로드
   private loadChannelMessages(): void {
     this.messages.set([]);
-    
-    // 메모리에서 기존 채팅 이력 로드 - 이미 joinRoom에서 처리됨
-    // 추가 로직이 필요한 경우 여기에 구현
   }
 
   // 디스플레이 메시지 추가
-  private addDisplayMessage(message: SimpleChatMessage): void {
-    // load와 check 이벤트는 UI에 표시하지 않음 (내부 처리용)
-    if (message.event === 'load' || message.event === 'check') {
+  private addDisplayMessage(message: ChatMessageDto): void {
+    if (message.message === 'ping') {
       return;
     }
 
     const displayMessage: DisplayMessage = {
       id: this.generateMessageId(),
-      senderId: message.senderId,
+      senderEmail: message.senderEmail,
       senderUsername: message.senderUsername,
-      content: message.messages,
+      content: message.message, // 백엔드 예시에 맞춰 'message' 필드 사용
       timestamp: new Date(message.timestamp || Date.now()),
-      type: message.type,
-      event: message.event,
-      isOwn: message.senderId === this.currentUserId() || 
+      type: this.getDisplayType(message.type),
+      messageType: message.type,
+      isOwn: message.senderEmail === this.currentUserEmail() || 
              message.senderUsername === this.currentUsername()
     };
     
     this.messages.update(messages => [...messages, displayMessage]);
   }
 
+  // 메시지 타입을 디스플레이 타입으로 변환
+  private getDisplayType(messageType: 'CHAT' | 'JOIN' | 'LEAVE' | 'IMAGE'): 'user' | 'system' {
+    return (messageType === 'JOIN' || messageType === 'LEAVE') ? 'system' : 'user';
+  }
+
   // 시스템 메시지 추가
   private addSystemMessage(content: string): void {
     const systemMessage: DisplayMessage = {
       id: this.generateMessageId(),
-      senderId: 'system',
+      senderEmail: 'system',
       senderUsername: 'System',
       content,
       timestamp: new Date(),
       type: 'system',
-      event: 'chat', // 시스템 메시지는 항상 chat 이벤트로 처리
+      messageType: 'CHAT',
       isOwn: false
     };
     
     this.messages.update(messages => [...messages, systemMessage]);
   }
 
+  // 메시지 ID 생성
+  private generateMessageId(): string {
+    return `msg_${Date.now()}_${++this.messageIdCounter}`;
+  }
+
   // 메시지 전송
   sendMessage(content: string): void {
-    if (!content.trim() || !this.webSocketService.isConnected()) {
-      if (!this.webSocketService.isConnected()) {
+    if (!content.trim() || !this.stompWebSocketService.isConnected()) {
+      if (!this.stompWebSocketService.isConnected()) {
         this.addSystemMessage('서버에 연결되지 않았습니다. 연결을 확인해주세요.');
       }
       return;
     }
 
-    const roomId = this.chatRoomId();
-    const userId = this.currentUserId();
+    const clubId = this.chatRoomId();
+    const userEmail = this.currentUserEmail();
     const username = this.currentUsername();
 
-    if (roomId && userId && username) {
-      this.webSocketService.sendChatMessage(roomId, userId, username, content);
+    if (clubId !== -1 && userEmail && username) {
+      this.stompWebSocketService.sendChatMessage(clubId, userEmail, username, content);
     }
   }
 
@@ -226,28 +236,25 @@ export class MainContainerComponent implements OnInit, OnDestroy {
   }
 
   private uploadFile(file: File): void {
-    if (!this.webSocketService.isConnected()) {
+    if (!this.stompWebSocketService.isConnected()) {
       this.addSystemMessage('연결이 끊어져 파일을 업로드할 수 없습니다');
       return;
     }
 
-    // 파일 크기 제한 (5MB)
     const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
       this.addSystemMessage('파일 크기는 5MB를 초과할 수 없습니다');
       return;
     }
 
-    // 파일을 Base64로 변환하여 전송
     const reader = new FileReader();
     reader.onload = () => {
       const base64Data = reader.result as string;
-      const roomId = this.chatRoomId();
-      const userId = this.currentUserId();
+      const clubId = this.chatRoomId();
+      const userEmail = this.currentUserEmail();
       const username = this.currentUsername();
 
-      if (roomId && userId && username) {
-        // 파일 정보와 함께 전송
+      if (clubId !== -1 && userEmail && username) {
         const fileInfo = {
           name: file.name,
           size: file.size,
@@ -255,8 +262,8 @@ export class MainContainerComponent implements OnInit, OnDestroy {
           data: base64Data
         };
         
-        this.webSocketService.sendImageMessage(
-          roomId, userId, username, JSON.stringify(fileInfo)
+        this.stompWebSocketService.sendImageMessage(
+          clubId, userEmail, username, JSON.stringify(fileInfo)
         );
         
         this.addSystemMessage(`파일 업로드: ${file.name} (${this.formatFileSize(file.size)})`);
@@ -299,8 +306,9 @@ export class MainContainerComponent implements OnInit, OnDestroy {
     const channelId = this.currentChannel();
     const baseMessage = this.getChannelDescription(channelId);
     const stats = this.messageStats();
+    const clubId = this.chatRoomId();
     
-    return `${baseMessage}\n\n메모리에 ${stats.count}개의 메시지가 저장되어 있습니다.\nWebSocket을 통해 실시간으로 소통해보세요!`;
+    return `${baseMessage}\n\n채팅방 ID: ${clubId}\n메모리에 ${stats.count}개의 메시지가 저장되어 있습니다.\nSTOMP를 통해 실시간으로 소통해보세요!`;
   }
 
   public getChannelDescription(channelId: string): string {
@@ -388,17 +396,17 @@ export class MainContainerComponent implements OnInit, OnDestroy {
 
   // 이미지 메시지 확인
   isImageMessage(message: DisplayMessage): boolean {
-    return message.event === 'image';
+    return message.messageType === 'IMAGE';
   }
 
-  // 시각적 메시지 확인 (chat 또는 image)
+  // 시각적 메시지 확인 (CHAT 또는 IMAGE)
   isVisualMessage(message: DisplayMessage): boolean {
-    return message.event === 'chat' || message.event === 'image';
+    return message.messageType === 'CHAT' || message.messageType === 'IMAGE';
   }
 
-  // 디버그 메시지 확인 (load 또는 check) - 개발용
-  isDebugMessage(message: DisplayMessage): boolean {
-    return message.event === 'load' || message.event === 'check';
+  // 시스템 메시지 확인 (JOIN 또는 LEAVE)
+  isSystemMessage(message: DisplayMessage): boolean {
+    return message.messageType === 'JOIN' || message.messageType === 'LEAVE';
   }
 
   // 이미지 데이터 파싱
@@ -421,16 +429,11 @@ export class MainContainerComponent implements OnInit, OnDestroy {
 
   // 연결 관리
   reconnect(): void {
-    this.addSystemMessage('서버에 재연결을 시도합니다...');
-    this.webSocketService.disconnect();
+    this.addSystemMessage('STOMP 서버에 재연결을 시도합니다...');
+    this.stompWebSocketService.disconnect();
     setTimeout(() => {
-      this.initializeWebSocket();
+      this.initializeStompConnection();
     }, 1000);
-  }
-
-  // 메시지 ID 생성
-  private generateMessageId(): string {
-    return `msg_${Date.now()}_${++this.messageIdCounter}`;
   }
 
   // 현재 채널 채팅 이력 삭제
@@ -439,7 +442,7 @@ export class MainContainerComponent implements OnInit, OnDestroy {
     const channel = this.currentChannel();
     
     if (group && channel) {
-      this.webSocketService.clearChatHistory(group, channel);
+      this.stompWebSocketService.clearChatHistory(group, channel);
       this.messages.set([]);
       this.addSystemMessage('채팅 이력이 삭제되었습니다.');
     }
@@ -447,7 +450,7 @@ export class MainContainerComponent implements OnInit, OnDestroy {
 
   // 모든 채팅 이력 삭제
   clearAllHistory(): void {
-    this.webSocketService.clearAllChatHistory();
+    this.stompWebSocketService.clearAllChatHistory();
     this.messages.set([]);
     this.addSystemMessage('모든 채팅 이력이 삭제되었습니다.');
   }
@@ -479,7 +482,6 @@ export class MainContainerComponent implements OnInit, OnDestroy {
     const fileData = this.getImageData(message);
     if (!fileData || !fileData.type.startsWith('image/')) return;
 
-    // 새 창에서 이미지 미리보기
     const newWindow = window.open('', '_blank');
     if (newWindow) {
       newWindow.document.write(`
@@ -496,10 +498,10 @@ export class MainContainerComponent implements OnInit, OnDestroy {
   // 개발용 데모 메시지 추가
   addDemoMessage(): void {
     const demoMessages = [
-      '안녕하세요! 테스트 메시지입니다.',
-      'WebSocket 연결이 정상적으로 작동하고 있나요?',
+      '안녕하세요! STOMP 테스트 메시지입니다.',
+      'STOMP over WebSocket 연결이 정상적으로 작동하고 있나요?',
       '파일 업로드 기능도 테스트해보세요!',
-      '실시간 채팅을 즐겨보세요! 🎉'
+      '실시간 STOMP 채팅을 즐겨보세요! 🎉'
     ];
     
     const randomMessage = demoMessages[Math.floor(Math.random() * demoMessages.length)];
@@ -509,15 +511,17 @@ export class MainContainerComponent implements OnInit, OnDestroy {
   // 통계 정보 표시
   showStats(): void {
     const stats = this.messageStats();
-    this.addSystemMessage(`현재 채널 메시지: ${stats.count}개, 전체 채팅방: ${stats.rooms.length}개`);
+    const clubId = this.chatRoomId();
+    this.addSystemMessage(`채팅방 ID: ${clubId}, 현재 채널 메시지: ${stats.count}개, 전체 채팅방: ${stats.rooms.length}개`);
   }
 
   // 연결 테스트
   testConnection(): void {
-    if (this.webSocketService.isConnected()) {
-      this.addSystemMessage('✅ WebSocket 연결이 정상입니다.');
+    if (this.stompWebSocketService.isConnected()) {
+      const clubId = this.chatRoomId();
+      this.addSystemMessage(`✅ STOMP 연결이 정상입니다. (채팅방 ID: ${clubId})`);
     } else {
-      this.addSystemMessage('❌ WebSocket 연결이 끊어졌습니다. 재연결을 시도해주세요.');
+      this.addSystemMessage('❌ STOMP 연결이 끊어졌습니다. 재연결을 시도해주세요.');
     }
   }
 }

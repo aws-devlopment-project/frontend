@@ -221,10 +221,10 @@
                         <div class="channel-item">
                           <div class="channel-info">
                             <mat-icon>tag</mat-icon>
-                            <span>{{ channel }}</span>
+                            <span>{{ channel.name }}</span>
                           </div>
                           <button class="btn btn-warning btn-sm" 
-                                  (click)="leaveClub(group.groupname, channel)">
+                                  (click)="leaveClub(group.groupname, channel.name)">
                             채널 탈퇴
                           </button>
                         </div>

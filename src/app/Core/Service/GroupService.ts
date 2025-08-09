@@ -2,7 +2,6 @@ import { Injectable } from "@angular/core";
 import { DataCacheService } from "./DataCacheService";
 import { HttpService } from "./HttpService";
 import { HttpHeaders } from "@angular/common/http";
-import { matchingGroupTable, environment } from "../../../environments/environtment";
 import { Group } from "../Models/group";
 
 @Injectable({
@@ -12,7 +11,6 @@ export class GroupService {
 
     constructor(private httpService: HttpService, private dataService: DataCacheService) {}
 
-    table = matchingGroupTable;
     async checkQuestCreateTime(groupname: string) : Promise<boolean> {
         const group: Group | null = await this.dataService.getCache(groupname);
 
@@ -30,7 +28,7 @@ export class GroupService {
         if (group) {
             return group;
         }
-        const url = environment.apiUrl + `/api/group/getGroupInfo?name=${groupname}`;
+        const url = `/api/group/getGroupInfo?name=${groupname}`;
         const headers: HttpHeaders = new HttpHeaders({
             'Content-Type': 'application/json'
         });
@@ -42,7 +40,7 @@ export class GroupService {
     }
 
     async getGroupList(): Promise<Group[] | []> {
-        const url = environment.apiUrl + '/api/group/getGroupList';
+        const url = '/api/group/getGroupList';
         const headers: HttpHeaders = new HttpHeaders({
             'Content-Type': 'application/json'
         });
@@ -57,7 +55,7 @@ export class GroupService {
     }
 
     async joinUser(group: string, user: string): Promise<boolean> {
-        const url = environment.apiUrl + '/api/group/joinUser';
+        const url = '/api/group/joinUser';
         const headers: HttpHeaders = new HttpHeaders({
             'Content-Type': 'application/json'
         });
@@ -71,8 +69,49 @@ export class GroupService {
         return true;
     }
 
+    async questSuccessWithFeedback(
+        group: string, 
+        user: string, 
+        questList: string[], 
+        feedbackText: string
+        ): Promise<boolean> {
+        const url = '/api/group/questSuccessWithFeedback';
+        const headers = new HttpHeaders({
+            'Content-Type': 'application/json'
+        });
+        
+        const body = JSON.stringify({
+            group,
+            user,
+            questList,
+            feedback: feedbackText,
+            timestamp: new Date().toISOString()
+        });
+        
+        try {
+            const response = await this.httpService.post(url, body, headers).toPromise();
+            
+            // 기존 캐시 업데이트 로직
+            let cacheGroup: Group | null = await this.dataService.getCache(group);
+            if (cacheGroup) {
+            questList.forEach((quest) => {
+                const questIndex = cacheGroup.questList.indexOf(quest);
+                if (questIndex !== -1) {
+                cacheGroup.questSuccessNum[questIndex] += 1;
+                }
+            });
+            this.dataService.setCache(group, cacheGroup);
+            }
+            
+            return true;
+        } catch (error) {
+            console.error('Error in questSuccessWithFeedback:', error);
+            return false;
+        }
+    }
+
     async questSuccess(group: string, user: string, questList: string[]): Promise<boolean> {
-        const url = environment.apiUrl + '/api/group/questSuccess';
+        const url = '/api/group/questSuccess';
         const headers: HttpHeaders = new HttpHeaders({
             'Content-Type': 'application/json'
         });

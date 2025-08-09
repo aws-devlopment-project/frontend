@@ -10,6 +10,7 @@ import { matchingGroup } from "../../../../environments/environtment";
 import { Group } from "../../../Core/Models/group";
 
 interface GroupInfo {
+  id: number;
   name: string;
   description: string;
   emoji: string;
@@ -69,6 +70,7 @@ export class GroupJoinComponent implements OnInit {
         groups.forEach((info: Group) => {
           if (info) {
             groupInfoPromises.push({
+              id: info.id,
               name: info.name,
               description: info.description ? info.description : '',
               emoji: info.icon ? info.icon : '👥',
@@ -76,6 +78,7 @@ export class GroupJoinComponent implements OnInit {
               activeToday: info.questSuccessNum ? Math.max(...info.questSuccessNum) : 0,
               tags: info.tag || []
             });
+            this.shared.addListGroup(info.id, info.name);
           } else {
             console.error('[group]: groupList load fail to Server');
           }
@@ -96,10 +99,10 @@ export class GroupJoinComponent implements OnInit {
 
   selectGroup(group: GroupInfo): void {
     this.selectedGroup.set(group);
-    this.loadChannelsForGroup(group.name);
+    this.loadClubsForGroup(group.name);
   }
 
-  private async loadChannelsForGroup(groupId: string): Promise<void> {
+  private async loadClubsForGroup(groupId: string): Promise<void> {
     try {
       // 그룹별 모임 데이터
       let groupInfo = await this.groupService.getGroupInfo(groupId);
@@ -107,6 +110,18 @@ export class GroupJoinComponent implements OnInit {
       let clubData: ClubInfo[] = [];
       
       if (groupInfo && groupInfo.clubList) {
+        groupInfo.clubList.forEach((club) => {
+          const data: ClubInfo = {
+            id: club.name,
+            name: club.name,
+            icon: club.icon ? club.icon : '🏠',
+            description: club.description ? club.description : '',
+            members: club.memberNum || 0,
+            activity: '활발'
+          };
+          clubData.push(data);
+          this.shared.addListClub(club.clubId, club.name, groupInfo.id);
+        })
         clubData = groupInfo.clubList.map((club, index) => ({
           id: club.name, // 실제 클럽 이름을 ID로 사용
           name: club.name,
@@ -190,8 +205,9 @@ export class GroupJoinComponent implements OnInit {
         selectedChannels: Array.from(selectedChannelIds)
       });
 
+      const groupSet = this.shared.groupList().filter((g) => g.id === group.id);
       // 1. UserService를 통해 그룹 참여
-      const joinGroupSuccess = await this.userService.joinGroup(currentUser.id, group.name);
+      const joinGroupSuccess = await this.userService.joinGroup(currentUser.id, group.id, group.name);
       if (!joinGroupSuccess) {
         throw new Error('그룹 참여에 실패했습니다.');
       }
@@ -209,7 +225,13 @@ export class GroupJoinComponent implements OnInit {
       console.log('Successfully joined channels:', Array.from(selectedChannelIds));
 
       // 3. SharedStateService에 새로운 그룹과 채널 추가
-      this.shared.addUserGroupWithChannels(group.name, Array.from(selectedChannelIds));
+      const clubList = this.shared.clubList().filter((club) => club.groupId === group.id).map((club) => ({
+        clubId: club.id,
+        name: club.name,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }));
+      this.shared.addUserGroupWithChannels(group.id, group.name, clubList);
       console.log('Updated SharedStateService with new group and channels');
 
       // 4. 그룹 탭으로 전환하고 선택된 그룹/채널 설정

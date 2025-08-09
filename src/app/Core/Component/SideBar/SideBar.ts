@@ -1,4 +1,4 @@
-// SideBar.ts
+// SideBar.ts - Fixed Channel Selection
 import { Component, OnInit, output } from "@angular/core";
 import { MatIconModule } from "@angular/material/icon";
 import { CommonModule } from "@angular/common";
@@ -70,16 +70,37 @@ export class SideBarComponent implements OnInit {
         }
     }
 
-    // === Channel Selection ===
-    async selectChannel(channelId: string): Promise<void> {
+    // === Channel Selection (FIXED) ===
+    async selectChannel(channel: any): Promise<void> {
+        console.log('Raw channel object received:', channel);
+        
+        // 채널 객체에서 실제 채널 ID(name) 추출
+        let channelId: string;
+        
+        if (typeof channel === 'string') {
+            channelId = channel;
+        } else if (channel && typeof channel === 'object' && channel.name) {
+            // Club 객체인 경우 name 속성을 사용
+            channelId = channel.name;
+        } else {
+            console.error('Invalid channel object:', channel);
+            return;
+        }
+        
+        console.log('Extracted channel ID:', channelId);
+        
         // 현재 선택된 그룹 찾기
         const currentGroup = await this.getCurrentGroupForChannel(channelId);
         if (currentGroup) {
+            console.log('Found group for channel:', { channelId, currentGroup });
+            
             // 부모에게 채널 선택 알림
             this.channelSelect.emit({ 
                 groupId: currentGroup, 
                 channelId: channelId 
             });
+        } else {
+            console.warn('No group found for channel:', channelId);
         }
     }
 
@@ -94,7 +115,15 @@ export class SideBarComponent implements OnInit {
 
         // 채널 ID를 기반으로 어느 그룹에 속하는지 판단
         for (const join of this.userJoin.joinList) {
-            if (join.clubList.includes(channelId)) {
+            // Club 객체의 name과 비교
+            if (join.clubList.some((club: any) => {
+                if (typeof club === 'string') {
+                    return club === channelId;
+                } else if (club && typeof club === 'object' && club.name) {
+                    return club.name === channelId;
+                }
+                return false;
+            })) {
                 return join.groupname;
             }
         }
@@ -149,5 +178,15 @@ export class SideBarComponent implements OnInit {
     // === 그룹 탭 여부 확인 ===
     isGroupTabActive(): boolean {
         return this.sharedState.activeTab() === 'group';
+    }
+
+    // === Helper method for getting channel name ===
+    getChannelName(channel: any): string {
+        if (typeof channel === 'string') {
+            return channel;
+        } else if (channel && typeof channel === 'object' && channel.name) {
+            return channel.name;
+        }
+        return 'Unknown Channel';
     }
 }
