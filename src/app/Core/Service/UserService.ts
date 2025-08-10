@@ -9,6 +9,7 @@ import { firstValueFrom, throwError } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
 import { Group } from "../Models/group";
 import { LoginService } from "../../Auth/Service/LoginService";
+import { environment } from "../../../environments/environtment";
 
 @Injectable({
     providedIn: 'root'
@@ -101,7 +102,7 @@ export class UserService {
             }
 
             // API 호출  
-            const url = `/api/user/getUserJoin?email=${id}`;
+            const url = environment.apiUrl + `/api/user/getUserJoin?email=${id}`;
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
             const response = await firstValueFrom(

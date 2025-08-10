@@ -68,7 +68,7 @@ export class HttpService {
       throw new Error('No authentication token found');
     }
 
-    const token = userObject.accessToken;
+    const token = userObject.idToken;
     return new HttpHeaders().set('Authorization', `Bearer ${token}`);
   }
 

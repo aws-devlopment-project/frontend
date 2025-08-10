@@ -232,9 +232,9 @@ export class LoginComponent implements OnInit {
         try {
             // 직접 session에서 토큰 가져오기
             const session = await fetchAuthSession();
-            const accessToken = session.tokens?.accessToken?.toString();
+            const idToken = session.tokens?.idToken?.toString();
             
-            if (!accessToken) {
+            if (!idToken) {
                 console.error('AccessToken not found in session');
                 return;
             }
@@ -266,7 +266,7 @@ export class LoginComponent implements OnInit {
             const user: UserCredentials = {
                 id: userId,
                 name: displayName,
-                accessToken: accessToken,
+                idToken: idToken,
             };
 
             const userStatus: UserStatus = {
@@ -358,29 +358,29 @@ export class LoginComponent implements OnInit {
     private async handleAuthCallback(): Promise<void> {
         // 로컬에서 사용 시 try 내부 코드에서 주석 처리된 코드를 활성화 해주시고 기존에 활성화된 코드는 주석 처리해주세요
         try {
-            // const user: UserCredentials = {
-            //     id: "wefwef@wefwefwef.wefwefwef",
-            //     name: "wefwefwefwefwef",
-            //     accessToken: "1234",
-            // };
+            const user: UserCredentials = {
+                id: "wefwef@wefwefwef.wefwefwef",
+                name: "wefwefwefwefwef",
+                idToken: "1234",
+            };
 
-            // const userStatus: UserStatus = {
-            //     id: "wefwef@wefwefwef.wefwefwef",
-            //     name: "wefwefwefwefwef",
-            //     status: 'online',
-            //     joinDate: new Date(),
-            //     lastSeen: new Date()
-            // };
+            const userStatus: UserStatus = {
+                id: "wefwef@wefwefwef.wefwefwef",
+                name: "wefwefwefwefwef",
+                status: 'online',
+                joinDate: new Date(),
+                lastSeen: new Date()
+            };
 
-            // this.cacheService.setCache('user', user);
-            // this.cacheService.setCache('userStatus', userStatus);
+            this.cacheService.setCache('user', user);
+            this.cacheService.setCache('userStatus', userStatus);
             
-            // await this.router.navigate(['/board']);
-            const isAuthenticated = await this.auth.checkAuthState();
+            await this.router.navigate(['/board']);
+            // const isAuthenticated = await this.auth.checkAuthState();
             
-            if (isAuthenticated) {
-                await this.handleSuccessfulAuth();
-            }
+            // if (isAuthenticated) {
+            //     await this.handleSuccessfulAuth();
+            // }
         } catch (error) {
             console.error('인증 상태 확인 오류:', error);
         }
@@ -434,7 +434,7 @@ export class LoginComponent implements OnInit {
                 status: 200,
                 id: "admin@nameless.com",
                 username: "admin",
-                accessToken: "adminToken"
+                idToken: "adminToken"
             }
             // const res = await this.auth.signInUser(email, password);
 
@@ -442,7 +442,7 @@ export class LoginComponent implements OnInit {
                 const user: UserCredentials = {
                     id: email,
                     name: res.username,
-                    accessToken: res.accessToken,
+                    idToken: res.idToken
                 };
                 const userStatus: UserStatus = {
                     id: email,

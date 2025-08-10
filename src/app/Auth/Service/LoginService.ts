@@ -29,8 +29,8 @@ export class LoginService {
                 const session = await fetchAuthSession();
                 
                 // 세션 유효성 검증
-                if (!session.tokens?.accessToken) {
-                    throw new Error('액세스 토큰을 가져올 수 없습니다.');
+                if (!session.tokens?.idToken) {
+                    throw new Error('ID 토큰을 가져올 수 없습니다.');
                 }
                 
                 // Cognito 직접 로그인이므로 fetchUserAttributes 사용 가능
@@ -42,7 +42,7 @@ export class LoginService {
                 return {
                     status: 200, 
                     username: displayName, 
-                    accessToken: session.tokens.accessToken.toString()
+                    idToken: session.tokens.idToken.toString()
                 };
             } else {
                 return {status: 400, username: '', accessToken: ''};

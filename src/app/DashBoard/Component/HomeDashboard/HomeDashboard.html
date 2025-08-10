@@ -56,12 +56,12 @@
       </div>
     </div>
 
-    <!-- 활동 스트릭 캘린더 섹션 -->
+    <!-- 퀘스트 캘린더 섹션 -->
     <div class="activity-streak-section">
       <div class="section-header">
         <h2 class="section-title">
           <mat-icon>calendar_month</mat-icon>
-          활동 캘린더
+          퀘스트 캘린더
         </h2>
         <div class="streak-summary">
           <div class="streak-badge current">
@@ -77,9 +77,11 @@
       
       <div class="calendar-container">
         <app-streak-calendar
-          [heatmapData]="heatmapData()"
+          [questData]="questCalendarData()"
           [currentStreak]="currentStreak()"
-          [longestStreak]="longestStreak()">
+          [longestStreak]="longestStreak()"
+          (questClick)="onQuestClick($event)"
+          (dayClick)="onDayClick($event)">
         </app-streak-calendar>
       </div>
 
@@ -97,6 +99,22 @@
         </div>
         <div class="progress-details">
           <span>{{ activitySummary().weeklyProgress }}일 / {{ activitySummary().weeklyGoal }}일 목표</span>
+        </div>
+      </div>
+
+      <!-- 퀘스트 캘린더 사용법 안내 -->
+      <div class="calendar-guide">
+        <div class="guide-item">
+          <mat-icon class="guide-icon">touch_app</mat-icon>
+          <span class="guide-text">퀘스트를 클릭하면 해당 그룹으로 이동합니다</span>
+        </div>
+        <div class="guide-item">
+          <mat-icon class="guide-icon">calendar_today</mat-icon>
+          <span class="guide-text">날짜를 클릭하면 해당 날의 모든 퀘스트를 볼 수 있습니다</span>
+        </div>
+        <div class="guide-item">
+          <mat-icon class="guide-icon">palette</mat-icon>
+          <span class="guide-text">색상은 퀘스트 완료율을 나타냅니다</span>
         </div>
       </div>
     </div>

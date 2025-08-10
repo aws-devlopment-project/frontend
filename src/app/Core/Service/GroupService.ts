@@ -32,10 +32,14 @@ export class GroupService {
         const headers: HttpHeaders = new HttpHeaders({
             'Content-Type': 'application/json'
         });
-        const response = this.httpService.get(url, headers).subscribe(async (data: Group) => {
-            this.dataService.setCache(groupname, data);
-            return await this.dataService.getCache(groupname);
-        });
+        try {
+            const response = this.httpService.get(url, headers).subscribe(async (data: Group) => {
+                this.dataService.setCache(groupname, data);
+                return await this.dataService.getCache(groupname);
+            })
+        } catch (e) {
+            console.error("[API] getGroupInfo: " + e);
+        }
         return undefined;
     }
 
@@ -44,29 +48,19 @@ export class GroupService {
         const headers: HttpHeaders = new HttpHeaders({
             'Content-Type': 'application/json'
         });
-        const response = await this.httpService.get(url, headers).toPromise();
-        const groupList: Group[] | null = response;
-        if (groupList) {
-            groupList.forEach((group) => {
-                this.dataService.setCache(group.name, group);
-            });
+        try {
+            const response = await this.httpService.get(url, headers).toPromise();
+            const groupList: Group[] | null = response;
+            if (groupList) {
+                groupList.forEach((group) => {
+                    this.dataService.setCache(group.name, group);
+                });
+            }
+            return groupList || [];
+        } catch (e) {
+            console.error("[API] getGroupList: " + e);
         }
-        return groupList ? groupList : [];
-    }
-
-    async joinUser(group: string, user: string): Promise<boolean> {
-        const url = '/api/group/joinUser';
-        const headers: HttpHeaders = new HttpHeaders({
-            'Content-Type': 'application/json'
-        });
-        const body = JSON.stringify({group: group, user: user});
-        const response = await this.httpService.post(url, body, headers).toPromise();
-        let cacheGroup: Group | null = await this.dataService.getCache(group);
-        if (cacheGroup) {
-            cacheGroup.memberNum += 1;
-        }
-        this.dataService.setCache(group, cacheGroup);
-        return true;
+        return [];
     }
 
     async questSuccessWithFeedback(
@@ -91,13 +85,13 @@ export class GroupService {
             // 기존 캐시 업데이트 로직
             let cacheGroup: Group | null = await this.dataService.getCache(group);
             if (cacheGroup) {
-            questList.forEach((quest) => {
-                const questIndex = cacheGroup.questList.indexOf(quest.quest);
-                if (questIndex !== -1) {
-                cacheGroup.questSuccessNum[questIndex] += 1;
-                }
-            });
-            this.dataService.setCache(group, cacheGroup);
+                questList.forEach((quest) => {
+                    const questIndex = cacheGroup.questList.indexOf(quest.quest);
+                    if (questIndex !== -1) {
+                    cacheGroup.questSuccessNum[questIndex] += 1;
+                    }
+                });
+                this.dataService.setCache(group, cacheGroup);
             }
             
             return true;

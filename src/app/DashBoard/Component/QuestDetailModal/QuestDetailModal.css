@@ -1,0 +1,145 @@
+.quest-modal-container {
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px 24px 16px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    color: #2d3748;
+}
+
+.modal-content {
+    padding: 24px;
+}
+
+.empty-quests {
+    text-align: center;
+    padding: 40px 20px;
+    color: #718096;
+}
+
+.empty-quests mat-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.quest-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.quest-item {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.quest-item:hover {
+    border-color: #3182ce;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(49, 130, 206, 0.15);
+}
+
+.quest-item.completed {
+    background: #f7fafc;
+    border-color: #48bb78;
+}
+
+.quest-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.priority-icon {
+    font-size: 20px;
+}
+
+.quest-header h3 {
+    flex: 1;
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #2d3748;
+}
+
+.group-badge {
+    background: #3182ce;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.quest-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    font-size: 14px;
+}
+
+.due-time {
+    color: #718096;
+}
+
+.status.completed {
+    color: #48bb78;
+    font-weight: 600;
+}
+
+.status.pending {
+    color: #f6ad55;
+    font-weight: 600;
+}
+
+.quest-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.action-btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.action-btn.primary {
+    background: #3182ce;
+    color: white;
+}
+
+.action-btn.primary:hover {
+    background: #2b6cb0;
+}
+
+.action-btn.secondary {
+    background: #e2e8f0;
+    color: #4a5568;
+}
+
+.action-btn.secondary:hover {
+    background: #cbd5e0;
+}

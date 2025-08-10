@@ -30,7 +30,12 @@
                 "input": "src",
                 "output": "/"
               },
-              "src/assets"
+              "src/assets",
+              {
+                "glob": "chatbot-qa.txt",
+                "input": "src/assets",
+                "output": "/assets"
+              }
             ],
             "styles": [
               "src/styles.css"

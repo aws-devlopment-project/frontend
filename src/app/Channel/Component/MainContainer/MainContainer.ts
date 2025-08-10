@@ -5,7 +5,8 @@ import { MatIconModule } from "@angular/material/icon";
 import { FormsModule } from "@angular/forms";
 import { Subscription } from "rxjs";
 import { SharedStateService } from "../../../Core/Service/SharedService";
-import { StompWebSocketService, ChatMessageDto } from "../../Service/WebSocketChatService";
+import { StompWebSocketService } from "../../Service/WebSocketChatService";
+import { ChatMessageDto, ChatHistory } from "../../Models/chatMessage";
 
 interface DisplayMessage {
   id: string;
