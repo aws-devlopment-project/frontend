@@ -1,6 +1,7 @@
 import { Component, OnInit, signal } from "@angular/core";
 import { FormBuilder, Validators, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router } from "@angular/router";
+import { fetchAuthSession } from '@aws-amplify/auth';
 import { LoginService } from "../../Service/LoginService";
 import { DataCacheService } from "../../../Core/Service/DataCacheService";
 import { UserCredentials, UserStatus } from "../../../Core/Models/user";
@@ -18,6 +19,7 @@ export class LoginComponent implements OnInit {
     successLogin = signal(true);
     signUpNextStep = signal(false);
     isLoading = signal(false);
+    loadingType = signal<'signin' | 'signup' | 'verification' | 'google' | 'password-reset' | 'auto-signin'>('signin');
     showPassword = signal(false);
 
     // 비밀번호 강도 관련 시그널
@@ -110,9 +112,50 @@ export class LoginComponent implements OnInit {
         this.showPassword.update(current => !current);
     }
 
-    // HTML에서 사용할 동적 FormGroup getter
-    get loginForm(): FormGroup {
-        return this.clickLogin() ? this.signInForm : this.signUpForm;
+    // 로딩 제목 반환
+    getLoadingTitle(): string {
+        switch (this.loadingType()) {
+            case 'signin':
+                return '로그인 중...';
+            case 'signup':
+                return '회원가입 중...';
+            case 'verification':
+                return '인증 확인 중...';
+            case 'google':
+                return 'Google 로그인 중...';
+            case 'password-reset':
+                return '비밀번호 재설정 중...';
+            case 'auto-signin':
+                return '자동 로그인 중...';
+            default:
+                return '처리 중...';
+        }
+    }
+
+    // 로딩 메시지 반환
+    getLoadingMessage(): string {
+        switch (this.loadingType()) {
+            case 'signin':
+                return '계정 정보를 확인하고 있습니다...';
+            case 'signup':
+                return '계정을 생성하고 있습니다...';
+            case 'verification':
+                return '인증 코드를 확인하고 있습니다...';
+            case 'google':
+                return 'Google로 리다이렉트 중입니다...';
+            case 'password-reset':
+                return '비밀번호 재설정 이메일을 발송 중입니다...';
+            case 'auto-signin':
+                return '자동 로그인을 완료하고 있습니다...';
+            default:
+                return '잠시만 기다려주세요...';
+        }
+    }
+
+    // 로딩 상태 설정 헬퍼 메서드
+    private setLoading(type: 'signin' | 'signup' | 'verification' | 'google' | 'password-reset' | 'auto-signin', loading: boolean): void {
+        this.loadingType.set(type);
+        this.isLoading.set(loading);
     }
 
     async onGoogleLogin(): Promise<void> {
@@ -155,11 +198,95 @@ export class LoginComponent implements OnInit {
 
         try {
             const res = await this.auth.confirmUser(email, verificationCode);
+            console.log('인증 결과:', res);
+            
+            // autoSignIn이 완료되기를 기다림
+            if (res.nextStep?.signUpStep === 'COMPLETE_AUTO_SIGN_IN') {
+                console.log('자동 로그인 진행 중...');
+                
+                // 잠시 기다린 후 인증 상태 확인
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                const isAuthenticated = await this.auth.checkAuthState();
+                console.log('자동 로그인 후 인증 상태:', isAuthenticated);
+                
+                if (isAuthenticated) {
+                    // 자동 로그인 성공 - 사용자 정보 처리
+                    await this.handleSuccessfulAuth();
+                    return;
+                }
+            }
+            
+            // 일반적인 경우 - 로그인 화면으로 이동
             this.toggle(true);
             this.signUpNextStep.update(() => false);
+            
         } catch (error: any) {
             this.errMsg = error.message || '인증 코드 확인 중 오류가 발생했습니다.';
             throw error;
+        }
+    }
+
+    // 성공적인 인증 후 처리 로직을 별도 메서드로 분리
+    private async handleSuccessfulAuth(): Promise<void> {
+        try {
+            // 직접 session에서 토큰 가져오기
+            const session = await fetchAuthSession();
+            const accessToken = session.tokens?.accessToken?.toString();
+            
+            if (!accessToken) {
+                console.error('AccessToken not found in session');
+                return;
+            }
+            
+            const userInfo = await this.auth.getCurrentUserInfo();
+            console.log('사용자 정보:', userInfo);
+            
+            // Google OAuth인 경우와 일반 회원가입 구분
+            let displayName: string;
+            let userId: string;
+            
+            if (userInfo.authProvider === 'google') {
+                // Google OAuth
+                displayName = userInfo.userAttributes?.name || 
+                            userInfo.userAttributes?.email?.split('@')[0] || 
+                            'User';
+                userId = userInfo.userAttributes?.email || userInfo.user.userId;
+            } else {
+                // 일반 Cognito 회원가입
+                displayName = userInfo.userAttributes?.['custom:username'] || 
+                            userInfo.userAttributes?.name || 
+                            userInfo.userAttributes?.email?.split('@')[0] || 
+                            'User';
+                userId = userInfo.userAttributes?.email || userInfo.user.userId;
+            }
+
+            console.log('처리된 사용자 정보:', { userId, displayName, authProvider: userInfo.authProvider });
+
+            const user: UserCredentials = {
+                id: userId,
+                name: displayName,
+                accessToken: accessToken,
+            };
+
+            const userStatus: UserStatus = {
+                id: userId,
+                name: displayName,
+                status: 'online',
+                joinDate: new Date(),
+                lastSeen: new Date()
+            };
+
+            this.cacheService.setCache('user', user);
+            this.cacheService.setCache('userStatus', userStatus);
+            
+            await this.router.navigate(['/board']);
+            
+        } catch (error) {
+            console.error('인증 성공 후 처리 오류:', error);
+            // 오류 발생 시 로그인 화면으로 이동
+            this.toggle(true);
+            this.signUpNextStep.update(() => false);
         }
     }
 
@@ -207,11 +334,11 @@ export class LoginComponent implements OnInit {
     }
 
     get emailControl() {
-        return this.loginForm.get('email');
+        return this.clickLogin() ? this.signInForm.get('email') : this.signUpForm.get('email');
     }
 
     get passwordControl() {
-        return this.loginForm.get('password');
+        return this.clickLogin() ? this.signInForm.get('password') : this.signUpForm.get('password');
     }
 
     get usernameControl() {
@@ -228,76 +355,32 @@ export class LoginComponent implements OnInit {
             callback();
         }
     }
-
     private async handleAuthCallback(): Promise<void> {
+        // 로컬에서 사용 시 try 내부 코드에서 주석 처리된 코드를 활성화 해주시고 기존에 활성화된 코드는 주석 처리해주세요
         try {
-            // 로컬 사용 시, try 내부 코드를 전부 주석 처리하고 이 주석의 코드를 활성화하세요
-            /*
-            let userId = "wefwefw@wefewfwe.fwwefwefwef";
-            let displayName = "wewefwefwefwef";
             const user: UserCredentials = {
-                id: userId,
-                name: displayName,
-                accessToken: userInfo.accessToken,
+                id: "wefwef@wefwefwef.wefwefwef",
+                name: "wefwefwefwefwef",
+                accessToken: "1234",
             };
 
             const userStatus: UserStatus = {
-                id: userId,
-                name: displayName,
+                id: "wefwef@wefwefwef.wefwefwef",
+                name: "wefwefwefwefwef",
                 status: 'online',
                 joinDate: new Date(),
                 lastSeen: new Date()
             };
+
             this.cacheService.setCache('user', user);
             this.cacheService.setCache('userStatus', userStatus);
             
             await this.router.navigate(['/board']);
-            */
-            const isAuthenticated = await this.auth.checkAuthState();
+            // const isAuthenticated = await this.auth.checkAuthState();
             
-            if (isAuthenticated) {
-                const userInfo = await this.auth.getCurrentUserInfo();
-                
-                // Google OAuth인 경우 email과 name을 사용하여 displayName 생성
-                let displayName: string;
-                let userId: string;
-                
-                if (userInfo.authProvider === 'google') {
-                    // Google OAuth: name을 우선 사용, 없으면 email의 @ 앞부분 사용
-                    displayName = userInfo.userAttributes?.name || 
-                                userInfo.userAttributes?.email?.split('@')[0] || 
-                                'User';
-                    // Google OAuth: email을 userId로 사용
-                    userId = userInfo.userAttributes?.email || userInfo.user.userId;
-                } else {
-                    // Cognito 직접 로그인: custom:username -> name -> email 순으로 사용
-                    displayName = userInfo.userAttributes?.['custom:username'] || 
-                                userInfo.userAttributes?.name || 
-                                userInfo.userAttributes?.email || 
-                                'User';
-                    // Cognito 직접 로그인: email을 userId로 사용 (있으면), 없으면 기본 userId
-                    userId = userInfo.userAttributes?.email || userInfo.user.userId;
-                }
-
-                const user: UserCredentials = {
-                    id: userId,
-                    name: displayName,
-                    accessToken: userInfo.accessToken,
-                };
-
-                const userStatus: UserStatus = {
-                    id: userId,
-                    name: displayName,
-                    status: 'online',
-                    joinDate: new Date(),
-                    lastSeen: new Date()
-                };
-
-                this.cacheService.setCache('user', user);
-                this.cacheService.setCache('userStatus', userStatus);
-                
-                await this.router.navigate(['/board']);
-            }
+            // if (isAuthenticated) {
+            //     await this.handleSuccessfulAuth();
+            // }
         } catch (error) {
             console.error('인증 상태 확인 오류:', error);
         }
@@ -308,7 +391,6 @@ export class LoginComponent implements OnInit {
         this.successLogin.update(() => true);
         this.signUpNextStep.update(() => false);
     }
-
     async onSubmit(event: Event): Promise<void> {
         event.preventDefault();
         
@@ -338,7 +420,7 @@ export class LoginComponent implements OnInit {
             this.isLoading.update(() => false);
         }
     }
-
+    
     private async handleLogin(): Promise<void> {
         if (!this.signInForm.valid) {
             this.markFormGroupTouched(this.signInForm);

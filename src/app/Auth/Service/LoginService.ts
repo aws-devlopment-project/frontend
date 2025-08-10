@@ -182,7 +182,6 @@ export class LoginService {
                     }
                     
                     const idTokenPayload = JSON.parse(atob(session.tokens.idToken.toString().split('.')[1]));
-                    console.log('Google ID Token 정보:', idTokenPayload);
                     
                     user = {
                         userId: idTokenPayload.sub,

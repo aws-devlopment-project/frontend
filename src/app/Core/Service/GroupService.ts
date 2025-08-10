@@ -74,7 +74,7 @@ export class GroupService {
         user: string, 
         questList: {club: string, quest: string, feedback: string}[],
         ): Promise<boolean> {
-        const url = '/api/group/questSuccessWithFeedback';
+        const url = '/api/group/questSuccess';
         const headers = new HttpHeaders({
             'Content-Type': 'application/json'
         });
@@ -86,7 +86,7 @@ export class GroupService {
         });
         
         try {
-            const response = await this.httpService.post(url, body, headers).toPromise();
+            const response = await this.httpService.post(url + `?email=${user}`, body, headers).toPromise();
             
             // 기존 캐시 업데이트 로직
             let cacheGroup: Group | null = await this.dataService.getCache(group);
@@ -105,23 +105,5 @@ export class GroupService {
             console.error('Error in questSuccessWithFeedback:', error);
             return false;
         }
-    }
-
-    async questSuccess(group: string, user: string, questList: string[]): Promise<boolean> {
-        const url = '/api/group/questSuccess';
-        const headers: HttpHeaders = new HttpHeaders({
-            'Content-Type': 'application/json'
-        });
-        const body = JSON.stringify({group: group, user: user, questList: questList});
-        const response = await this.httpService.post(url, body, headers).toPromise();
-        let cacheGroup: Group | null = await this.dataService.getCache(group);
-        if (cacheGroup) {
-            questList.forEach((quest) => {
-                if (questList.filter((q) => q === quest).length)
-                    cacheGroup.questSuccessNum[questList.indexOf(quest)] += 1;
-            })
-            this.dataService.setCache(group, cacheGroup);
-        }
-        return true;
     }
 }

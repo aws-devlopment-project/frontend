@@ -2,7 +2,17 @@
     <h2>로그인</h2>
     <p>좋은 친구들과 함께 습관을 만들어보세요</p>
 </div>
-<div class="loginView">
+<div class="loginView" [class.loading]="isLoading()">
+    <!-- 로딩 오버레이 -->
+    <div class="loading-overlay" [class.hidden]="!isLoading()">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">{{ getLoadingTitle() }}</div>
+        <div class="loading-subtext">{{ getLoadingMessage() }}</div>
+        <div class="loading-progress">
+            <div class="loading-progress-bar"></div>
+        </div>
+    </div>
+
     <div class="loginOrSign">
         <div class="selectLogin" 
              (click)="toggle(true)" 
@@ -26,7 +36,7 @@
     @if (clickLogin() == true) {
         <form id="aws-login-form" 
               class="login-form" 
-              [formGroup]="loginForm" 
+              [formGroup]="signInForm" 
               (ngSubmit)="onSubmit($event)"
               novalidate>
             <div class="form-row">
@@ -38,7 +48,7 @@
                            formControlName="email"
                            placeholder="name@company.com"
                            autocomplete="email">
-                    @if (loginForm.get('email')?.invalid && loginForm.get('email')?.touched) {
+                    @if (signInForm.get('email')?.invalid && signInForm.get('email')?.touched) {
                         <small class="text-danger">
                             올바른 이메일 주소를 입력해주세요
                         </small>
@@ -52,7 +62,7 @@
                            formControlName="password"
                            placeholder="비밀번호를 입력하세요"
                            autocomplete="current-password">
-                    @if (loginForm.get('password')?.invalid && loginForm.get('password')?.touched) {
+                    @if (signInForm.get('password')?.invalid && signInForm.get('password')?.touched) {
                         <small class="text-danger">
                             비밀번호를 입력해주세요
                         </small>
@@ -71,9 +81,9 @@
         <button class="btn btn-aws" 
                 type="submit" 
                 form="aws-login-form" 
-                [disabled]="loginForm.invalid"
+                [disabled]="signInForm.invalid || isLoading()"
                 aria-label="AWS로 로그인">
-            로그인
+            {{ isLoading() && loadingType() === 'signin' ? '로그인 중...' : '로그인' }}
         </button>
         
         <div class="btn btn-google" 
@@ -82,7 +92,7 @@
             tabindex="0" 
             role="button"
             aria-label="Google로 로그인">
-            {{ isLoading() ? '로그인 중...' : 'Google로 로그인' }}
+            {{ isLoading() && loadingType() === 'google' ? 'Google 로그인 중...' : 'Google로 로그인' }}
         </div>
     }
 
@@ -90,7 +100,7 @@
     @else if (signUpNextStep() == false) {
         <form id="aws-sign-up-form" 
               class="login-form" 
-              [formGroup]="loginForm" 
+              [formGroup]="signUpForm" 
               (ngSubmit)="onSubmit($event)"
               novalidate>
             <div class="form-row">
@@ -102,7 +112,7 @@
                            formControlName="email"
                            placeholder="name@company.com"
                            autocomplete="email">
-                    @if (loginForm.get('email')?.invalid && loginForm.get('email')?.touched) {
+                    @if (signUpForm.get('email')?.invalid && signUpForm.get('email')?.touched) {
                         <small class="text-danger">
                             올바른 이메일 주소를 입력해주세요
                         </small>
@@ -184,10 +194,10 @@
                         }
                     </div>
                     
-                    @if (loginForm.get('password')?.invalid && loginForm.get('password')?.touched) {
+                    @if (signUpForm.get('password')?.invalid && signUpForm.get('password')?.touched) {
                         <small class="text-danger">
                             {{ passwordStrength() === 'weak' ? 
-                               '비밀번호가 너무 약합니다. 요구사항을 확인해주세요' : 
+                               '비밀번호가 너무 약습니다. 요구사항을 확인해주세요' : 
                                '비밀번호를 입력해주세요' }}
                         </small>
                     }
@@ -201,7 +211,7 @@
                            formControlName="username"
                            placeholder="서비스에서 사용할 별칭을 입력해주세요"
                            autocomplete="username">
-                    @if (loginForm.get('username')?.invalid && loginForm.get('username')?.touched) {
+                    @if (signUpForm.get('username')?.invalid && signUpForm.get('username')?.touched) {
                         <small class="text-danger">
                             별칭을 입력해주세요
                         </small>
@@ -213,9 +223,9 @@
         <button class="btn btn-sign-up-aws" 
                 type="submit" 
                 form="aws-sign-up-form" 
-                [disabled]="loginForm.invalid || passwordStrength() === 'weak'"
+                [disabled]="signUpForm.invalid || passwordStrength() === 'weak' || isLoading()"
                 aria-label="AWS로 회원가입">
-            계정 만들기
+            {{ isLoading() && loadingType() === 'signup' ? '회원가입 중...' : '계정 만들기' }}
         </button>
     }
 
@@ -248,9 +258,9 @@
         <button class="btn btn-sign-up-aws" 
                 type="submit" 
                 form="verification-form" 
-                [disabled]="emailForm.invalid"
+                [disabled]="emailForm.invalid || isLoading()"
                 aria-label="인증 코드 확인">
-            인증 코드 확인
+            {{ isLoading() && loadingType() === 'verification' ? '인증 확인 중...' : '인증 코드 확인' }}
         </button>
     }
 </div>
