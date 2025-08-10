@@ -72,8 +72,7 @@ export class GroupService {
     async questSuccessWithFeedback(
         group: string, 
         user: string, 
-        questList: string[], 
-        feedbackText: string
+        questList: {club: string, quest: string, feedback: string}[],
         ): Promise<boolean> {
         const url = '/api/group/questSuccessWithFeedback';
         const headers = new HttpHeaders({
@@ -83,9 +82,7 @@ export class GroupService {
         const body = JSON.stringify({
             group,
             user,
-            questList,
-            feedback: feedbackText,
-            timestamp: new Date().toISOString()
+            questList
         });
         
         try {
@@ -95,7 +92,7 @@ export class GroupService {
             let cacheGroup: Group | null = await this.dataService.getCache(group);
             if (cacheGroup) {
             questList.forEach((quest) => {
-                const questIndex = cacheGroup.questList.indexOf(quest);
+                const questIndex = cacheGroup.questList.indexOf(quest.quest);
                 if (questIndex !== -1) {
                 cacheGroup.questSuccessNum[questIndex] += 1;
                 }

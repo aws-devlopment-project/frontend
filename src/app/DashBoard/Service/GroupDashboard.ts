@@ -117,25 +117,27 @@ export class GroupDashboardService {
                 questList,
                 hasFeedback: !!feedbackText
             });
-
-            // 1. 기존 questSuccess 호출
-            const questSuccessResult = await this.groupService.questSuccess(groupName, username, questList);
-            
-            // 2. 사용자 퀘스트 기록 업데이트
+            // 1. 사용자 퀘스트 기록 업데이트
             const userQuestResult = await this.userService.setUserQuestRecord(username, groupName, questList);
+            const userQuestCur = await this.userService.getUserQuestCur(username);
+            let questVal: {club: string, quest: string, feedback: string}[] = [];
+            userQuestCur?.curQuestTotalList.forEach((quest) => {
+                questVal.push({
+                    club: quest.club,
+                    quest: quest.quest,
+                    feedback: feedbackText?.trim() || ''
+                });
+            });
 
-            // 3. 피드백이 있는 경우 추가 처리
-            if (feedbackText && feedbackText.trim().length > 0) {
-                await this.processFeedbackWithQuestSuccess(
-                    groupName, 
-                    username, 
-                    questList, 
-                    feedbackText.trim()
-                );
-            }
+            // 2. API 전송
+            await this.processFeedbackWithQuestSuccess(
+                groupName, 
+                username, 
+                questVal
+            );
 
             console.log('Quest success with feedback completed successfully');
-            return questSuccessResult && userQuestResult;
+            return userQuestResult;
 
         } catch (error) {
             console.error('Error in questSuccessWithFeedback:', error);
@@ -147,32 +149,16 @@ export class GroupDashboardService {
     private async processFeedbackWithQuestSuccess(
         groupName: string,
         username: string,
-        questList: string[],
-        feedbackText: string
+        questList: {club: string, quest: string, feedback: string}[],
     ): Promise<void> {
         try {
             // 피드백 데이터를 questSuccess와 함께 전송하는 확장된 API 호출
-            // 실제 구현에서는 GroupService에 새로운 메서드를 추가하거나
-            // 기존 questSuccess 메서드를 확장해야 할 수 있습니다.
-            
-            const feedbackData = {
-                group: groupName,
-                user: username,
-                questList: questList,
-                feedback: feedbackText,
-                timestamp: new Date().toISOString(),
-                metadata: {
-                    source: 'dashboard',
-                    questCount: questList.length
-                }
-            };
-
             // 피드백과 함께 서버에 전송
-            await this.sendQuestSuccessWithFeedback(feedbackData);
+            await this.groupService.questSuccessWithFeedback(groupName, username, questList);
 
             console.log('Feedback integrated with quest success:', {
                 questCount: questList.length,
-                feedbackLength: feedbackText.length,
+                feedbackLength: questList[0].feedback,
                 user: username
             });
 
@@ -181,31 +167,7 @@ export class GroupDashboardService {
             // 피드백 처리 실패해도 퀘스트 완료는 이미 처리되었으므로 에러를 던지지 않음
         }
     }
-
-    // 실제 API 호출 메서드 (GroupService 확장 필요)
-    private async sendQuestSuccessWithFeedback(data: any): Promise<boolean> {
-        try {
-            // 실제 구현에서는 GroupService에 questSuccessWithFeedback 메서드를 추가하거나
-            // 별도의 피드백 전송 API를 호출해야 합니다.
-            
-            // 예시: 확장된 questSuccess API 호출
-            // return await this.groupService.questSuccessWithFeedback(data);
-            
-            // 또는 별도의 피드백 API 호출
-            // await this.groupService.sendQuestFeedback(data);
-            
-            // 현재는 로깅만 수행 (실제 API 구현 필요)
-            console.log('Would send quest success with feedback to server:', data);
-            
-            // 시뮬레이션: 성공으로 처리
-            return true;
-
-        } catch (error) {
-            console.error('Error sending quest success with feedback:', error);
-            return false;
-        }
-    }
-
+    
     // 피드백 데이터 검증
     validateFeedback(feedbackText: string): { isValid: boolean; message?: string } {
         const trimmed = feedbackText.trim();
