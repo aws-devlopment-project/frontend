@@ -22,7 +22,6 @@ import {
     providedIn: 'root',
 })
 export class LoginService {
-    
     async signInUser(username: string, password: string) {
         try {
             const user = await signIn({username, password});
@@ -96,11 +95,6 @@ export class LoginService {
             
             const tokenPayload = JSON.parse(atob(session.tokens.accessToken.toString().split('.')[1]));
             
-            // ID Token도 확인 (Google OAuth의 경우 여기에 정보가 있을 수 있음)
-            if (session.tokens?.idToken) {
-                const idTokenPayload = JSON.parse(atob(session.tokens.idToken.toString().split('.')[1]));
-            }
-            
             // Google OAuth 감지 방법들
             
             // 1. cognito:groups에 Google이 포함된 경우 (가장 확실한 방법)
@@ -117,7 +111,7 @@ export class LoginService {
                 return 'google';
             }
             
-            // 3. ID Token에 identities 필드가 있는 경우
+            // 3. ID Token에 identities 필드가 있는 경우 (가장 신뢰할 수 있는 방법)
             if (session.tokens?.idToken) {
                 const idTokenPayload = JSON.parse(atob(session.tokens.idToken.toString().split('.')[1]));
                 if (idTokenPayload.identities && Array.isArray(idTokenPayload.identities)) {
@@ -146,7 +140,7 @@ export class LoginService {
         }
     }
 
-    // 개선된 사용자 정보 가져오기 - 인증 방식별 분리
+    // 개선된 사용자 정보 가져오기 - email과 name만 사용
     async getCurrentUserInfo(): Promise<any> {
         try {
             const session = await fetchAuthSession();
@@ -181,8 +175,8 @@ export class LoginService {
                     break;
                     
                 case 'google':
-                    // Google OAuth: ID Token에서 정보 추출
-                    console.log('Google OAuth 로그인 - ID Token에서 정보 추출');
+                    // Google OAuth: ID Token에서 email과 name만 추출
+                    console.log('Google OAuth 로그인 - ID Token에서 email, name 추출');
                     if (!session.tokens?.idToken) {
                         throw new Error('ID 토큰을 찾을 수 없습니다.');
                     }
@@ -195,14 +189,12 @@ export class LoginService {
                         username: idTokenPayload.email
                     };
                     
+                    // email과 name만 사용하여 userAttributes 구성
                     userAttributes = {
                         email: idTokenPayload.email,
                         name: idTokenPayload.name,
-                        given_name: idTokenPayload.given_name,
-                        family_name: idTokenPayload.family_name,
-                        picture: idTokenPayload.picture,
-                        // custom:username은 name이나 email에서 추출
-                        'custom:username': idTokenPayload.name || idTokenPayload.email?.split('@')[0]
+                        // username은 Cognito 매핑에 따라 sub가 할당됨
+                        username: idTokenPayload.sub
                     };
                     break;
                     
@@ -220,13 +212,11 @@ export class LoginService {
                             username: idTokenPayload.email
                         };
                         
+                        // email과 name만 사용
                         userAttributes = {
                             email: idTokenPayload.email,
                             name: idTokenPayload.name,
-                            given_name: idTokenPayload.given_name,
-                            family_name: idTokenPayload.family_name,
-                            picture: idTokenPayload.picture,
-                            'custom:username': idTokenPayload.name || idTokenPayload.email?.split('@')[0]
+                            username: idTokenPayload.sub
                         };
                     } else {
                         // ID Token도 없으면 Cognito 직접 로그인으로 시도

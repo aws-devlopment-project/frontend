@@ -127,123 +127,6 @@ export class LoginComponent implements OnInit {
         }
     }
 
-    private async handleAuthCallback(): Promise<void> {
-        try {
-            const isAuthenticated = await this.auth.checkAuthState();
-            
-            if (isAuthenticated) {
-                const userInfo = await this.auth.getCurrentUserInfo();
-                
-                // userInfo에서 userAttributes 사용
-                const displayName = userInfo.userAttributes?.['custom:username'] || 
-                                  userInfo.userAttributes?.name || 
-                                  userInfo.userAttributes?.email || 
-                                  'User';
-
-                const user: UserCredentials = {
-                    id: userInfo.user.userId,
-                    name: displayName,
-                    accessToken: userInfo.accessToken,
-                };
-
-                const userStatus: UserStatus = {
-                    id: userInfo.user.userId,
-                    name: displayName,
-                    status: 'online',
-                    joinDate: new Date(),
-                    lastSeen: new Date()
-                };
-
-                this.cacheService.setCache('user', user);
-                this.cacheService.setCache('userStatus', userStatus);
-                
-                await this.router.navigate(['/board']);
-            }
-        } catch (error) {
-            console.error('인증 상태 확인 오류:', error);
-        }
-    }
-
-    toggle(flag: boolean): void {
-        this.clickLogin.update(() => flag);
-        this.successLogin.update(() => true);
-        this.signUpNextStep.update(() => false);
-    }
-
-    async onSubmit(event: Event): Promise<void> {
-        event.preventDefault();
-        
-        const formElement = event.target as HTMLFormElement;
-        const formId = formElement.id;
-
-        this.isLoading.update(() => true);
-        
-        try {
-            switch (formId) {
-                case "aws-login-form":
-                    await this.handleLogin();
-                    break;
-                case "aws-sign-up-form":
-                    await this.handleSignUp();
-                    break;
-                case "verification-form":
-                    await this.handleVerification();
-                    break;
-                default:
-                    console.warn('Unknown form submitted:', formId);
-            }
-        } catch (error) {
-            console.error('Form submission error:', error);
-            this.handleError(error);
-        } finally {
-            this.isLoading.update(() => false);
-        }
-    }
-
-    private async handleLogin(): Promise<void> {
-        if (!this.signInForm.valid) {
-            this.markFormGroupTouched(this.signInForm);
-            return;
-        }
-
-        const { email, password } = this.signInForm.value;
-
-        try {
-            const res = {
-                status: 200,
-                id: "admin@nameless.com",
-                username: "admin",
-                accessToken: "adminToken"
-            }
-            // const res = await this.auth.signInUser(email, password);
-
-            if (res.status === 200) {
-                const user: UserCredentials = {
-                    id: email,
-                    name: res.username,
-                    accessToken: res.accessToken,
-                };
-                const userStatus: UserStatus = {
-                    id: email,
-                    name: res.username,
-                    status: 'online',
-                    joinDate: new Date(),
-                    lastSeen: new Date()
-                }
-                this.cacheService.setCache('user', user);
-                this.cacheService.setCache('userStatus', userStatus);
-                await this.router.navigate(['/board']);
-            } else {
-                this.errMsg = '로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.';
-                this.successLogin.update(() => false);
-            }
-        } catch (error: any) {
-            this.errMsg = error.message || '로그인 중 오류가 발생했습니다.';
-            this.successLogin.update(() => false);
-            throw error;
-        }
-    }
-
     private async handleSignUp(): Promise<void> {
         if (!this.signUpForm.valid) {
             this.markFormGroupTouched(this.signUpForm);
@@ -343,6 +226,138 @@ export class LoginComponent implements OnInit {
         if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
             callback();
+        }
+    }
+
+    private async handleAuthCallback(): Promise<void> {
+        try {
+            const isAuthenticated = await this.auth.checkAuthState();
+            
+            if (isAuthenticated) {
+                const userInfo = await this.auth.getCurrentUserInfo();
+                
+                // Google OAuth인 경우 email과 name을 사용하여 displayName 생성
+                let displayName: string;
+                let userId: string;
+                
+                if (userInfo.authProvider === 'google') {
+                    // Google OAuth: name을 우선 사용, 없으면 email의 @ 앞부분 사용
+                    displayName = userInfo.userAttributes?.name || 
+                                userInfo.userAttributes?.email?.split('@')[0] || 
+                                'User';
+                    // Google OAuth: email을 userId로 사용
+                    userId = userInfo.userAttributes?.email || userInfo.user.userId;
+                } else {
+                    // Cognito 직접 로그인: custom:username -> name -> email 순으로 사용
+                    displayName = userInfo.userAttributes?.['custom:username'] || 
+                                userInfo.userAttributes?.name || 
+                                userInfo.userAttributes?.email || 
+                                'User';
+                    // Cognito 직접 로그인: email을 userId로 사용 (있으면), 없으면 기본 userId
+                    userId = userInfo.userAttributes?.email || userInfo.user.userId;
+                }
+
+                const user: UserCredentials = {
+                    id: userId,
+                    name: displayName,
+                    accessToken: userInfo.accessToken,
+                };
+
+                const userStatus: UserStatus = {
+                    id: userId,
+                    name: displayName,
+                    status: 'online',
+                    joinDate: new Date(),
+                    lastSeen: new Date()
+                };
+
+                this.cacheService.setCache('user', user);
+                this.cacheService.setCache('userStatus', userStatus);
+                
+                await this.router.navigate(['/board']);
+            }
+        } catch (error) {
+            console.error('인증 상태 확인 오류:', error);
+        }
+    }
+
+    toggle(flag: boolean): void {
+        this.clickLogin.update(() => flag);
+        this.successLogin.update(() => true);
+        this.signUpNextStep.update(() => false);
+    }
+
+    async onSubmit(event: Event): Promise<void> {
+        event.preventDefault();
+        
+        const formElement = event.target as HTMLFormElement;
+        const formId = formElement.id;
+
+        this.isLoading.update(() => true);
+        
+        try {
+            switch (formId) {
+                case "aws-login-form":
+                    await this.handleLogin();
+                    break;
+                case "aws-sign-up-form":
+                    await this.handleSignUp();
+                    break;
+                case "verification-form":
+                    await this.handleVerification();
+                    break;
+                default:
+                    console.warn('Unknown form submitted:', formId);
+            }
+        } catch (error) {
+            console.error('Form submission error:', error);
+            this.handleError(error);
+        } finally {
+            this.isLoading.update(() => false);
+        }
+    }
+
+    private async handleLogin(): Promise<void> {
+        if (!this.signInForm.valid) {
+            this.markFormGroupTouched(this.signInForm);
+            return;
+        }
+
+        const { email, password } = this.signInForm.value;
+
+        try {
+            const res = {
+                status: 200,
+                id: "admin@nameless.com",
+                username: "admin",
+                accessToken: "adminToken"
+            }
+            // const res = await this.auth.signInUser(email, password);
+
+            if (res.status === 200) {
+                const user: UserCredentials = {
+                    id: email,
+                    name: res.username,
+                    accessToken: res.accessToken,
+                };
+                const userStatus: UserStatus = {
+                    id: email,
+                    name: res.username,
+                    status: 'online',
+                    joinDate: new Date(),
+                    lastSeen: new Date()
+                }
+                this.cacheService.setCache('user', user);
+                this.cacheService.setCache('userStatus', userStatus);
+                await this.router.navigate(['/board']);
+            } else {
+                this.errMsg = '로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.';
+                this.successLogin.update(() => false);
+            }
+        } catch (error: any) {
+            this.errMsg = error.message || '로그인 중 오류가 발생했습니다.';
+            this.successLogin.update(() => false);
+            throw error;
         }
     }
 }
