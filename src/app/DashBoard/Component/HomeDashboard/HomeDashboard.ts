@@ -374,11 +374,11 @@ export class HomeDashboardComponent implements OnInit {
     this.sharedState.setActiveTab('group');
   }
 
-  // 날짜 클릭 이벤트 핸들러 (모달 표시)
+  // 날짜 클릭 이벤트 핸들러 (모달 표시, 완료 기능 제거)
   onDayClick(event: { date: string; quests: DailyQuest[] }): void {
     console.log('Day clicked:', event);
     
-    // 퀘스트 상세 모달 열기
+    // 퀘스트 상세 모달 열기 (완료 기능 제거)
     const dialogRef = this.dialog.open(QuestDetailModalComponent, {
       width: '600px',
       maxHeight: '80vh',
@@ -387,66 +387,15 @@ export class HomeDashboardComponent implements OnInit {
         quests: event.quests,
         onQuestClick: (quest: DailyQuest) => {
           this.onQuestClick({ quest, date: event.date });
-        },
-        onMarkCompleted: (quest: DailyQuest) => {
-          this.onMarkQuestCompleted(quest, event.date);
         }
       }
     });
   }
 
-  // 퀘스트 완료 표시
-  private onMarkQuestCompleted(quest: DailyQuest, date: string): void {
-    console.log('Marking quest as completed:', quest);
-    
-    // 로컬 데이터 업데이트
-    this.questCalendarData.update(data => {
-      return data.map(dayData => {
-        if (dayData.date === date) {
-          return {
-            ...dayData,
-            quests: dayData.quests.map(q => 
-              q.id === quest.id ? { ...q, isCompleted: true } : q
-            )
-          };
-        }
-        return dayData;
-      });
-    });
+  // 퀘스트 완료 표시 메서드 제거 (그룹 대시보드에서 처리)
+  // private onMarkQuestCompleted 메서드 삭제
 
-    // 활동 추적
-    this.localActivityService.trackActivity(
-      'quest_complete',
-      `${quest.title} 퀘스트 완료`,
-      `${quest.groupName} 그룹의 "${quest.title}" 퀘스트를 완료했습니다!`,
-      {
-        questName: quest.title,
-        groupName: quest.groupName,
-        date: date
-      }
-    );
-
-    // 실제 API 호출도 여기서 수행
-    this.updateQuestCompletionOnServer(quest, date);
-  }
-
-  private async updateQuestCompletionOnServer(quest: DailyQuest, date: string): Promise<void> {
-    try {
-      const userCreds = await this.userService.getUserCredentials();
-      if (!userCreds) return;
-
-      // 실제 퀘스트 완료 API 호출
-      await this.userService.setUserQuestRecord(
-        userCreds.id, 
-        quest.groupName, 
-        [quest.title]
-      );
-      
-      console.log('Quest completion updated on server');
-    } catch (error) {
-      console.error('Error updating quest completion:', error);
-    }
-  }
+  // private updateQuestCompletionOnServer 메서드 삭제
 
   // 기존 메서드들...
   private async loadActivitySummary(): Promise<void> {

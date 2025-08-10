@@ -36,8 +36,10 @@
             [class.today]="day.isToday"
             [class.other-month]="!day.isCurrentMonth"
             [class.has-quests]="day.totalCount > 0"
+            [class.past-day]="day.isPast"
+            [class.future-day]="day.isFuture"
+            [class.clickable]="isDayClickable(day)"
             [class]="getCompletionColorClass(day.completionRate)"
-            [matTooltip]="getDayTooltip(day)"
             (click)="onDayClick(day)">
             
             <!-- 날짜 숫자 -->
@@ -59,7 +61,9 @@
                   <div class="quest-item" 
                        [class.completed]="quest.isCompleted"
                        [class.priority]="quest.priority"
-                       (click)="onQuestClick($event, quest, day.date)">
+                       [class.clickable]="isQuestClickable(day)"
+                       [class.disabled]="!isQuestClickable(day)"
+                       (click)="onQuestClick($event, quest, day.date, day)">
                     <span class="priority-icon">{{ getPriorityIcon(quest.priority) }}</span>
                     <span class="quest-title">{{ quest.title }}</span>
                     @if (quest.isCompleted) {
@@ -70,7 +74,9 @@
                 
                 <!-- 숨겨진 퀘스트 개수 표시 -->
                 @if (getHiddenQuestCount(day.quests) > 0) {
-                  <div class="more-quests">
+                  <div class="more-quests" 
+                       [class.clickable]="isDayClickable(day)"
+                       [class.disabled]="!isDayClickable(day)">
                     +{{ getHiddenQuestCount(day.quests) }}개 더
                   </div>
                 }
@@ -80,7 +86,22 @@
             <!-- 퀘스트가 없는 날 -->
             @if (day.totalCount === 0 && day.isCurrentMonth) {
               <div class="no-quests">
-                <span class="empty-indicator">휴식일</span>
+                <span class="empty-indicator">
+                  @if (day.isPast) {
+                    휴식일
+                  } @else if (day.isToday) {
+                    오늘
+                  } @else {
+                    예정
+                  }
+                </span>
+              </div>
+            }
+
+            <!-- 과거 날짜 오버레이 -->
+            @if (day.isPast && day.totalCount > 0) {
+              <div class="past-overlay">
+                <mat-icon>history</mat-icon>
               </div>
             }
           </div>

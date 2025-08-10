@@ -443,81 +443,187 @@
   }
 }
 
-/* 애니메이션 */
-.quest-item {
-  animation: slideIn 0.3s ease-out;
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.calendar-day.has-quests:hover .quest-item {
-  transform: translateY(-1px);
-}
-
-/* 오늘 날짜 특별 효과 */
-.calendar-day.today {
+/* 과거 날짜 스타일링 */
+.calendar-day.past-day {
+  opacity: 0.6;
   position: relative;
-  overflow: hidden;
 }
 
-.calendar-day.today::before {
+.calendar-day.past-day .quest-item.disabled,
+.calendar-day.past-day .more-quests.disabled {
+  cursor: default;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.calendar-day.past-day:not(.clickable) {
+  cursor: default;
+}
+
+/* 클릭 가능한 날짜와 불가능한 날짜 구분 */
+.calendar-day.clickable {
+  cursor: pointer;
+}
+
+.calendar-day:not(.clickable) {
+  cursor: default;
+}
+
+.calendar-day.clickable:hover {
+  background: #f7fafc;
+}
+
+.calendar-day.past-day:hover {
+  background: transparent; /* 과거 날짜는 호버 효과 제거 */
+}
+
+/* 과거 날짜 오버레이 */
+.past-overlay {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  color: #a0aec0;
+  font-size: 12px;
+  z-index: 1;
+}
+
+.past-overlay mat-icon {
+  font-size: 14px !important;
+  width: 14px;
+  height: 14px;
+}
+
+/* 퀘스트 아이템 클릭 가능 상태 */
+.quest-item.clickable {
+  cursor: pointer;
+}
+
+.quest-item.disabled {
+  cursor: default;
+  pointer-events: none;
+}
+
+.quest-item.clickable:hover {
+  background: white;
+  border-color: #3182ce;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(49, 130, 206, 0.15);
+}
+
+.quest-item.disabled:hover {
+  transform: none;
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.9);
+  border-color: transparent;
+}
+
+/* more-quests 클릭 상태 */
+.more-quests.clickable {
+  cursor: pointer;
+}
+
+.more-quests.disabled {
+  cursor: default;
+  pointer-events: none;
+}
+
+.more-quests.clickable:hover {
+  background: rgba(113, 128, 150, 0.2);
+}
+
+.more-quests.disabled:hover {
+  background: rgba(113, 128, 150, 0.1);
+}
+
+/* 미래 날짜 스타일링 */
+.calendar-day.future-day {
+  position: relative;
+}
+
+.calendar-day.future-day::after {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.1) 50%, transparent 70%);
-  animation: shimmer 3s infinite;
+  background: linear-gradient(135deg, rgba(66, 153, 225, 0.02), rgba(49, 130, 206, 0.01));
+  pointer-events: none;
+  border-radius: inherit;
 }
 
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
-/* 호버 효과 개선 */
-.calendar-day.has-quests {
-  cursor: pointer;
-}
-
-.calendar-day.has-quests:hover {
-  box-shadow: 0 4px 12px rgba(49, 130, 206, 0.15);
-  transform: translateY(-2px);
-}
-
-/* 완료 상태별 특별 효과 */
-.calendar-day.completion-perfect {
+/* 오늘 날짜 강조 */
+.calendar-day.today {
+  background: linear-gradient(135deg, #4ecdc4, #3cb8b3);
+  color: white;
   position: relative;
 }
 
-.calendar-day.completion-perfect::after {
-  content: '✨';
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  font-size: 12px;
-  opacity: 0.7;
+.calendar-day.today .day-number {
+  color: white;
+  font-weight: 700;
 }
 
-/* 퀘스트 우선순위별 글로우 효과 */
-.quest-item.priority.high {
-  box-shadow: 0 0 8px rgba(229, 62, 62, 0.1);
+.calendar-day.today .quest-item,
+.calendar-day.today .more-quests {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
-.quest-item.priority.medium {
-  box-shadow: 0 0 8px rgba(246, 173, 85, 0.1);
+.calendar-day.today .quest-title,
+.calendar-day.today .completion-indicator {
+  color: #2d3748;
 }
 
-.quest-item.priority.low {
-  box-shadow: 0 0 8px rgba(66, 153, 225, 0.1);
+.calendar-day.today .empty-indicator {
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 600;
+}
+
+/* 빈 상태 표시 개선 */
+.empty-indicator {
+  color: #a0aec0;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.calendar-day.past-day .empty-indicator {
+  color: #cbd5e0;
+}
+
+.calendar-day.future-day .empty-indicator {
+  color: #90cdf4;
+  font-weight: 600;
+}
+
+/* 완료율에 따른 과거 날짜 색상 조정 */
+.calendar-day.past-day.completion-none {
+  border-left: 3px solid #e2e8f0;
+  background: rgba(226, 232, 240, 0.3);
+}
+
+.calendar-day.past-day.completion-low {
+  border-left: 3px solid #f6ad55;
+  background: rgba(246, 173, 85, 0.1);
+}
+
+.calendar-day.past-day.completion-medium {
+  border-left: 3px solid #4299e1;
+  background: rgba(66, 153, 225, 0.1);
+}
+
+.calendar-day.past-day.completion-high {
+  border-left: 3px solid #48bb78;
+  background: rgba(72, 187, 120, 0.1);
+}
+
+.calendar-day.past-day.completion-perfect {
+  border-left: 3px solid #38a169;
+  background: rgba(56, 161, 105, 0.15);
+}
+
+/* 호버 효과 제거를 위한 추가 스타일 */
+.calendar-day.past-day.has-quests:hover {
+  box-shadow: none;
+  transform: none;
 }

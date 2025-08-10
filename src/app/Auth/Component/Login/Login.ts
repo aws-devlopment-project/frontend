@@ -430,13 +430,13 @@ export class LoginComponent implements OnInit {
         const { email, password } = this.signInForm.value;
 
         try {
-            const res = {
-                status: 200,
-                id: "admin@nameless.com",
-                username: "admin",
-                idToken: "adminToken"
-            }
-            // const res = await this.auth.signInUser(email, password);
+            // const res = {
+            //     status: 200,
+            //     id: "admin@nameless.com",
+            //     username: "admin",
+            //     idToken: "adminToken"
+            // }
+            const res = await this.auth.signInUser(email, password);
 
             if (res.status === 200) {
                 const user: UserCredentials = {

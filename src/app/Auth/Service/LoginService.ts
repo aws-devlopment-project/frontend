@@ -1,4 +1,5 @@
 import { Injectable } from "@angular/core";
+import { updatePassword, UpdatePasswordInput } from "@aws-amplify/auth";
 
 import { 
   fetchAuthSession, 
@@ -45,7 +46,7 @@ export class LoginService {
                     idToken: session.tokens.idToken.toString()
                 };
             } else {
-                return {status: 400, username: '', accessToken: ''};
+                return {status: 400, username: '', idToken: ''};
             }
         } catch (error: any) {
             
@@ -514,6 +515,39 @@ export class LoginService {
         } catch (error) {
             console.error('OAuth 리다이렉트 처리 오류:', error);
             return false;
+        }
+    }
+
+    async updatePassword(oldPassword: string, newPassword: string): Promise<void> {
+        try {
+            // 새 비밀번호 유효성 검증
+            if (!this.validatePassword(newPassword)) {
+                throw new Error('비밀번호는 8자 이상이어야 하며, 대소문자, 숫자, 특수문자를 포함해야 합니다.');
+            }
+
+            const updatePasswordInput: UpdatePasswordInput = {
+                oldPassword: oldPassword,
+                newPassword: newPassword
+            };
+
+            await updatePassword(updatePasswordInput);
+            console.log('비밀번호가 성공적으로 변경되었습니다.');
+            
+        } catch (error: any) {
+            console.error('비밀번호 변경 실패:', error);
+            
+            // Amplify 에러 타입별 처리
+            if (error.name === 'NotAuthorizedException') {
+                throw new Error('현재 비밀번호가 올바르지 않습니다.');
+            } else if (error.name === 'InvalidPasswordException') {
+                throw new Error('새 비밀번호가 정책에 맞지 않습니다.');
+            } else if (error.name === 'LimitExceededException') {
+                throw new Error('비밀번호 변경 시도 횟수가 초과되었습니다. 잠시 후 다시 시도해주세요.');
+            } else if (error.name === 'UserNotFoundException') {
+                throw new Error('사용자를 찾을 수 없습니다.');
+            }
+            
+            throw new Error(error.message || '비밀번호 변경 중 오류가 발생했습니다.');
         }
     }
 }

@@ -1,3 +1,4 @@
+
 import { Component } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { MatIconModule } from "@angular/material/icon";
@@ -13,7 +14,6 @@ interface DailyQuest {
   dueTime?: string;
 }
 
-// 퀘스트 상세 모달 컴포넌트
 @Component({
   selector: 'app-quest-detail-modal',
   templateUrl: './QuestDetailModal.html',
@@ -28,7 +28,6 @@ export class QuestDetailModalComponent {
       date: string; 
       quests: DailyQuest[]; 
       onQuestClick: (quest: DailyQuest) => void; 
-      onMarkCompleted: (quest: DailyQuest) => void 
     }
   ) {}
 
@@ -39,10 +38,6 @@ export class QuestDetailModalComponent {
   onQuestClick(quest: DailyQuest): void {
     this.data.onQuestClick(quest);
     this.closeModal();
-  }
-
-  markAsCompleted(quest: DailyQuest): void {
-    this.data.onMarkCompleted(quest);
   }
 
   getPriorityIcon(priority: string): string {

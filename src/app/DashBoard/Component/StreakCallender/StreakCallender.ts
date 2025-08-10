@@ -1,9 +1,9 @@
-// StreakCalendar.ts - 퀘스트 중심 개선 버전
-import { Component, Input, Output, EventEmitter, computed, signal } from '@angular/core';
+// StreakCalendar.ts - 개선된 버전 (과거 날짜 비활성화, 툴팁 제거)
+import { Component, Input, Output, EventEmitter, computed, signal, Inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatDialogModule, MatDialog } from '@angular/material/dialog';
+import { MatDialogModule, MatDialog, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 
 interface DailyQuest {
   id: string;
@@ -19,6 +19,8 @@ interface CalendarDay {
   dayOfMonth: number;
   isToday: boolean;
   isCurrentMonth: boolean;
+  isFuture: boolean; // 오늘 이후 날짜
+  isPast: boolean;   // 오늘 이전 날짜
   quests: DailyQuest[];
   completedCount: number;
   totalCount: number;
@@ -33,7 +35,7 @@ interface CalendarWeek {
   selector: 'app-streak-calendar',
   templateUrl: './StreakCallender.html',
   styleUrl: './StreakCallender.css',
-  imports: [CommonModule, MatIconModule, MatTooltipModule, MatDialogModule],
+  imports: [CommonModule, MatIconModule, MatDialogModule],
   standalone: true
 })
 export class StreakCalendarComponent {
@@ -71,6 +73,8 @@ export class StreakCalendarComponent {
     
     const weeks: CalendarWeek[] = [];
     const today = new Date();
+    // 오늘 날짜의 시간을 00:00:00으로 설정해서 정확한 비교
+    today.setHours(0, 0, 0, 0);
     
     for (let weekStart = new Date(startDate); weekStart <= endDate; weekStart.setDate(weekStart.getDate() + 7)) {
       const days: CalendarDay[] = [];
@@ -78,6 +82,7 @@ export class StreakCalendarComponent {
       for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
         const currentDay = new Date(weekStart);
         currentDay.setDate(currentDay.getDate() + dayOffset);
+        currentDay.setHours(0, 0, 0, 0);
         
         const dateStr = this.formatDate(currentDay);
         const dayQuests = this.getQuestsForDate(dateStr);
@@ -85,11 +90,17 @@ export class StreakCalendarComponent {
         const totalCount = dayQuests.length;
         const completionRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
         
+        const isToday = currentDay.getTime() === today.getTime();
+        const isFuture = currentDay.getTime() > today.getTime();
+        const isPast = currentDay.getTime() < today.getTime();
+        
         days.push({
           date: dateStr,
           dayOfMonth: currentDay.getDate(),
-          isToday: this.isSameDay(currentDay, today),
+          isToday,
           isCurrentMonth: currentDay.getMonth() === month,
+          isFuture,
+          isPast,
           quests: dayQuests,
           completedCount,
           totalCount,
@@ -133,26 +144,32 @@ export class StreakCalendarComponent {
     return current.getMonth() < today.getMonth() || current.getFullYear() < today.getFullYear();
   }
 
-  getDayTooltip(day: CalendarDay): string {
-    if (day.totalCount === 0) {
-      return `${day.date}: 퀘스트 없음`;
-    }
-    
-    const statusText = day.completedCount === day.totalCount ? '모든 퀘스트 완료!' : 
-                      day.completedCount > 0 ? `${day.completedCount}/${day.totalCount} 완료` :
-                      '미완료 퀘스트 있음';
-    
-    return `${day.date}: ${statusText}`;
+  // 클릭 가능 여부 확인
+  isDayClickable(day: CalendarDay): boolean {
+    // 오늘이거나 미래 날짜이고, 퀘스트가 있는 경우만 클릭 가능
+    return (day.isToday || day.isFuture) && day.totalCount > 0;
+  }
+
+  isQuestClickable(day: CalendarDay): boolean {
+    // 오늘이거나 미래 날짜인 경우만 퀘스트 클릭 가능
+    return day.isToday || day.isFuture;
   }
 
   onDayClick(day: CalendarDay): void {
-    if (day.totalCount > 0) {
-      this.dayClick.emit({ date: day.date, quests: day.quests });
+    if (!this.isDayClickable(day)) {
+      return; // 클릭 불가능한 날짜는 무시
     }
+    
+    this.dayClick.emit({ date: day.date, quests: day.quests });
   }
 
-  onQuestClick(event: Event, quest: DailyQuest, date: string): void {
+  onQuestClick(event: Event, quest: DailyQuest, date: string, day: CalendarDay): void {
     event.stopPropagation(); // 날짜 클릭 이벤트와 구분
+    
+    if (!this.isQuestClickable(day)) {
+      return; // 클릭 불가능한 날짜의 퀘스트는 무시
+    }
+    
     this.questClick.emit({ quest, date });
   }
 
