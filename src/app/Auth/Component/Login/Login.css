@@ -501,3 +501,158 @@ small {
 .loginView * {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
+
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.95);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    border-radius: 12px;
+    backdrop-filter: blur(2px);
+    animation: fadeIn 0.3s ease-out;
+}
+
+.loading-overlay.hidden {
+    display: none;
+}
+
+/* 로딩 스피너 */
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #e8e8e8;
+    border-top: 4px solid #1264a3;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 16px;
+}
+
+/* 로딩 텍스트 */
+.loading-text {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1d1c1d;
+    margin-bottom: 8px;
+}
+
+.loading-subtext {
+    font-size: 14px;
+    color: #616061;
+    text-align: center;
+    max-width: 250px;
+    line-height: 1.4;
+}
+
+/* 스피너 애니메이션 */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 페이드인 애니메이션 */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* 로딩 중일 때 loginView 스타일 */
+.loginView.loading {
+    position: relative;
+    pointer-events: none; /* 모든 클릭 이벤트 비활성화 */
+}
+
+.loginView.loading form,
+.loginView.loading .btn,
+.loginView.loading .loginOrSign {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* 로딩 상태별 메시지 */
+.loading-message-signin {
+    color: #007a5a;
+}
+
+.loading-message-signup {
+    color: #1264a3;
+}
+
+.loading-message-verification {
+    color: #f2c744;
+}
+
+.loading-message-google {
+    color: #4285f4;
+}
+
+/* 진행 표시기 (선택사항) */
+.loading-progress {
+    width: 200px;
+    height: 4px;
+    background-color: #e8e8e8;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 16px;
+}
+
+.loading-progress-bar {
+    height: 100%;
+    background-color: #1264a3;
+    border-radius: 2px;
+    animation: progress 2s ease-in-out infinite;
+}
+
+@keyframes progress {
+    0% {
+        width: 0%;
+        margin-left: 0%;
+    }
+    50% {
+        width: 75%;
+        margin-left: 0%;
+    }
+    100% {
+        width: 0%;
+        margin-left: 100%;
+    }
+}
+
+/* 반응형 디자인 */
+@media (max-width: 480px) {
+    .loading-overlay {
+        padding: 20px;
+    }
+    
+    .loading-spinner {
+        width: 36px;
+        height: 36px;
+        border-width: 3px;
+    }
+    
+    .loading-text {
+        font-size: 15px;
+    }
+    
+    .loading-subtext {
+        font-size: 13px;
+        max-width: 200px;
+    }
+    
+    .loading-progress {
+        width: 150px;
+        height: 3px;
+    }
+}

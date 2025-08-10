@@ -89,19 +89,6 @@ export class GroupDashboardService {
         // 챌린지 처리 로직 (필요시 구현)
     }
 
-    // 기존 questClear 메서드 (호환성 유지)
-    questClear(username: string, groupname: string | null, clearQuests: Quest[]) {
-        let questList: string[] = [];
-        clearQuests.forEach((quest) => {
-            if (quest.status === 'completed')
-                questList.push(quest.title);
-        });
-        if (groupname) {
-            this.groupService.questSuccess(groupname, username, questList);
-            this.userService.setUserQuestRecord(username, groupname, questList);
-        }
-    }
-
     // 새로 추가된 메서드: 피드백과 함께 퀘스트 완료 처리
     async questSuccessWithFeedback(
         groupName: string, 
