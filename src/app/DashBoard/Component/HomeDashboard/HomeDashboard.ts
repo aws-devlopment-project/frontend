@@ -1,11 +1,25 @@
+// HomeDashboard.ts - 퀘스트 캘린더 통합 버전
 import { Component, signal, OnInit, computed, inject } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { MatIconModule } from "@angular/material/icon";
+import { MatDialog } from "@angular/material/dialog";
 import { SharedStateService } from "../../../Core/Service/SharedService";
 import { HomeDashboardService } from "../../Service/HomeDashboard";
 import { LocalActivityService } from "../../Service/LocalActivityService";
 import { StreakCalendarComponent } from "../StreakCallender/StreakCallender";
+import { QuestDetailModalComponent } from "../QuestDetailModal/QuestDetailModal";
 import { Router } from "@angular/router";
+import { UserService } from "../../../Core/Service/UserService";
+
+// 퀘스트 인터페이스 정의
+interface DailyQuest {
+  id: string;
+  title: string;
+  groupName: string;
+  isCompleted: boolean;
+  priority: 'high' | 'medium' | 'low';
+  dueTime?: string;
+}
 
 interface QuickStat {
   id: string;
@@ -66,6 +80,8 @@ interface ActivitySummary {
 export class HomeDashboardComponent implements OnInit {
   // 서비스 주입
   private localActivityService = inject(LocalActivityService);
+  private userService = inject(UserService);
+  private dialog = inject(MatDialog);
 
   // 현재 시간
   currentTime = signal(new Date());
@@ -89,7 +105,7 @@ export class HomeDashboardComponent implements OnInit {
     weeklyProgress: 0
   });
 
-  // 빠른 통계 - LocalActivityService 데이터 활용
+  // 빠른 통계
   quickStats = signal<QuickStat[]>([]);
 
   // 빠른 액션
@@ -128,12 +144,12 @@ export class HomeDashboardComponent implements OnInit {
     }
   ]);
 
-  // 스트릭 캘린더 데이터
-  heatmapData = computed(() => this.localActivityService.getHeatmapData());
+  // 퀘스트 캘린더 데이터
+  questCalendarData = signal<{ date: string; quests: DailyQuest[] }[]>([]);
   currentStreak = computed(() => this.localActivityService.getCurrentStreak());
   longestStreak = computed(() => this.localActivityService.getLongestStreak());
 
-  // 오늘의 하이라이트 - LocalActivityService의 실제 활동 기반
+  // 오늘의 하이라이트
   highlights = computed<HighlightItem[]>(() => {
     const activities = this.localActivityService.activities();
     const recentActivities = activities.slice(0, 5);
@@ -141,7 +157,6 @@ export class HomeDashboardComponent implements OnInit {
 
     const highlights: HighlightItem[] = [];
 
-    // 연속 기록 달성
     if (activityStats.streakCount >= 7) {
       highlights.push({
         id: 'streak',
@@ -153,7 +168,6 @@ export class HomeDashboardComponent implements OnInit {
       });
     }
 
-    // 최근 퀘스트 완료 활동
     const recentQuests = recentActivities.filter(a => a.type === 'quest_complete');
     if (recentQuests.length > 0) {
       const latestQuest = recentQuests[0];
@@ -167,7 +181,6 @@ export class HomeDashboardComponent implements OnInit {
       });
     }
 
-    // 그룹/클럽 참여 활동
     const socialActivities = recentActivities.filter(a => 
       a.type === 'group_join' || a.type === 'club_join'
     );
@@ -183,7 +196,6 @@ export class HomeDashboardComponent implements OnInit {
       });
     }
 
-    // 활동이 없을 경우 격려 메시지
     if (highlights.length === 0) {
       highlights.push({
         id: 'encouragement',
@@ -214,17 +226,16 @@ export class HomeDashboardComponent implements OnInit {
     this.isLoading.set(true);
     
     try {
-      // 실시간 시간 업데이트
       setInterval(() => {
         this.currentTime.set(new Date());
       }, 60000);
 
-      // 병렬로 데이터 로드
       await Promise.all([
         this.loadActivitySummary(),
         this.loadQuickStats(),
         this.loadRecommendedChallenges(),
-        this.loadPersonalInsights()
+        this.loadPersonalInsights(),
+        this.loadQuestCalendarData()
       ]);
 
     } catch (error) {
@@ -234,13 +245,165 @@ export class HomeDashboardComponent implements OnInit {
     }
   }
 
+  // 퀘스트 캘린더 데이터 로드
+  private async loadQuestCalendarData(): Promise<void> {
+    try {
+      const userCreds = await this.userService.getUserCredentials();
+      if (!userCreds) return;
+
+      // 현재 사용자의 퀘스트 데이터 가져오기
+      const [questCur, userJoin] = await Promise.all([
+        this.userService.getUserQuestCur(userCreds.id),
+        this.userService.getUserJoin(userCreds.id)
+      ]);
+
+      if (!questCur || !userJoin) return;
+
+      // 지난 90일간의 데이터 생성
+      const questData: { date: string; quests: DailyQuest[] }[] = [];
+      const today = new Date();
+
+      for (let i = 89; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateStr = this.formatDate(date);
+
+        const dayQuests = this.generateQuestsForDate(dateStr, questCur, userJoin);
+        questData.push({
+          date: dateStr,
+          quests: dayQuests
+        });
+      }
+
+      this.questCalendarData.set(questData);
+    } catch (error) {
+      console.error('Error loading quest calendar data:', error);
+    }
+  }
+
+  // 특정 날짜의 퀘스트 생성 (실제 데이터 기반)
+  private generateQuestsForDate(date: string, questCur: any, userJoin: any): DailyQuest[] {
+    const quests: DailyQuest[] = [];
+    const dateObj = new Date(date);
+    const today = new Date();
+    
+    // 오늘 이후의 날짜는 퀘스트 없음
+    if (dateObj > today) return [];
+
+    // 현재 진행중인 퀘스트들을 기반으로 생성
+    if (questCur.curQuestTotalList) {
+      questCur.curQuestTotalList.forEach((quest: any, index: number) => {
+        // 모든 날짜에 모든 퀘스트를 표시하지 않고, 랜덤하게 일부만 표시
+        const shouldInclude = Math.random() < 0.7; // 70% 확률로 포함
+        
+        if (shouldInclude) {
+          const isCompleted = quest.isSuccess || Math.random() < 0.3; // 실제 완료 상태 또는 30% 확률로 완료
+          
+          quests.push({
+            id: `quest-${date}-${index}`,
+            title: quest.quest,
+            groupName: quest.group,
+            isCompleted: isCompleted,
+            priority: this.getQuestPriority(quest.quest),
+            dueTime: this.generateDueTime()
+          });
+        }
+      });
+    }
+
+    // 추가로 더미 퀘스트 생성 (데이터가 부족한 경우)
+    if (quests.length === 0 && Math.random() < 0.5) {
+      const dummyQuests = [
+        '아침 운동하기', '독서 30분', '물 8잔 마시기', '일기 쓰기', '명상 10분',
+        '새로운 기술 학습', '친구와 연락하기', '건강한 식사', '스트레칭', '목표 점검'
+      ];
+      
+      const questCount = Math.floor(Math.random() * 3) + 1; // 1-3개
+      for (let i = 0; i < questCount; i++) {
+        const questTitle = dummyQuests[Math.floor(Math.random() * dummyQuests.length)];
+        quests.push({
+          id: `dummy-${date}-${i}`,
+          title: questTitle,
+          groupName: '개인 목표',
+          isCompleted: Math.random() < 0.6,
+          priority: ['high', 'medium', 'low'][Math.floor(Math.random() * 3)] as 'high' | 'medium' | 'low',
+          dueTime: this.generateDueTime()
+        });
+      }
+    }
+
+    return quests;
+  }
+
+  private getQuestPriority(questTitle: string): 'high' | 'medium' | 'low' {
+    const highPriorityKeywords = ['운동', '건강', '중요', '필수'];
+    const lowPriorityKeywords = ['선택', '여가', '취미'];
+    
+    if (highPriorityKeywords.some(keyword => questTitle.includes(keyword))) {
+      return 'high';
+    }
+    if (lowPriorityKeywords.some(keyword => questTitle.includes(keyword))) {
+      return 'low';
+    }
+    return 'medium';
+  }
+
+  private generateDueTime(): string {
+    const times = ['오전 9시', '오후 2시', '오후 6시', '오후 9시'];
+    return Math.random() < 0.7 ? times[Math.floor(Math.random() * times.length)] : '';
+  }
+
+  // 퀘스트 클릭 이벤트 핸들러
+  onQuestClick(event: { quest: DailyQuest; date: string }): void {
+    console.log('Quest clicked:', event);
+    
+    // 활동 추적
+    this.localActivityService.trackActivity(
+      'quest_view',
+      `${event.quest.title} 퀘스트 조회`,
+      `${event.quest.groupName} 그룹의 퀘스트를 확인했습니다.`,
+      { 
+        questName: event.quest.title,
+        groupName: event.quest.groupName,
+        date: event.date
+      }
+    );
+
+    // 해당 그룹으로 이동
+    this.sharedState.setSelectedGroup(event.quest.groupName);
+    this.sharedState.setActiveTab('group');
+  }
+
+  // 날짜 클릭 이벤트 핸들러 (모달 표시, 완료 기능 제거)
+  onDayClick(event: { date: string; quests: DailyQuest[] }): void {
+    console.log('Day clicked:', event);
+    
+    // 퀘스트 상세 모달 열기 (완료 기능 제거)
+    const dialogRef = this.dialog.open(QuestDetailModalComponent, {
+      width: '600px',
+      maxHeight: '80vh',
+      data: {
+        date: this.formatDateForDisplay(event.date),
+        quests: event.quests,
+        onQuestClick: (quest: DailyQuest) => {
+          this.onQuestClick({ quest, date: event.date });
+        }
+      }
+    });
+  }
+
+  // 퀘스트 완료 표시 메서드 제거 (그룹 대시보드에서 처리)
+  // private onMarkQuestCompleted 메서드 삭제
+
+  // private updateQuestCompletionOnServer 메서드 삭제
+
+  // 기존 메서드들...
   private async loadActivitySummary(): Promise<void> {
     try {
       const activityStats = this.localActivityService.getActivityStats();
       const questStats = await this.localActivityService.getQuestBasedStats();
       
-      // 주간 목표 대비 진행률 계산
-      const weeklyGoal = 7; // 주 7일 목표
+      const weeklyGoal = 7;
       const currentStreak = this.localActivityService.getCurrentStreak();
       const weeklyProgress = Math.min(currentStreak, weeklyGoal);
 
@@ -259,7 +422,6 @@ export class HomeDashboardComponent implements OnInit {
 
   private async loadQuickStats(): Promise<void> {
     try {
-      // HomeDashboardService와 LocalActivityService 데이터 병합
       const [serviceStats, localStats] = await Promise.all([
         this.homeDashboardService.getTodayBoard(),
         this.localActivityService.getQuestBasedStats()
@@ -268,12 +430,11 @@ export class HomeDashboardComponent implements OnInit {
       const activityStats = this.localActivityService.getActivityStats();
       const groupStats = await this.localActivityService.getGroupParticipationStats();
 
-      // LocalActivity 데이터로 보강된 통계
       const enhancedStats: QuickStat[] = [
         {
           id: '1',
           title: '오늘 달성률',
-          value: `${Math.max(parseInt(serviceStats[0].value) || 0, localStats.completionRate)}%`,
+          value: `${Math.max(parseInt(serviceStats[0]?.value) || 0, localStats.completionRate)}%`,
           change: this.getSmartGoalMessage(localStats.completionRate, activityStats.streakCount),
           trend: localStats.completionRate >= 70 ? 'up' : localStats.completionRate >= 40 ? 'stable' : 'down',
           icon: 'trending_up',
@@ -334,13 +495,13 @@ export class HomeDashboardComponent implements OnInit {
   private async loadPersonalInsights(): Promise<void> {
     try {
       const insights = await this.localActivityService.getPersonalizedInsights();
-      this.personalInsights.set(insights.slice(0, 3)); // 상위 3개만
+      this.personalInsights.set(insights.slice(0, 3));
     } catch (error) {
       console.error('Error loading personal insights:', error);
     }
   }
 
-  // 스마트한 목표 메시지 생성
+  // 유틸리티 메서드들...
   private getSmartGoalMessage(completionRate: number, streakDays: number): string {
     if (completionRate >= 90) return '완벽에 가까워요! 🎯';
     if (completionRate >= 80) return '훌륭한 성과입니다! ⭐';
@@ -349,6 +510,20 @@ export class HomeDashboardComponent implements OnInit {
     if (completionRate >= 30) return '꾸준히 진행하고 있어요! 📈';
     if (streakDays > 0) return '연속 기록을 이어가고 있어요! 🔥';
     return '오늘부터 새로운 시작! 🌱';
+  }
+
+  private formatDate(date: Date): string {
+    return date.toISOString().split('T')[0];
+  }
+
+  private formatDateForDisplay(dateStr: string): string {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'long'
+    });
   }
 
   // UI 메서드들
@@ -405,7 +580,6 @@ export class HomeDashboardComponent implements OnInit {
     return '방금 전';
   }
 
-  // 주간 진행률 퍼센트 계산
   getWeeklyProgressPercent(): number {
     const summary = this.activitySummary();
     return Math.round((summary.weeklyProgress / summary.weeklyGoal) * 100);
@@ -415,7 +589,6 @@ export class HomeDashboardComponent implements OnInit {
   onQuickAction(action: QuickAction): void {
     console.log('Quick action clicked:', action.route);
     
-    // LocalActivityService에 페이지 방문 추적
     this.localActivityService.trackActivity(
       'page_visit',
       `${action.title} 페이지 방문`,
@@ -423,7 +596,6 @@ export class HomeDashboardComponent implements OnInit {
       { route: action.route }
     );
 
-    // 네비게이션 처리
     switch (action.route) {
       case '/challenge':
       case '/chat':
@@ -446,7 +618,6 @@ export class HomeDashboardComponent implements OnInit {
   onJoinChallenge(challenge: RecommendedChallenge): void {
     console.log('Join challenge:', challenge.id);
     
-    // 퀘스트 시작 추적
     this.localActivityService.trackActivity(
       'quest_start',
       `${challenge.title} 퀘스트 시작`,

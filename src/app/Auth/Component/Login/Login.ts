@@ -232,9 +232,9 @@ export class LoginComponent implements OnInit {
         try {
             // 직접 session에서 토큰 가져오기
             const session = await fetchAuthSession();
-            const accessToken = session.tokens?.accessToken?.toString();
+            const idToken = session.tokens?.idToken?.toString();
             
-            if (!accessToken) {
+            if (!idToken) {
                 console.error('AccessToken not found in session');
                 return;
             }
@@ -266,7 +266,7 @@ export class LoginComponent implements OnInit {
             const user: UserCredentials = {
                 id: userId,
                 name: displayName,
-                accessToken: accessToken,
+                idToken: idToken,
             };
 
             const userStatus: UserStatus = {
@@ -361,7 +361,7 @@ export class LoginComponent implements OnInit {
             // const user: UserCredentials = {
             //     id: "wefwef@wefwefwef.wefwefwef",
             //     name: "wefwefwefwefwef",
-            //     accessToken: "1234",
+            //     idToken: "1234",
             // };
 
             // const userStatus: UserStatus = {
@@ -430,19 +430,19 @@ export class LoginComponent implements OnInit {
         const { email, password } = this.signInForm.value;
 
         try {
-            const res = {
-                status: 200,
-                id: "admin@nameless.com",
-                username: "admin",
-                accessToken: "adminToken"
-            }
-            // const res = await this.auth.signInUser(email, password);
+            // const res = {
+            //     status: 200,
+            //     id: "admin@nameless.com",
+            //     username: "admin",
+            //     idToken: "adminToken"
+            // }
+            const res = await this.auth.signInUser(email, password);
 
             if (res.status === 200) {
                 const user: UserCredentials = {
                     id: email,
                     name: res.username,
-                    accessToken: res.accessToken,
+                    idToken: res.idToken
                 };
                 const userStatus: UserStatus = {
                     id: email,

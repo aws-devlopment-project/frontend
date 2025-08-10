@@ -188,7 +188,9 @@
             </div>
           }
         }
-        <app-chatbot></app-chatbot>
+        @if (this.sharedState.activeTab() !== 'channel') {
+          <app-chatbot></app-chatbot>
+        }
       </main>
     </div>
   }

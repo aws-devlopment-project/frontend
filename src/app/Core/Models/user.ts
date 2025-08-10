@@ -1,7 +1,7 @@
 export interface UserCredentials {
     id: string,
     name: string,
-    accessToken: string
+    idToken: string
 }
 
 export interface UserJoin {

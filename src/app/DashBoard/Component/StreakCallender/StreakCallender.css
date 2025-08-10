@@ -1,282 +1,629 @@
 .streak-calendar {
-    background: white;
-    border-radius: 16px;
-    padding: 24px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .calendar-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 24px;
-    flex-wrap: wrap;
-    gap: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
 .calendar-controls {
-    display: flex;
-    align-items: center;
-    gap: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .nav-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 8px;
-    border-radius: 8px;
-    color: #4a5568;
-    transition: all 0.2s ease;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 8px;
+  color: #4a5568;
+  transition: all 0.2s ease;
 }
 
 .nav-btn:hover:not(:disabled) {
-    background: #f7fafc;
-    color: #2d3748;
+  background: #f7fafc;
+  color: #2d3748;
 }
 
 .nav-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .month-title {
-    font-size: 20px;
-    font-weight: 700;
-    color: #2d3748;
-    margin: 0;
-    min-width: 120px;
-    text-align: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: #2d3748;
+  margin: 0;
+  min-width: 120px;
+  text-align: center;
 }
 
 .streak-info {
-    display: flex;
-    gap: 20px;
+  display: flex;
+  gap: 20px;
 }
 
 .streak-stat {
-    text-align: center;
+  text-align: center;
 }
 
 .streak-number {
-    display: block;
-    font-size: 24px;
-    font-weight: 800;
-    color: #4ecdc4;
-    line-height: 1;
+  display: block;
+  font-size: 24px;
+  font-weight: 800;
+  color: #4ecdc4;
+  line-height: 1;
 }
 
 .streak-label {
-    font-size: 12px;
-    color: #718096;
-    font-weight: 500;
+  font-size: 12px;
+  color: #718096;
+  font-weight: 500;
 }
 
 .calendar-grid {
-    border-radius: 12px;
-    overflow: hidden;
-    border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
 }
 
 .weekday-header {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    background: #f7fafc;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  background: #f7fafc;
 }
 
 .weekday {
-    padding: 12px 8px;
-    text-align: center;
-    font-size: 12px;
-    font-weight: 600;
-    color: #4a5568;
-    border-right: 1px solid #e2e8f0;
+  padding: 12px 8px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4a5568;
+  border-right: 1px solid #e2e8f0;
 }
 
 .weekday:last-child {
-    border-right: none;
+  border-right: none;
 }
 
 .calendar-week {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    border-bottom: 1px solid #e2e8f0;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .calendar-week:last-child {
-    border-bottom: none;
+  border-bottom: none;
 }
 
 .calendar-day {
-    position: relative;
-    min-height: 60px;
-    padding: 8px;
-    border-right: 1px solid #e2e8f0;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
+  position: relative;
+  min-height: 120px;
+  padding: 8px;
+  border-right: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  background: white;
 }
 
 .calendar-day:last-child {
-    border-right: none;
+  border-right: none;
 }
 
 .calendar-day:hover {
-    background: #f7fafc;
+  background: #f7fafc;
 }
 
 .calendar-day.today {
-    background: linear-gradient(135deg, #4ecdc4, #3cb8b3);
-    color: white;
+  background: linear-gradient(135deg, #4ecdc4, #3cb8b3);
+  color: white;
 }
 
 .calendar-day.today .day-number {
-    color: white;
-    font-weight: 700;
+  color: white;
+  font-weight: 700;
 }
 
 .calendar-day.other-month {
-    opacity: 0.3;
+  opacity: 0.3;
+}
+
+/* 완료율 기반 색상 */
+.calendar-day.completion-none {
+  border-left: 3px solid #e2e8f0;
+}
+
+.calendar-day.completion-low {
+  border-left: 3px solid #f6ad55;
+  background: rgba(246, 173, 85, 0.05);
+}
+
+.calendar-day.completion-medium {
+  border-left: 3px solid #4299e1;
+  background: rgba(66, 153, 225, 0.05);
+}
+
+.calendar-day.completion-high {
+  border-left: 3px solid #48bb78;
+  background: rgba(72, 187, 120, 0.05);
+}
+
+.calendar-day.completion-perfect {
+  border-left: 3px solid #38a169;
+  background: rgba(56, 161, 105, 0.1);
+}
+
+.day-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
 }
 
 .day-number {
-    font-size: 14px;
-    font-weight: 500;
-    color: #2d3748;
-    align-self: flex-start;
+  font-size: 14px;
+  font-weight: 500;
+  color: #2d3748;
 }
 
-.activity-indicator {
-    align-self: center;
-    border-radius: 6px;
-    padding: 2px 6px;
-    font-size: 10px;
-    font-weight: 600;
-    transition: all 0.2s ease;
+.quest-summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.activity-indicator[data-level="0"] {
-    background: transparent;
+.completion-indicator {
+  background: rgba(66, 153, 225, 0.1);
+  color: #3182ce;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
 }
 
-.activity-indicator[data-level="1"] {
-    background: #e6fffa;
-    color: #234e52;
+.calendar-day.completion-perfect .completion-indicator {
+  background: rgba(72, 187, 120, 0.2);
+  color: #38a169;
 }
 
-.activity-indicator[data-level="2"] {
-    background: #b2f5ea;
-    color: #234e52;
+.quest-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
 }
 
-.activity-indicator[data-level="3"] {
-    background: #4ecdc4;
-    color: white;
+.quest-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.2;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: 1px solid transparent;
 }
 
-.activity-indicator[data-level="4"] {
-    background: #319795;
-    color: white;
+.quest-item:hover {
+  background: white;
+  border-color: #3182ce;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(49, 130, 206, 0.15);
 }
 
-.calendar-day.today .activity-indicator {
-    background: rgba(255, 255, 255, 0.2);
-    color: white;
+.quest-item.completed {
+  background: rgba(72, 187, 120, 0.1);
+  border-color: rgba(72, 187, 120, 0.3);
+  text-decoration: line-through;
+  opacity: 0.8;
 }
 
-.points {
-    font-size: 10px;
-    font-weight: 600;
+.quest-item.priority.high {
+  border-left: 2px solid #e53e3e;
+}
+
+.quest-item.priority.medium {
+  border-left: 2px solid #f6ad55;
+}
+
+.quest-item.priority.low {
+  border-left: 2px solid #4299e1;
+}
+
+.priority-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.quest-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #2d3748;
+  font-weight: 500;
+}
+
+.completed-icon {
+  font-size: 14px !important;
+  color: #48bb78;
+  flex-shrink: 0;
+}
+
+.more-quests {
+  background: rgba(113, 128, 150, 0.1);
+  color: #718096;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.more-quests:hover {
+  background: rgba(113, 128, 150, 0.2);
+}
+
+.no-quests {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-indicator {
+  color: #a0aec0;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.calendar-day.today .quest-item,
+.calendar-day.today .more-quests {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.calendar-day.today .quest-title,
+.calendar-day.today .completion-indicator {
+  color: #2d3748;
+}
+
+.calendar-day.today .empty-indicator {
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .calendar-legend {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 12px;
-    margin-top: 20px;
-    padding-top: 16px;
-    border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
 }
 
 .legend-label {
-    font-size: 12px;
-    color: #4a5568;
-    font-weight: 500;
+  font-size: 12px;
+  color: #4a5568;
+  font-weight: 500;
 }
 
 .legend-items {
-    display: flex;
-    gap: 8px;
+  display: flex;
+  gap: 8px;
 }
 
 .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .legend-square {
-    width: 12px;
-    height: 12px;
-    border-radius: 2px;
-    border: 1px solid #e2e8f0;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  border: 1px solid #e2e8f0;
 }
 
-.legend-square[data-level="0"] {
-    background: #f7fafc;
+.legend-square.completion-none {
+  background: #f7fafc;
 }
 
-.legend-square[data-level="1"] {
-    background: #e6fffa;
+.legend-square.completion-low {
+  background: rgba(246, 173, 85, 0.3);
 }
 
-.legend-square[data-level="2"] {
-    background: #b2f5ea;
+.legend-square.completion-medium {
+  background: rgba(66, 153, 225, 0.3);
 }
 
-.legend-square[data-level="3"] {
-    background: #4ecdc4;
+.legend-square.completion-high {
+  background: rgba(72, 187, 120, 0.3);
 }
 
-.legend-square[data-level="4"] {
-    background: #319795;
+.legend-square.completion-perfect {
+  background: rgba(56, 161, 105, 0.5);
 }
 
 .legend-text {
-    font-size: 11px;
-    color: #718096;
+  font-size: 11px;
+  color: #718096;
 }
 
 /* 반응형 */
 @media (max-width: 768px) {
-    .streak-calendar {
+  .streak-calendar {
     padding: 16px;
-    }
+  }
 
-    .calendar-header {
+  .calendar-header {
     flex-direction: column;
     text-align: center;
-    }
+  }
 
-    .calendar-day {
-    min-height: 50px;
+  .calendar-day {
+    min-height: 100px;
     padding: 4px;
-    }
+  }
 
-    .day-number {
+  .day-number {
     font-size: 12px;
-    }
+  }
 
-    .activity-indicator {
-    padding: 1px 4px;
+  .quest-item {
+    padding: 4px 6px;
+    font-size: 10px;
+  }
+
+  .priority-icon {
+    font-size: 10px;
+  }
+
+  .completion-indicator {
     font-size: 9px;
-    }
+    padding: 1px 4px;
+  }
 
-    .calendar-legend {
+  .calendar-legend {
     flex-wrap: wrap;
     justify-content: center;
-    }
+  }
+
+  .quest-title {
+    max-width: 60px;
+  }
+}
+
+@media (max-width: 480px) {
+  .calendar-day {
+    min-height: 80px;
+    padding: 2px;
+  }
+
+  .quest-item {
+    padding: 2px 4px;
+    font-size: 9px;
+  }
+
+  .quest-title {
+    max-width: 40px;
+  }
+
+  .more-quests {
+    font-size: 8px;
+    padding: 2px 4px;
+  }
+
+  .streak-info {
+    gap: 12px;
+  }
+
+  .streak-number {
+    font-size: 20px;
+  }
+}
+
+/* 과거 날짜 스타일링 */
+.calendar-day.past-day {
+  opacity: 0.6;
+  position: relative;
+}
+
+.calendar-day.past-day .quest-item.disabled,
+.calendar-day.past-day .more-quests.disabled {
+  cursor: default;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.calendar-day.past-day:not(.clickable) {
+  cursor: default;
+}
+
+/* 클릭 가능한 날짜와 불가능한 날짜 구분 */
+.calendar-day.clickable {
+  cursor: pointer;
+}
+
+.calendar-day:not(.clickable) {
+  cursor: default;
+}
+
+.calendar-day.clickable:hover {
+  background: #f7fafc;
+}
+
+.calendar-day.past-day:hover {
+  background: transparent; /* 과거 날짜는 호버 효과 제거 */
+}
+
+/* 과거 날짜 오버레이 */
+.past-overlay {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  color: #a0aec0;
+  font-size: 12px;
+  z-index: 1;
+}
+
+.past-overlay mat-icon {
+  font-size: 14px !important;
+  width: 14px;
+  height: 14px;
+}
+
+/* 퀘스트 아이템 클릭 가능 상태 */
+.quest-item.clickable {
+  cursor: pointer;
+}
+
+.quest-item.disabled {
+  cursor: default;
+  pointer-events: none;
+}
+
+.quest-item.clickable:hover {
+  background: white;
+  border-color: #3182ce;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(49, 130, 206, 0.15);
+}
+
+.quest-item.disabled:hover {
+  transform: none;
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.9);
+  border-color: transparent;
+}
+
+/* more-quests 클릭 상태 */
+.more-quests.clickable {
+  cursor: pointer;
+}
+
+.more-quests.disabled {
+  cursor: default;
+  pointer-events: none;
+}
+
+.more-quests.clickable:hover {
+  background: rgba(113, 128, 150, 0.2);
+}
+
+.more-quests.disabled:hover {
+  background: rgba(113, 128, 150, 0.1);
+}
+
+/* 미래 날짜 스타일링 */
+.calendar-day.future-day {
+  position: relative;
+}
+
+.calendar-day.future-day::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(66, 153, 225, 0.02), rgba(49, 130, 206, 0.01));
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* 오늘 날짜 강조 */
+.calendar-day.today {
+  background: linear-gradient(135deg, #4ecdc4, #3cb8b3);
+  color: white;
+  position: relative;
+}
+
+.calendar-day.today .day-number {
+  color: white;
+  font-weight: 700;
+}
+
+.calendar-day.today .quest-item,
+.calendar-day.today .more-quests {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.calendar-day.today .quest-title,
+.calendar-day.today .completion-indicator {
+  color: #2d3748;
+}
+
+.calendar-day.today .empty-indicator {
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 600;
+}
+
+/* 빈 상태 표시 개선 */
+.empty-indicator {
+  color: #a0aec0;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.calendar-day.past-day .empty-indicator {
+  color: #cbd5e0;
+}
+
+.calendar-day.future-day .empty-indicator {
+  color: #90cdf4;
+  font-weight: 600;
+}
+
+/* 완료율에 따른 과거 날짜 색상 조정 */
+.calendar-day.past-day.completion-none {
+  border-left: 3px solid #e2e8f0;
+  background: rgba(226, 232, 240, 0.3);
+}
+
+.calendar-day.past-day.completion-low {
+  border-left: 3px solid #f6ad55;
+  background: rgba(246, 173, 85, 0.1);
+}
+
+.calendar-day.past-day.completion-medium {
+  border-left: 3px solid #4299e1;
+  background: rgba(66, 153, 225, 0.1);
+}
+
+.calendar-day.past-day.completion-high {
+  border-left: 3px solid #48bb78;
+  background: rgba(72, 187, 120, 0.1);
+}
+
+.calendar-day.past-day.completion-perfect {
+  border-left: 3px solid #38a169;
+  background: rgba(56, 161, 105, 0.15);
+}
+
+/* 호버 효과 제거를 위한 추가 스타일 */
+.calendar-day.past-day.has-quests:hover {
+  box-shadow: none;
+  transform: none;
 }

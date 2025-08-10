@@ -1,17 +1,17 @@
-// MemberDashboard.ts - 이미지 업로드 아바타 버전
-// MemberDashboard.ts - 개선된 이미지 업로드 아바타 버전
+// MemberDashboard.ts - 완전한 업데이트 버전
 import { Component, signal, OnInit, OnDestroy, ViewChild, ElementRef } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { MatIconModule } from "@angular/material/icon";
 import { FormsModule } from "@angular/forms";
 import { RouterLink } from "@angular/router";
 import { ManagementDashboardService } from "../../Service/ManagementDashboard";
+import { LoginService } from "../../../Auth/Service/LoginService";
 import { UserJoin } from "../../../Core/Models/user";
 
 interface UserProfile {
   username: string;
   email: string;
-  avatar: string; // 이미지 URL 또는 base64 데이터
+  avatar: string;
   joinDate: Date;
   totalQuests: number;
   completedQuests: number;
@@ -43,6 +43,13 @@ interface AppSettings {
   animationEffects: boolean;
 }
 
+// 비밀번호 변경 폼 인터페이스 추가
+interface PasswordChangeForm {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
 @Component({
   selector: 'app-member-dashboard',
   templateUrl: './MemberDashboard.html',
@@ -67,11 +74,34 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
   uploadError = signal<string | null>(null);
   uploadSuccess = signal<boolean>(false);
   
+  // 비밀번호 변경 관련 signals 추가
+  showPasswordChangeModal = signal<boolean>(false);
+  passwordChangeLoading = signal<boolean>(false);
+  passwordChangeError = signal<string | null>(null);
+  passwordChangeSuccess = signal<boolean>(false);
+  
+  // 비밀번호 폼 데이터
+  passwordForm = signal<PasswordChangeForm>({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+
+  // 비밀번호 강도 관련 (재사용)
+  newPasswordStrength = signal<'weak' | 'medium' | 'strong'>('weak');
+  newPasswordRequirements = signal({
+    minLength: false,
+    hasLowercase: false,
+    hasUppercase: false,
+    hasNumber: false,
+    hasSpecialChar: false
+  });
+  
   // 사용자 데이터
   userProfile = signal<UserProfile>({
     username: '김사용자',
     email: 'user@example.com',
-    avatar: '/assets/images/default-avatar.png', // 기본 아바타 이미지
+    avatar: '/assets/images/default-avatar.png',
     joinDate: new Date('2024-01-15'),
     totalQuests: 156,
     completedQuests: 89,
@@ -120,7 +150,10 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
     { id: 'account', label: '계정 관리', icon: 'account_circle', description: '비밀번호 변경 및 계정 탈퇴' }
   ];
 
-  constructor(private managementDashboardService: ManagementDashboardService) {}
+  constructor(
+    private managementDashboardService: ManagementDashboardService,
+    private loginService: LoginService // 추가된 의존성 주입
+  ) {}
 
   async ngOnInit(): Promise<void> {
     await this.loadUserData();
@@ -131,7 +164,149 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
     this.cleanupResources();
   }
 
-  // === 초기화 및 데이터 로드 ===
+  // === 비밀번호 변경 관련 메서드들 ===
+  
+  // 비밀번호 변경 모달 표시
+  changePassword(): void {
+    this.showPasswordChangeModal.set(true);
+    this.clearPasswordForm();
+    this.clearPasswordMessages();
+  }
+
+  // 비밀번호 변경 모달 닫기
+  closePasswordChangeModal(): void {
+    this.showPasswordChangeModal.set(false);
+    this.clearPasswordForm();
+    this.clearPasswordMessages();
+  }
+
+  // 비밀번호 폼 데이터 업데이트
+  updatePasswordForm(field: keyof PasswordChangeForm, value: string): void {
+    const currentForm = this.passwordForm();
+    this.passwordForm.set({
+      ...currentForm,
+      [field]: value
+    });
+
+    // 새 비밀번호 입력 시 강도 검증
+    if (field === 'newPassword') {
+      this.validateNewPasswordStrength(value);
+    }
+
+    this.clearPasswordMessages();
+  }
+
+  // 새 비밀번호 강도 검증
+  private validateNewPasswordStrength(password: string): void {
+    const requirements = {
+      minLength: password.length >= 8,
+      hasLowercase: /[a-z]/.test(password),
+      hasUppercase: /[A-Z]/.test(password),
+      hasNumber: /\d/.test(password),
+      hasSpecialChar: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+    };
+
+    this.newPasswordRequirements.set(requirements);
+
+    // 강도 계산
+    const passedRequirements = Object.values(requirements).filter(Boolean).length;
+    
+    if (passedRequirements < 3) {
+      this.newPasswordStrength.set('weak');
+    } else if (passedRequirements < 5) {
+      this.newPasswordStrength.set('medium');
+    } else {
+      this.newPasswordStrength.set('strong');
+    }
+  }
+
+  // 새 비밀번호 요구사항 완성도 계산
+  get newPasswordCompletionPercentage(): number {
+    const requirements = this.newPasswordRequirements();
+    const completed = Object.values(requirements).filter(Boolean).length;
+    return Math.round((completed / 5) * 100);
+  }
+
+  // 비밀번호 변경 폼 유효성 검사
+  isPasswordFormValid(): boolean {
+    const form = this.passwordForm();
+    return (
+      form.currentPassword.length > 0 &&
+      form.newPassword.length >= 8 &&
+      form.confirmPassword.length > 0 &&
+      form.newPassword === form.confirmPassword &&
+      this.newPasswordStrength() !== 'weak'
+    );
+  }
+
+  // 비밀번호 일치 여부 확인
+  get passwordsMatch(): boolean {
+    const form = this.passwordForm();
+    return form.newPassword === form.confirmPassword;
+  }
+
+  // 비밀번호 변경 실행
+  async submitPasswordChange(): Promise<void> {
+    if (!this.isPasswordFormValid()) {
+      this.passwordChangeError.set('모든 필드를 올바르게 입력해주세요.');
+      return;
+    }
+
+    const form = this.passwordForm();
+    
+    if (form.newPassword !== form.confirmPassword) {
+      this.passwordChangeError.set('새 비밀번호와 확인 비밀번호가 일치하지 않습니다.');
+      return;
+    }
+
+    this.passwordChangeLoading.set(true);
+    this.clearPasswordMessages();
+
+    try {
+      await this.loginService.updatePassword(form.currentPassword, form.newPassword);
+      
+      this.passwordChangeSuccess.set(true);
+      this.showMessage('비밀번호가 성공적으로 변경되었습니다.', 'success');
+      
+      // 3초 후 모달 자동 닫기
+      setTimeout(() => {
+        this.closePasswordChangeModal();
+      }, 3000);
+
+    } catch (error: any) {
+      console.error('비밀번호 변경 실패:', error);
+      this.passwordChangeError.set(error.message || '비밀번호 변경에 실패했습니다.');
+    } finally {
+      this.passwordChangeLoading.set(false);
+    }
+  }
+
+  // 폼 초기화
+  private clearPasswordForm(): void {
+    this.passwordForm.set({
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    });
+    this.newPasswordStrength.set('weak');
+    this.newPasswordRequirements.set({
+      minLength: false,
+      hasLowercase: false,
+      hasUppercase: false,
+      hasNumber: false,
+      hasSpecialChar: false
+    });
+  }
+
+  // 메시지 초기화
+  private clearPasswordMessages(): void {
+    this.passwordChangeError.set(null);
+    this.passwordChangeSuccess.set(false);
+  }
+
+  // === 기존 메서드들 (변경사항 없음) ===
+  
+  // 초기화 및 데이터 로드
   private async loadUserData(): Promise<void> {
     try {
       this.userProfile.set(await this.managementDashboardService.getUserProfile());
@@ -156,13 +331,13 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
     }
   }
 
-  // === 섹션 관리 ===
+  // 섹션 관리
   setActiveSection(sectionId: string): void {
     this.activeSection.set(sectionId);
-    this.clearMessages(); // 섹션 변경 시 메시지 초기화
+    this.clearMessages();
   }
 
-  // === 드래그 앤 드롭 이벤트 처리 ===
+  // 드래그 앤 드롭 이벤트 처리
   onDragOver(event: DragEvent): void {
     event.preventDefault();
     event.stopPropagation();
@@ -186,7 +361,7 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
     }
   }
 
-  // === 아바타 관리 ===
+  // 아바타 관리
   toggleAvatarSelector(): void {
     this.showAvatarSelector.update(show => !show);
     if (!this.showAvatarSelector()) {
@@ -210,11 +385,9 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
     }
   }
 
-  // 파일 처리 로직 통합
   private processFile(file: File): void {
     this.clearMessages();
     
-    // 파일 유효성 검사
     const validation = this.validateImageFile(file);
     if (!validation.isValid) {
       this.uploadError.set(validation.error || '잘못된 파일입니다.');
@@ -225,10 +398,9 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
     this.createPreviewUrl(file);
   }
 
-  // 개선된 이미지 파일 유효성 검사
   private validateImageFile(file: File): { isValid: boolean; error?: string } {
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    const maxSize = 5 * 1024 * 1024;
 
     if (!allowedTypes.includes(file.type)) {
       return {
@@ -248,9 +420,7 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
     return { isValid: true };
   }
 
-  // 미리보기 URL 생성
   private createPreviewUrl(file: File): void {
-    // 기존 URL 정리
     if (this.avatarPreviewUrl()) {
       URL.revokeObjectURL(this.avatarPreviewUrl()!);
     }
@@ -259,7 +429,6 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
     this.avatarPreviewUrl.set(previewUrl);
   }
 
-  // 아바타 선택 리셋
   resetAvatarSelection(): void {
     if (this.avatarPreviewUrl()) {
       URL.revokeObjectURL(this.avatarPreviewUrl()!);
@@ -268,13 +437,11 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
     this.selectedAvatarFile.set(null);
     this.clearMessages();
     
-    // 파일 입력 초기화
     if (this.fileInput?.nativeElement) {
       this.fileInput.nativeElement.value = '';
     }
   }
 
-  // 아바타 변경 확인 - 개선된 버전
   async confirmAvatarChange(): Promise<void> {
     const file = this.selectedAvatarFile();
     if (!file) {
@@ -287,23 +454,18 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
     this.clearMessages();
     
     try {
-      // 업로드 진행률 시뮬레이션
       this.simulateUploadProgress();
       
-      // 이미지 리사이징 후 업로드
       const resizedImage = await this.resizeImage(file, 200, 200);
       
-      // ManagementDashboardService를 통해 업로드
       const result = await this.managementDashboardService.setAvatarImage(file);
       
       if (result && result.success) {
-        // 성공적으로 업로드되면 프로필 업데이트
         await this.loadUserData();
         
         this.uploadSuccess.set(true);
         this.showAvatarSelector.set(false);
         
-        // 성공 메시지 자동 숨김
         setTimeout(() => {
           this.uploadSuccess.set(false);
         }, 3000);
@@ -323,7 +485,6 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
     }
   }
 
-  // 이미지 리사이징 기능
   private async resizeImage(file: File, maxWidth: number = 200, maxHeight: number = 200): Promise<string> {
     return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas');
@@ -332,7 +493,6 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
       
       img.onload = () => {
         try {
-          // 비율 계산
           const ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
           const newWidth = img.width * ratio;
           const newHeight = img.height * ratio;
@@ -340,10 +500,8 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
           canvas.width = newWidth;
           canvas.height = newHeight;
           
-          // 이미지 그리기
           ctx?.drawImage(img, 0, 0, newWidth, newHeight);
           
-          // base64로 변환 (품질 0.8)
           const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
           resolve(resizedDataUrl);
         } catch (error) {
@@ -362,7 +520,6 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
     });
   }
 
-  // 업로드 진행률 시뮬레이션
   private simulateUploadProgress(): void {
     let progress = 0;
     const interval = setInterval(() => {
@@ -374,24 +531,20 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
       this.uploadProgress.set(progress);
     }, 200);
 
-    // 업로드 완료 시 100%로 설정
     setTimeout(() => {
       this.uploadProgress.set(100);
     }, 2000);
   }
 
-  // 현재 아바타 이미지 URL 가져오기 - 개선된 버전
   getCurrentAvatarUrl(): string {
     const previewUrl = this.avatarPreviewUrl();
     if (previewUrl) return previewUrl;
     
     const userAvatar = this.userProfile().avatar;
     if (userAvatar && userAvatar !== '/assets/images/default-avatar.png') {
-      // base64 데이터인지 확인
       if (userAvatar.startsWith('data:image/')) {
         return userAvatar;
       }
-      // URL인지 확인
       if (userAvatar.startsWith('http')) {
         return userAvatar;
       }
@@ -400,14 +553,12 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
     return '/assets/images/default-avatar.png';
   }
 
-  // 아바타 이미지 로드 에러 처리
   onAvatarImageError(event: Event): void {
     const img = event.target as HTMLImageElement;
     img.src = '/assets/images/default-avatar.png';
     console.warn('아바타 이미지 로드 실패, 기본 이미지로 대체');
   }
 
-  // 아바타 리셋 기능 추가
   async resetAvatar(): Promise<void> {
     if (confirm('아바타를 기본 이미지로 리셋하시겠습니까?')) {
       try {
@@ -430,7 +581,7 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
     }
   }
 
-  // === 프로필 관리 ===
+  // 프로필 관리
   async updateProfile(): Promise<void> {
     this.isLoading.set(true);
     this.clearMessages();
@@ -446,7 +597,7 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
     }
   }
 
-  // === 그룹 관리 ===
+  // 그룹 관리
   async leaveGroup(groupId: string): Promise<void> {
     if (confirm('정말로 이 그룹에서 탈퇴하시겠습니까? 그룹 내 모든 채널에서도 탈퇴됩니다.')) {
       try {
@@ -476,7 +627,7 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
     }
   }
 
-  // === 계정 관리 ===
+  // 계정 관리
   showDeleteAccountConfirm(): void {
     this.showDeleteConfirm.set(true);
   }
@@ -491,7 +642,6 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
       await this.managementDashboardService.departUser();
       alert('계정이 성공적으로 탈퇴되었습니다. 이용해 주셔서 감사합니다.');
       
-      // 로컬 데이터 정리
       this.cleanupResources();
       localStorage.clear();
       sessionStorage.clear();
@@ -504,12 +654,7 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
     }
   }
 
-  // === 기타 기능 ===
-  changePassword(): void {
-    // 실제로는 비밀번호 변경 모달이나 페이지로 이동
-    this.showMessage('비밀번호 변경 기능은 준비 중입니다.', 'info');
-  }
-
+  // 기타 기능
   contactSupport(): void {
     window.open('mailto:support@example.com?subject=문의사항', '_blank');
   }
@@ -518,7 +663,7 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
     window.open('https://help.example.com', '_blank');
   }
 
-  // === 메시지 관리 ===
+  // 메시지 관리
   private clearMessages(): void {
     this.uploadError.set(null);
     this.uploadSuccess.set(false);
@@ -534,12 +679,11 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
         this.uploadError.set(message);
         break;
       default:
-        // 임시로 alert 사용, 실제로는 토스트 메시지 등으로 대체
         alert(message);
     }
   }
 
-  // === 유틸리티 메서드 ===
+  // 유틸리티 메서드
   getJoinDuration(): string {
     const joinDate = this.userProfile().joinDate;
     const now = new Date();
@@ -565,14 +709,11 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  // === 리소스 정리 ===
+  // 리소스 정리
   private cleanupResources(): void {
-    // 미리보기 URL 정리
     if (this.avatarPreviewUrl()) {
       URL.revokeObjectURL(this.avatarPreviewUrl()!);
       this.avatarPreviewUrl.set(null);
     }
-    
-    // 타이머 정리 등 추가 정리 작업이 필요하다면 여기에 추가
   }
 }

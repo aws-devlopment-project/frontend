@@ -1,4 +1,4 @@
-// ChatbotService.ts - 완전한 활동 데이터 기반 개선된 챗봇 서비스
+// ChatbotService.ts - 기존 파일에 Q&A 기능 통합한 개선 버전
 import { Injectable } from '@angular/core';
 import { LocalActivityService } from '../../DashBoard/Service/LocalActivityService';
 
@@ -8,6 +8,9 @@ export interface ChatbotMessage {
   isUser: boolean;
   timestamp: Date;
   animated?: boolean;
+  feedback?: 'helpful' | 'unhelpful' | null;
+  showFeedback?: boolean;
+  feedbackProvided?: boolean;
 }
 
 export interface MacroResponse {
@@ -28,7 +31,6 @@ export interface UserActivityContext {
   selectedChannel: string | null;
   userName?: string;
   initialized: boolean;
-  // LocalActivityService 데이터
   activityStats?: {
     totalActivities: number;
     totalPoints: number;
@@ -52,12 +54,28 @@ export interface UserActivityContext {
   personalizedInsights?: string[];
 }
 
+// === Q&A 관련 인터페이스 ===
+interface QAItem {
+  id: string;
+  question: string;
+  answer: string;
+  keywords: string[];
+  category: string;
+  confidence: number;
+}
+
+interface QASearchResult {
+  item: QAItem;
+  score: number;
+  matchType: 'exact' | 'keyword' | 'semantic' | 'fuzzy';
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class ChatbotService {
   private readonly macroResponses: MacroResponse[] = [
-    // === 기본 그룹/퀘스트 관련 (기존) ===
+    // === 기본 그룹/퀘스트 관련 (기존 유지) ===
     {
       id: 'group_join',
       keywords: ['그룹', '참여', '가입', '들어가기'],
@@ -76,82 +94,6 @@ export class ChatbotService {
       category: 'quest',
       confidence: 0.85
     },
-
-    // === 활동 통계 관련 (신규) ===
-    {
-      id: 'stats_overall',
-      keywords: ['통계', '진행', '활동', '얼마나', '수치'],
-      patterns: ['통계 보여줘', '얼마나 활동', '진행상황', '나의 기록'],
-      response: '',
-      followUp: ['더 자세한 통계가 궁금하시면 "상세 통계" 탭을 확인해보세요!'],
-      category: 'stats',
-      confidence: 0.9,
-      contextualConditions: (context) => context.activityStats?.totalActivities > 0
-    },
-    {
-      id: 'streak_info',
-      keywords: ['연속', '스트릭', '연달아', '며칠', '꾸준히'],
-      patterns: ['몇일 연속', '연속으로 얼마나', '스트릭은', '꾸준히 했나'],
-      response: '',
-      followUp: ['연속 기록을 늘려보세요! 💪'],
-      category: 'achievement',
-      confidence: 0.85,
-      contextualConditions: (context) => context.activityStats?.streakCount > 0
-    },
-    {
-      id: 'quest_completion_rate',
-      keywords: ['퀘스트', '완료율', '달성률', '성공률', '얼마나 완료'],
-      patterns: ['퀘스트 완료율', '얼마나 달성', '성공률은'],
-      response: '',
-      followUp: ['더 높은 달성률을 위해 꾸준히 도전해보세요!'],
-      category: 'quest',
-      confidence: 0.9,
-      contextualConditions: (context) => context.questStats?.completionRate !== undefined
-    },
-    {
-      id: 'favorite_group',
-      keywords: ['좋아하는', '자주', '즐겨', '선호', '가장', '많이'],
-      patterns: ['가장 좋아하는 그룹', '자주 가는 그룹', '선호하는 그룹'],
-      response: '',
-      followUp: ['해당 그룹에서 더 많은 활동을 해보시는 건 어떨까요?'],
-      category: 'group',
-      confidence: 0.8,
-      contextualConditions: (context) => context.questStats?.favoriteGroup && context.questStats.favoriteGroup !== '없음'
-    },
-    {
-      id: 'recent_activity',
-      keywords: ['최근', '요즘', '근래', 'lately', '최근에'],
-      patterns: ['최근에 뭐했나', '요즘 활동', '근래 어떤'],
-      response: '',
-      followUp: ['오늘도 새로운 도전을 해보시는 건 어떨까요?'],
-      category: 'general',
-      confidence: 0.8,
-      contextualConditions: (context) => context.recentActivities?.length > 0
-    },
-
-    // === 동기부여 및 개인화 응답 (신규) ===
-    {
-      id: 'motivation_low_activity',
-      keywords: ['동기', '의욕', '힘들어', '지쳐', '포기'],
-      patterns: ['동기부여', '의욕이 없어', '힘들어서', '지쳐서'],
-      response: '',
-      followUp: ['작은 목표부터 시작해보세요. 당신은 할 수 있어요! 💪'],
-      category: 'help',
-      confidence: 0.7,
-      contextualConditions: (context) => context.activityStats?.streakCount < 3
-    },
-    {
-      id: 'congratulations_high_streak',
-      keywords: ['자랑', '칭찬', '잘했', '대단', '축하'],
-      patterns: ['잘하고 있나', '대단한가', '칭찬해줘'],
-      response: '',
-      followUp: ['이 기세로 계속 해보세요! 🎉'],
-      category: 'achievement',
-      confidence: 0.8,
-      contextualConditions: (context) => context.activityStats?.streakCount >= 7
-    },
-
-    // === 기존 헬프 및 일반 ===
     {
       id: 'general_help',
       keywords: ['도움', '도와줘', '모르겠어', '헬프'],
@@ -163,23 +105,201 @@ export class ChatbotService {
     }
   ];
 
-  constructor(private activityService: LocalActivityService) {}
+  // === Q&A 지식 베이스 ===
+  private knowledgeBase: QAItem[] = [];
+  private keywordIndex: Map<string, QAItem[]> = new Map();
+  private qaInitialized = false;
 
-  // === 메인 응답 생성 (개선됨) ===
+  constructor(private activityService: LocalActivityService) {
+    this.initializeQAKnowledge();
+  }
+
+  // === Q&A 시스템 초기화 ===
+  private async initializeQAKnowledge(): Promise<void> {
+    try {
+      // assets 폴더에서 Q&A 파일 로드 시도
+      const response = await fetch('/assets/chatbot-qa.txt');
+      if (response.ok) {
+        const qaContent = await response.text();
+        await this.loadQAFile(qaContent);
+      } else {
+        // 파일이 없으면 기본 Q&A 데이터 사용
+        this.loadDefaultQAData();
+      }
+    } catch (error) {
+      console.warn('Q&A 파일을 로드할 수 없어 기본 데이터를 사용합니다:', error);
+      this.loadDefaultQAData();
+    }
+  }
+
+  // 기본 Q&A 데이터 (파일이 없을 때 대체용)
+  private loadDefaultQAData(): void {
+    const defaultQAData = `
+[Question]
+그룹에 어떻게 가입하나요?
+
+[Answer]
+좌측 사이드바의 "그룹 참여하기" 버튼을 클릭하거나, 홈 화면에서 관심 있는 그룹을 선택하여 가입할 수 있습니다. 가입 후에는 해당 그룹의 퀘스트와 채널에 참여할 수 있어요!
+
+[Question]
+퀘스트 완료가 안됩니다
+
+[Answer]
+퀘스트 완료 버튼을 클릭한 후 잠시 기다려보세요. 네트워크 상태가 불안정하면 완료 처리가 지연될 수 있습니다. 계속 문제가 발생하면 페이지를 새로고침해보세요.
+
+[Question]
+통계는 어디서 볼 수 있나요?
+
+[Answer]
+좌측 메뉴에서 "통계" 탭을 클릭하면 자세한 활동 통계를 확인할 수 있습니다. 연속 기록, 포인트, 완료한 퀘스트 등을 한눈에 볼 수 있어요!
+
+[Question]
+연속 기록이 끊어졌어요
+
+[Answer]
+연속 기록은 매일 최소 1개 이상의 활동(퀘스트 완료, 그룹 참여 등)을 해야 유지됩니다. 하루라도 활동이 없으면 리셋되지만, 새로운 연속 기록을 다시 시작할 수 있어요! 💪
+
+[Question]
+채널에 참여하는 방법
+
+[Answer]
+그룹에 가입한 후, 해당 그룹 페이지에서 원하는 채널을 선택하여 참여할 수 있습니다. 각 채널은 다양한 주제로 나뉘어져 있어요.
+
+[Question]
+점수가 안 올라가요
+
+[Answer]
+활동 완료 후 점수 반영까지 최대 1-2분 정도 걸릴 수 있습니다. 페이지를 새로고침해보시거나, "통계 보여줘"로 현재 상태를 확인해보세요.
+`;
+
+    try {
+      this.loadQAFile(defaultQAData);
+      console.log('기본 Q&A 데이터가 로드되었습니다.');
+    } catch (error) {
+      console.error('기본 Q&A 데이터 로드 실패:', error);
+    }
+  }
+
+  // Q&A 파일 로드 및 파싱
+  private async loadQAFile(fileContent: string): Promise<void> {
+    try {
+      const qaItems = this.parseQAFile(fileContent);
+      const processedItems = qaItems.map(item => this.preprocessQAItem(item));
+      
+      this.knowledgeBase = processedItems;
+      this.buildKeywordIndex();
+      this.qaInitialized = true;
+      
+      console.log(`Q&A Knowledge base loaded: ${this.knowledgeBase.length} items`);
+    } catch (error) {
+      console.error('Failed to load Q&A file:', error);
+      throw error;
+    }
+  }
+
+  // Q&A 텍스트 파일 파싱
+  private parseQAFile(content: string): { question: string; answer: string }[] {
+    const qaItems: { question: string; answer: string }[] = [];
+    
+    // 정규표현식으로 [Question]과 [Answer] 섹션 분리
+    const sections = content.split(/\[Question\]|\[Answer\]/i).filter(section => section.trim());
+    
+    for (let i = 0; i < sections.length; i += 2) {
+      const question = sections[i]?.trim();
+      const answer = sections[i + 1]?.trim();
+      
+      if (question && answer) {
+        qaItems.push({ question, answer });
+      }
+    }
+    
+    return qaItems;
+  }
+
+  // Q&A 아이템 전처리
+  private preprocessQAItem(item: { question: string; answer: string }): QAItem {
+    const keywords = this.extractKeywords(item.question);
+    const category = this.categorizeQuestion(item.question);
+    
+    return {
+      id: this.generateId(),
+      question: item.question,
+      answer: item.answer,
+      keywords,
+      category,
+      confidence: 1.0
+    };
+  }
+
+  // 키워드 추출
+  private extractKeywords(text: string): string[] {
+    const stopWords = new Set(['은', '는', '이', '가', '을', '를', '에', '에서', '와', '과', '의', '도', '만', '부터', '까지', '으로', '로', '한다', '하다', '이다', '있다', '없다', '것', '수', '때', '곳', '분', '년', '월', '일']);
+    
+    return text
+      .toLowerCase()
+      .replace(/[^\w\s가-힣]/g, ' ')
+      .split(/\s+/)
+      .filter(word => word.length > 1 && !stopWords.has(word))
+      .slice(0, 10);
+  }
+
+  // 질문 카테고리 분류
+  private categorizeQuestion(question: string): string {
+    const categoryKeywords = {
+      'group': ['그룹', '참여', '가입', '멤버', '팀'],
+      'quest': ['퀘스트', '미션', '목표', '달성', '완료'],
+      'stats': ['통계', '기록', '수치', '진행', '점수'],
+      'help': ['도움', '방법', '어떻게', '사용법', '가이드'],
+      'technical': ['오류', '버그', '문제', '안됨', '작동'],
+      'channel': ['채널', '클럽', '방', '채팅']
+    };
+
+    const questionLower = question.toLowerCase();
+    
+    for (const [category, keywords] of Object.entries(categoryKeywords)) {
+      if (keywords.some(keyword => questionLower.includes(keyword))) {
+        return category;
+      }
+    }
+    
+    return 'general';
+  }
+
+  // 키워드 인덱스 구축
+  private buildKeywordIndex(): void {
+    this.keywordIndex.clear();
+    
+    this.knowledgeBase.forEach(item => {
+      item.keywords.forEach(keyword => {
+        if (!this.keywordIndex.has(keyword)) {
+          this.keywordIndex.set(keyword, []);
+        }
+        this.keywordIndex.get(keyword)!.push(item);
+      });
+    });
+  }
+
+  // === 메인 응답 생성 (Q&A 통합 개선 버전) ===
   async generateResponseWithActivity(input: string, userContext: UserActivityContext): Promise<string> {
-    // 빈 입력 처리
     if (!input.trim()) {
       return this.getPersonalizedGreeting(userContext);
     }
 
     try {
-      // 활동 데이터가 있으면 컨텍스트 보강
+      // 활동 데이터 컨텍스트 보강
       const enrichedContext = await this.enrichContextWithActivity(userContext);
 
-      // 1단계: 활동 기반 키워드 매칭
+      // 1단계: Q&A 지식 베이스 검색 (최우선)
+      const qaResults = this.searchQA(input, 3);
+      if (qaResults.length > 0 && qaResults[0].score > 0.7) {
+        const bestMatch = qaResults[0];
+        return this.personalizeQAResponse(bestMatch.item.answer, enrichedContext);
+      }
+
+      // 2단계: 기존 매크로 응답 (활동 기반)
       let match = await this.keywordMatchWithActivity(input, enrichedContext);
       
-      // 2단계: 패턴 매칭
+      // 3단계: 패턴 매칭
       if (!match || match.confidence < 0.8) {
         const patternResult = this.patternMatch(input);
         if (patternResult && (!match || patternResult.confidence > match.confidence)) {
@@ -187,7 +307,16 @@ export class ChatbotService {
         }
       }
       
-      // 3단계: 유사도 매칭
+      // 4단계: Q&A 보조 검색 (낮은 점수라도 참고)
+      if (!match || match.confidence < 0.6) {
+        if (qaResults.length > 0 && qaResults[0].score > 0.4) {
+          const qaMatch = qaResults[0];
+          return this.personalizeQAResponse(qaMatch.item.answer, enrichedContext) + 
+                 '\n\n💡 더 정확한 답변이 필요하시면 구체적으로 질문해주세요!';
+        }
+      }
+      
+      // 5단계: 유사도 매칭
       if (!match || match.confidence < 0.6) {
         const similarityResult = this.similarityMatch(input);
         if (similarityResult && (!match || similarityResult.confidence > match.confidence)) {
@@ -200,15 +329,248 @@ export class ChatbotService {
         return this.generateContextualResponse(match, enrichedContext);
       }
       
-      // 기본 응답 (개인화)
-      return this.getPersonalizedDefaultResponse(enrichedContext);
+      // 기본 응답 (Q&A 제안 포함)
+      return this.getEnhancedDefaultResponse(input, enrichedContext, qaResults);
     } catch (error) {
-      console.error('Error generating response with activity:', error);
+      console.error('Error generating response with Q&A:', error);
       return this.getPersonalizedGreeting(userContext);
     }
   }
 
-  // === 활동 데이터 기반 응답 생성 ===
+  // === Q&A 검색 메서드 ===
+  private searchQA(query: string, limit: number = 5): QASearchResult[] {
+    if (!this.qaInitialized || this.knowledgeBase.length === 0) {
+      return [];
+    }
+
+    const results: QASearchResult[] = [];
+    
+    // 1. 정확한 매칭
+    const exactMatches = this.findExactMatches(query);
+    results.push(...exactMatches);
+    
+    // 2. 키워드 매칭
+    if (results.length < limit) {
+      const keywordMatches = this.findKeywordMatches(query);
+      results.push(...keywordMatches.filter(r => !results.some(existing => existing.item.id === r.item.id)));
+    }
+    
+    // 3. 의미적 유사도 매칭
+    if (results.length < limit) {
+      const semanticMatches = this.findSemanticMatches(query);
+      results.push(...semanticMatches.filter(r => !results.some(existing => existing.item.id === r.item.id)));
+    }
+    
+    // 4. 퍼지 매칭
+    if (results.length < limit) {
+      const fuzzyMatches = this.findFuzzyMatches(query);
+      results.push(...fuzzyMatches.filter(r => !results.some(existing => existing.item.id === r.item.id)));
+    }
+    
+    return results
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+  }
+
+  // 정확한 매칭
+  private findExactMatches(query: string): QASearchResult[] {
+    const queryLower = query.toLowerCase().trim();
+    
+    return this.knowledgeBase
+      .filter(item => 
+        item.question.toLowerCase().includes(queryLower) ||
+        queryLower.includes(item.question.toLowerCase())
+      )
+      .map(item => ({
+        item,
+        score: 1.0,
+        matchType: 'exact' as const
+      }));
+  }
+
+  // 키워드 매칭
+  private findKeywordMatches(query: string): QASearchResult[] {
+    const queryKeywords = this.extractKeywords(query);
+    const matches: Map<string, { item: QAItem; matchCount: number }> = new Map();
+    
+    queryKeywords.forEach(keyword => {
+      const items = this.keywordIndex.get(keyword) || [];
+      items.forEach(item => {
+        const existing = matches.get(item.id);
+        if (existing) {
+          existing.matchCount++;
+        } else {
+          matches.set(item.id, { item, matchCount: 1 });
+        }
+      });
+    });
+    
+    return Array.from(matches.values())
+      .map(({ item, matchCount }) => ({
+        item,
+        score: Math.min(matchCount / queryKeywords.length, 1.0) * 0.8,
+        matchType: 'keyword' as const
+      }))
+      .filter(result => result.score > 0.2);
+  }
+
+  // 의미적 유사도 매칭
+  private findSemanticMatches(query: string): QASearchResult[] {
+    const queryWords = new Set(this.extractKeywords(query));
+    
+    return this.knowledgeBase
+      .map(item => {
+        const itemWords = new Set(item.keywords);
+        const intersection = new Set([...queryWords].filter(word => itemWords.has(word)));
+        const union = new Set([...queryWords, ...itemWords]);
+        
+        const similarity = intersection.size / union.size;
+        
+        return {
+          item,
+          score: similarity * 0.6,
+          matchType: 'semantic' as const
+        };
+      })
+      .filter(result => result.score > 0.1);
+  }
+
+  // 퍼지 매칭
+  private findFuzzyMatches(query: string): QASearchResult[] {
+    const queryLower = query.toLowerCase();
+    
+    return this.knowledgeBase
+      .map(item => {
+        const similarity = this.calculateStringSimilarity(queryLower, item.question.toLowerCase());
+        
+        return {
+          item,
+          score: similarity * 0.4,
+          matchType: 'fuzzy' as const
+        };
+      })
+      .filter(result => result.score > 0.2);
+  }
+
+  // 문자열 유사도 계산
+  private calculateStringSimilarity(str1: string, str2: string): number {
+    const set1 = new Set(str1.split(''));
+    const set2 = new Set(str2.split(''));
+    
+    const intersection = new Set([...set1].filter(char => set2.has(char)));
+    const union = new Set([...set1, ...set2]);
+    
+    return intersection.size / union.size;
+  }
+
+  // === 응답 개인화 메서드 ===
+  private personalizeQAResponse(qaAnswer: string, context: UserActivityContext): string {
+    const userName = context.userName || '사용자';
+    const streak = context.activityStats?.streakCount || 0;
+    
+    let personalizedAnswer = qaAnswer;
+    
+    // 컨텍스트 기반 개인화
+    if (streak >= 7) {
+      personalizedAnswer += `\n\n🔥 ${userName}님은 ${streak}일 연속 활동 중이시네요! 대단해요!`;
+    }
+    
+    if (context.questStats && context.questStats?.completionRate >= 80) {
+      personalizedAnswer += `\n\n🎯 퀘스트 달성률 ${context.questStats.completionRate}%로 정말 열심히 하고 계시네요!`;
+    }
+    
+    if (!context.hasJoinedGroups) {
+      personalizedAnswer += '\n\n💡 아직 그룹에 참여하지 않으셨네요. 그룹 가입을 통해 더 많은 기능을 이용해보세요!';
+    }
+    
+    return personalizedAnswer;
+  }
+
+  // 향상된 기본 응답
+  private getEnhancedDefaultResponse(
+    input: string, 
+    context: UserActivityContext, 
+    qaResults: QASearchResult[]
+  ): string {
+    const suggestions = qaResults
+      .filter(result => result.score > 0.2)
+      .slice(0, 2)
+      .map(result => `"${result.item.question}"`)
+      .join(' 또는 ');
+
+    const baseResponse = this.getPersonalizedDefaultResponse(context);
+    
+    if (suggestions) {
+      return `${baseResponse}\n\n🤔 혹시 이런 질문을 하신 건가요?\n${suggestions}\n\n더 구체적으로 질문해주시면 정확한 답변을 드릴 수 있어요!`;
+    }
+    
+    return baseResponse;
+  }
+
+  // === 학습 및 관리 기능 ===
+  
+  // 사용자 피드백으로부터 학습
+  learnFromInteraction(input: string, response: string, feedback: 'helpful' | 'unhelpful', correction?: string): void {
+    console.log('Learning from interaction:', { input, feedback, hasCorrection: !!correction });
+    
+    if (feedback === 'unhelpful' && correction) {
+      // 새로운 Q&A 추가
+      this.addQA(input, correction);
+      console.log('New Q&A learned from user correction');
+    }
+    
+    // 로그 데이터 수집 (향후 분석용)
+    this.logInteraction(input, response, feedback);
+  }
+
+  // Q&A 동적 추가
+  addQA(question: string, answer: string): void {
+    const newItem = this.preprocessQAItem({ question, answer });
+    this.knowledgeBase.push(newItem);
+    
+    // 키워드 인덱스 업데이트
+    newItem.keywords.forEach(keyword => {
+      if (!this.keywordIndex.has(keyword)) {
+        this.keywordIndex.set(keyword, []);
+      }
+      this.keywordIndex.get(keyword)!.push(newItem);
+    });
+    
+    console.log('New Q&A added:', { question: question.substring(0, 50), category: newItem.category });
+  }
+
+  // Q&A 통계 조회
+  getQAStats() {
+    const categoryCounts: { [key: string]: number } = {};
+    this.knowledgeBase.forEach(item => {
+      categoryCounts[item.category] = (categoryCounts[item.category] || 0) + 1;
+    });
+
+    return {
+      totalItems: this.knowledgeBase.length,
+      categories: categoryCounts,
+      keywordIndexSize: this.keywordIndex.size,
+      initialized: this.qaInitialized
+    };
+  }
+
+  // 카테고리별 Q&A 조회
+  getQAByCategory(category: string): QAItem[] {
+    return this.knowledgeBase.filter(item => item.category === category);
+  }
+
+  // Q&A 검색 (외부 인터페이스)
+  searchKnowledge(query: string, limit: number = 10): QASearchResult[] {
+    return this.searchQA(query, limit);
+  }
+
+  // Q&A 파일 업로드
+  async uploadQAFile(fileContent: string): Promise<void> {
+    await this.loadQAFile(fileContent);
+  }
+
+  // === 기존 메서드들 (활동 데이터 기반 응답) ===
+  
   private async keywordMatchWithActivity(input: string, context: UserActivityContext): Promise<MacroResponse | null> {
     const inputLower = input.toLowerCase();
     
@@ -218,7 +580,6 @@ export class ChatbotService {
       ).length;
       
       if (keywordScore > 0) {
-        // 컨텍스트 조건 확인
         if (macro.contextualConditions && !macro.contextualConditions(context)) {
           continue;
         }
@@ -230,7 +591,6 @@ export class ChatbotService {
   }
 
   private generateContextualResponse(macro: MacroResponse, context: UserActivityContext): string {
-    // 매크로별 동적 응답 생성
     switch (macro.id) {
       case 'stats_overall':
         return this.generateStatsResponse(context);
@@ -240,18 +600,6 @@ export class ChatbotService {
       
       case 'quest_completion_rate':
         return this.generateQuestStatsResponse(context);
-      
-      case 'favorite_group':
-        return this.generateFavoriteGroupResponse(context);
-      
-      case 'recent_activity':
-        return this.generateRecentActivityResponse(context);
-      
-      case 'motivation_low_activity':
-        return this.generateMotivationResponse(context);
-      
-      case 'congratulations_high_streak':
-        return this.generateCongratulationsResponse(context);
       
       default:
         return macro.response;
@@ -313,67 +661,49 @@ export class ChatbotService {
 • 선호 그룹: **${quest.favoriteGroup}**`;
   }
 
-  private generateFavoriteGroupResponse(context: UserActivityContext): string {
-    const favoriteGroup = context.questStats?.favoriteGroup || context.groupStats?.mostActiveGroup;
-    
-    if (!favoriteGroup || favoriteGroup === '없음') {
-      return '아직 특별히 선호하는 그룹이 없으시네요. 다양한 그룹에서 활동해보세요! 🌟';
-    }
+  // === 유틸리티 메서드들 ===
+  
+  private async enrichContextWithActivity(context: UserActivityContext): Promise<UserActivityContext> {
+    try {
+      const activityStats = this.activityService.getActivityStats();
+      const recentActivities = this.activityService.activities().slice(0, 5);
 
-    return `🌟 **"${favoriteGroup}"** 그룹에서 가장 활발히 활동하고 계시네요!\n해당 그룹의 다른 멤버들과도 더 많이 소통해보시는 건 어떨까요? 🤝`;
+      const [questStats, groupStats, insights] = await Promise.allSettled([
+        this.activityService.getQuestBasedStats(),
+        this.activityService.getGroupParticipationStats(),
+        this.activityService.getPersonalizedInsights()
+      ]);
+
+      return {
+        ...context,
+        activityStats,
+        questStats: questStats.status === 'fulfilled' ? questStats.value : undefined,
+        groupStats: groupStats.status === 'fulfilled' ? groupStats.value : undefined,
+        recentActivities,
+        personalizedInsights: insights.status === 'fulfilled' ? insights.value : []
+      };
+    } catch (error) {
+      console.error('Error enriching context with activity data:', error);
+      return {
+        ...context,
+        activityStats: this.activityService?.getActivityStats() || undefined,
+        recentActivities: this.activityService?.activities()?.slice(0, 5) || []
+      };
+    }
   }
 
-  private generateRecentActivityResponse(context: UserActivityContext): string {
-    const activities = context.recentActivities;
-    if (!activities || activities.length === 0) {
-      return '최근 활동이 없어요. 오늘 새로운 도전을 시작해보시는 건 어떨까요? ✨';
-    }
-
-    const recentActivity = activities[0];
-    const activityCount = activities.length;
-
-    return `📝 최근에 **${activityCount}개의 활동**을 하셨네요!
-가장 최근: **${recentActivity.title}**
-
-${this.getEncouragementMessage(activityCount)} 🎉`;
-  }
-
-  private generateMotivationResponse(context: UserActivityContext): string {
-    const streak = context.activityStats?.streakCount || 0;
-    const total = context.activityStats?.totalActivities || 0;
-
-    if (total === 0) {
-      return '🌱 모든 시작이 그렇듯, 첫 걸음이 가장 중요해요!\n작은 퀘스트 하나부터 시작해보시는 건 어떨까요? 당신은 분명 해낼 수 있어요! 💪';
-    } else if (streak < 3) {
-      return `💪 지금까지 **${total}번의 활동**을 하셨어요!\n연속 기록을 쌓아가는 재미도 느껴보세요. 오늘 하나만 더 도전해볼까요? 🎯`;
-    }
-
-    return '🌟 때로는 쉬어가는 것도 필요해요. 부담갖지 마시고, 준비가 되면 언제든 다시 시작하세요! 😊';
-  }
-
-  private generateCongratulationsResponse(context: UserActivityContext): string {
-    const streak = context.activityStats?.streakCount || 0;
-    const points = context.activityStats?.totalPoints || 0;
-
-    if (streak >= 30) {
-      return `🏆 **${streak}일 연속!** 정말 대단한 끈기에요!\n당신은 진정한 목표 달성 마스터입니다! **${points}포인트**도 획득하셨고요. 👑`;
-    } else if (streak >= 14) {
-      return `🎉 **2주 연속!** 놀라운 꾸준함이에요!\n이런 습관이 있다면 어떤 목표든 달성할 수 있을 거예요! **${points}포인트** 축하드려요! 🌟`;
-    } else if (streak >= 7) {
-      return `🔥 **일주일 연속!** 정말 잘하고 있어요!\n이 습관을 계속 유지한다면 더 큰 성취를 이룰 수 있을 거예요! **${points}포인트**도 쌓였네요! 🎯`;
-    }
-
-    return `✨ **${streak}일 연속** 정말 대단해요! 이런 꾸준함이 성공의 비결이죠! 🌟`;
-  }
-
-  // === 개인화된 인사말 및 응답 ===
   private getPersonalizedGreeting(context: UserActivityContext): string {
     const userName = context.userName || '사용자';
     const streak = context.activityStats?.streakCount || 0;
     const hasGroups = context.hasJoinedGroups;
+    const qaCount = this.knowledgeBase.length;
     
     const timeOfDay = this.getTimeOfDay();
     const greeting = `${timeOfDay} ${userName}님! 😊`;
+
+    if (qaCount > 0) {
+      return `${greeting}\n\n🤖 ${qaCount}개의 Q&A 데이터로 더욱 똑똑해진 AI 어시스턴트입니다!\n${streak >= 7 ? `🔥 ${streak}일 연속 활동 중! 오늘도 멋진 하루 보내세요!` : '무엇을 도와드릴까요?'}`;
+    }
 
     if (streak >= 7) {
       return `${greeting}\n🔥 ${streak}일 연속 활동 중! 오늘도 멋진 하루 보내세요!`;
@@ -402,128 +732,20 @@ ${this.getEncouragementMessage(activityCount)} 🎉`;
     return defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
   }
 
-  // === 활동 데이터 컨텍스트 보강 ===
-  private async enrichContextWithActivity(context: UserActivityContext): Promise<UserActivityContext> {
-    try {
-      // 기본 활동 통계는 동기로 가져올 수 있음
-      const activityStats = this.activityService.getActivityStats();
-      const recentActivities = this.activityService.activities().slice(0, 5);
-
-      // 비동기 데이터는 에러 핸들링과 함께
-      const [questStats, groupStats, insights] = await Promise.allSettled([
-        this.activityService.getQuestBasedStats(),
-        this.activityService.getGroupParticipationStats(),
-        this.activityService.getPersonalizedInsights()
-      ]);
-
-      return {
-        ...context,
-        activityStats,
-        questStats: questStats.status === 'fulfilled' ? questStats.value : undefined,
-        groupStats: groupStats.status === 'fulfilled' ? groupStats.value : undefined,
-        recentActivities,
-        personalizedInsights: insights.status === 'fulfilled' ? insights.value : []
-      };
-    } catch (error) {
-      console.error('Error enriching context with activity data:', error);
-      // 기본 컨텍스트 반환
-      return {
-        ...context,
-        activityStats: this.activityService?.getActivityStats() || undefined,
-        recentActivities: this.activityService?.activities()?.slice(0, 5) || []
-      };
-    }
-  }
-
-  // === 유틸리티 메서드들 ===
-  private getTimeOfDay(): string {
-    const hour = new Date().getHours();
-    if (hour < 12) return '좋은 아침이에요!';
-    if (hour < 18) return '안녕하세요!';
-    return '좋은 저녁이에요!';
-  }
-
-  private getEncouragementMessage(activityCount: number): string {
-    if (activityCount >= 10) return '정말 활발하게 활동하고 계시네요!';
-    if (activityCount >= 5) return '꾸준히 잘 하고 계세요!';
-    return '좋은 시작이에요!';
-  }
-
-  // === 기존 메서드들 유지 ===
+  // === 기존 호환성 메서드들 ===
   
-  // 1단계: 키워드 매칭 (빠른 응답)
-  private keywordMatch(input: string): MacroResponse | null {
-    const inputLower = input.toLowerCase();
-    
-    for (const macro of this.macroResponses) {
-      const keywordScore = macro.keywords.filter(keyword => 
-        inputLower.includes(keyword.toLowerCase())
-      ).length;
-      
-      if (keywordScore > 0) {
-        return { ...macro, confidence: keywordScore / macro.keywords.length };
-      }
-    }
-    return null;
-  }
-
-  // 2단계: 패턴 매칭 (문맥 고려)
-  private patternMatch(input: string): MacroResponse | null {
-    const inputLower = input.toLowerCase();
-    
-    for (const macro of this.macroResponses) {
-      for (const pattern of macro.patterns) {
-        if (this.fuzzyMatch(inputLower, pattern.toLowerCase())) {
-          return { ...macro, confidence: 0.8 };
-        }
-      }
-    }
-    return null;
-  }
-
-  // 3단계: 유사도 기반 매칭 (ML 대안)
-  private similarityMatch(input: string): MacroResponse | null {
-    let bestMatch: MacroResponse | null = null;
-    let bestScore = 0;
-
-    for (const macro of this.macroResponses) {
-      const combinedText = [...macro.keywords, ...macro.patterns].join(' ');
-      const similarity = this.calculateSimilarity(input.toLowerCase(), combinedText.toLowerCase());
-      
-      if (similarity > bestScore && similarity > 0.3) {
-        bestScore = similarity;
-        bestMatch = { ...macro, confidence: similarity };
-      }
-    }
-    
-    return bestMatch;
-  }
-
-  // 퍼지 매칭 (오타 허용)
-  private fuzzyMatch(text: string, pattern: string): boolean {
-    const threshold = 0.7;
-    const similarity = this.calculateSimilarity(text, pattern);
-    return similarity >= threshold;
-  }
-
-  // 단순 유사도 계산 (Jaccard 유사도)
-  private calculateSimilarity(str1: string, str2: string): number {
-    const set1 = new Set(str1.split(/\s+/));
-    const set2 = new Set(str2.split(/\s+/));
-    
-    const intersection = new Set([...set1].filter(x => set2.has(x)));
-    const union = new Set([...set1, ...set2]);
-    
-    return intersection.size / union.size;
-  }
-
-  // 기존 호환성을 위한 메서드
   generateResponse(input: string): string {
-    // 기본 응답 (활동 데이터 없이)
     if (!input.trim()) {
       return '안녕하세요! 무엇을 도와드릴까요? 😊';
     }
 
+    // Q&A 검색 우선
+    const qaResults = this.searchQA(input, 1);
+    if (qaResults.length > 0 && qaResults[0].score > 0.6) {
+      return qaResults[0].item.answer;
+    }
+
+    // 기존 매크로 응답
     let match = this.keywordMatch(input);
     
     if (!match || match.confidence < 0.8) {
@@ -561,6 +783,74 @@ ${this.getEncouragementMessage(activityCount)} 🎉`;
     return baseResponse;
   }
 
+  private keywordMatch(input: string): MacroResponse | null {
+    const inputLower = input.toLowerCase();
+    
+    for (const macro of this.macroResponses) {
+      const keywordScore = macro.keywords.filter(keyword => 
+        inputLower.includes(keyword.toLowerCase())
+      ).length;
+      
+      if (keywordScore > 0) {
+        return { ...macro, confidence: keywordScore / macro.keywords.length };
+      }
+    }
+    return null;
+  }
+
+  private patternMatch(input: string): MacroResponse | null {
+    const inputLower = input.toLowerCase();
+    
+    for (const macro of this.macroResponses) {
+      for (const pattern of macro.patterns) {
+        if (this.fuzzyMatch(inputLower, pattern.toLowerCase())) {
+          return { ...macro, confidence: 0.8 };
+        }
+      }
+    }
+    return null;
+  }
+
+  private similarityMatch(input: string): MacroResponse | null {
+    let bestMatch: MacroResponse | null = null;
+    let bestScore = 0;
+
+    for (const macro of this.macroResponses) {
+      const combinedText = [...macro.keywords, ...macro.patterns].join(' ');
+      const similarity = this.calculateSimilarity(input.toLowerCase(), combinedText.toLowerCase());
+      
+      if (similarity > bestScore && similarity > 0.3) {
+        bestScore = similarity;
+        bestMatch = { ...macro, confidence: similarity };
+      }
+    }
+    
+    return bestMatch;
+  }
+
+  private fuzzyMatch(text: string, pattern: string): boolean {
+    const threshold = 0.7;
+    const similarity = this.calculateSimilarity(text, pattern);
+    return similarity >= threshold;
+  }
+
+  private calculateSimilarity(str1: string, str2: string): number {
+    const set1 = new Set(str1.split(/\s+/));
+    const set2 = new Set(str2.split(/\s+/));
+    
+    const intersection = new Set([...set1].filter(x => set2.has(x)));
+    const union = new Set([...set1, ...set2]);
+    
+    return intersection.size / union.size;
+  }
+
+  private getTimeOfDay(): string {
+    const hour = new Date().getHours();
+    if (hour < 12) return '좋은 아침이에요!';
+    if (hour < 18) return '안녕하세요!';
+    return '좋은 저녁이에요!';
+  }
+
   private getDefaultResponse(): string {
     const defaultResponses = [
       '죄송해요, 잘 이해하지 못했어요. 다시 말씀해 주시겠어요?',
@@ -571,12 +861,14 @@ ${this.getEncouragementMessage(activityCount)} 🎉`;
     return defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
   }
 
-  // 매크로 응답 동적 추가
+  private generateId(): string {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+  }
+
   addMacroResponse(macro: MacroResponse): void {
     this.macroResponses.push(macro);
   }
 
-  // 응답 품질 개선을 위한 학습 데이터 수집
   logInteraction(input: string, response: string, userFeedback?: 'helpful' | 'unhelpful'): void {
     console.log('Chatbot Interaction:', { input, response, userFeedback, timestamp: new Date() });
   }

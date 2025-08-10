@@ -1,4 +1,4 @@
-<!-- 최적화된 Chatbot.html - 성능 개선된 템플릿 -->
+<!-- 개선된 Chatbot.html - 피드백 기능 및 Q&A 통계 포함 -->
 <div class="chatbot-container">
   <!-- 챗봇 토글 버튼 -->
   <button 
@@ -12,6 +12,7 @@
     matBadgePosition="above before"
     (click)="toggleChatbot()"
     [attr.aria-label]="'챗봇 ' + (isOpen() ? '닫기' : '열기')"
+    [matTooltip]="'Q&A: ' + qaStats()?.totalItems + '개'"
     type="button">
     
     @if (isMinimized()) {
@@ -30,10 +31,20 @@
           <div class="bot-avatar" aria-hidden="true">🤖</div>
           <div class="bot-details">
             <h2 id="chatbot-title" class="bot-name">AI 어시스턴트</h2>
-            <span class="bot-status" aria-label="상태: 온라인">● 온라인</span>
+            <span class="bot-status" aria-label="상태: 온라인">
+              ● 온라인 (Q&A: {{ qaStats()?.totalItems || 0 }}개)
+            </span>
           </div>
         </div>
         <div class="header-actions">
+          <button 
+            class="header-btn" 
+            (click)="toggleQAStats()" 
+            aria-label="Q&A 통계"
+            [matTooltip]="'Q&A 통계 ' + (showQAStats() ? '숨기기' : '보기')"
+            type="button">
+            <mat-icon aria-hidden="true">analytics</mat-icon>
+          </button>
           <button 
             class="header-btn" 
             (click)="minimize()" 
@@ -50,6 +61,43 @@
           </button>
         </div>
       </header>
+
+      <!-- Q&A 통계 패널 (선택적 표시) -->
+      @if (showQAStats()) {
+        <div class="qa-stats-panel">
+          <h3>📊 Q&A 지식 베이스</h3>
+          <div class="stats-grid">
+            <div class="stat-item">
+              <span class="stat-label">총 Q&A</span>
+              <span class="stat-value">{{ qaStats()?.totalItems || 0 }}개</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">카테고리</span>
+              <span class="stat-value">{{ getCategoryCount() }}개</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">응답 품질</span>
+              <span class="stat-value">{{ getPerformanceStats()?.responseQuality || 0 }}%</span>
+            </div>
+          </div>
+          
+          <!-- Q&A 파일 업로드 (관리자 기능) -->
+          <div class="upload-section">
+            <input 
+              type="file" 
+              accept=".txt" 
+              (change)="uploadQAFile($event)"
+              #fileInput
+              style="display: none;">
+            <button 
+              class="upload-btn" 
+              (click)="fileInput.click()"
+              type="button">
+              📁 Q&A 파일 업로드
+            </button>
+          </div>
+        </div>
+      }
 
       <!-- 메시지 영역 -->
       <main 
@@ -79,7 +127,7 @@
             </nav>
           </div>
         } @else {
-          <!-- 메시지 리스트 - trackBy 함수 적용으로 성능 최적화 -->
+          <!-- 메시지 리스트 -->
           @for (message of messages(); track trackByMessageId($index, message)) {
             <article 
               class="message-wrapper" 
@@ -96,19 +144,49 @@
                   [attr.aria-label]="message.isUser ? '사용자 메시지' : '봇 응답'">
                   
                   <!-- 메시지 텍스트 -->
-                  <p 
-                    [attr.data-username]="message.isUser ? '당신' : ''"
-                    [innerHTML]="message.text"
-                    class="message-text">
-                  </p>
-                  
-                  <!-- 타임스탬프 -->
-                  <time 
-                    class="message-time"
-                    [attr.datetime]="message.timestamp | date:'yyyy-MM-ddTHH:mm:ss'"
-                    [title]="message.timestamp | date:'yyyy년 MM월 dd일 HH:mm:ss'">
-                    {{ message.timestamp | date:'HH:mm' }}
-                  </time>
+                  <div class="message-text-container">
+                    <p 
+                      [attr.data-username]="message.isUser ? '당신' : ''"
+                      [innerHTML]="message.text"
+                      class="message-text">
+                    </p>
+                    
+                    <!-- 타임스탬프 -->
+                    <time 
+                      class="message-time"
+                      [attr.datetime]="message.timestamp | date:'yyyy-MM-ddTHH:mm:ss'"
+                      [title]="message.timestamp | date:'yyyy년 MM월 dd일 HH:mm:ss'">
+                      {{ message.timestamp | date:'HH:mm' }}
+                    </time>
+                  </div>
+
+                  <!-- 피드백 버튼 (봇 메시지에만) -->
+                  @if (message.showFeedback && !message.feedbackProvided) {
+                  <div class="message-feedback">
+                    <span class="feedback-label">도움이 되었나요?</span>
+                    <div class="feedback-buttons">
+                      <button 
+                        class="feedback-btn helpful"
+                        (click)="onMessageFeedback(message.id, 'helpful')"
+                        type="button">
+                        👍
+                      </button>
+                      <button 
+                        class="feedback-btn unhelpful"
+                        (click)="onMessageFeedback(message.id, 'unhelpful')"
+                        type="button">
+                        👎
+                      </button>
+                    </div>
+                  </div>
+                }
+                @if (message.feedbackProvided) {
+                  <div class="feedback-status">
+                    <span class="feedback-thanks">
+                      {{ message.feedback === 'helpful' ? '✅ 감사합니다!' : 'ℹ️ 피드백 감사합니다' }}
+                    </span>
+                  </div>
+                }
                 </div>
               </div>
             </article>
@@ -128,7 +206,7 @@
                   <span></span>
                   <span></span>
                 </div>
-                <span class="sr-only">입력 중...</span>
+                <span class="sr-only">Q&A 검색 및 응답 생성 중...</span>
               </div>
             </div>
           </div>
@@ -143,7 +221,7 @@
             #userInputRef
             id="chat-input"
             class="native-input"
-            placeholder="메시지 보내기..."
+            placeholder="메시지 보내기... (Q&A 검색 가능)"
             [value]="userInputValue()"
             (input)="userInputValue.set($any($event.target).value)"
             (keydown)="onInputKeyPress($event)"
@@ -157,7 +235,7 @@
           <!-- 숨김 상태 표시 -->
           @if (isTyping()) {
             <div id="typing-status" class="sr-only" aria-live="polite">
-              봇이 응답을 생성하고 있습니다
+              Q&A 데이터베이스를 검색하며 응답을 생성하고 있습니다
             </div>
           }
           
@@ -173,7 +251,7 @@
         <!-- 빠른 액션 (메시지가 적을 때만 표시) -->
         @if (messages().length <= 1) {
           <nav class="input-quick-actions" aria-label="빠른 질문">
-            @for (action of quickActions().slice(0, 3); track action) {
+            @for (action of quickActions().slice(0, 4); track action) {
               <button 
                 class="quick-action-chip" 
                 (click)="onQuickAction(action)"
@@ -189,18 +267,3 @@
     </div>
   }
 </div>
-
-<!-- 스크린 리더용 숨김 텍스트를 위한 스타일 -->
-<style>
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-</style>
