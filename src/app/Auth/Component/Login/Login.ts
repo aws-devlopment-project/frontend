@@ -231,6 +231,28 @@ export class LoginComponent implements OnInit {
 
     private async handleAuthCallback(): Promise<void> {
         try {
+            // 로컬 사용 시, try 내부 코드를 전부 주석 처리하고 이 주석의 코드를 활성화하세요
+            /*
+            let userId = "wefwefw@wefewfwe.fwwefwefwef";
+            let displayName = "wewefwefwefwef";
+            const user: UserCredentials = {
+                id: userId,
+                name: displayName,
+                accessToken: userInfo.accessToken,
+            };
+
+            const userStatus: UserStatus = {
+                id: userId,
+                name: displayName,
+                status: 'online',
+                joinDate: new Date(),
+                lastSeen: new Date()
+            };
+            this.cacheService.setCache('user', user);
+            this.cacheService.setCache('userStatus', userStatus);
+            
+            await this.router.navigate(['/board']);
+            */
             const isAuthenticated = await this.auth.checkAuthState();
             
             if (isAuthenticated) {
