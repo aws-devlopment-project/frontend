@@ -252,9 +252,7 @@ export class ManagementDashboardService {
     async departUser(username: string = ""): Promise<void> {
         const user = this.shared.currentUser();
         if (user) {
-            const ans = await this.loginService.deleteCurrentUser();
-            this.cacheService.clearAllCache();
-            this.shared.reset();
+            const ans = await this.userService.departUser(user.id);
         } else {
             await this.userService.leaveGroup("", username);
         }
