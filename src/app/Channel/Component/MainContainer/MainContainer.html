@@ -1,11 +1,10 @@
-<!-- UpdatedMainContainer.html - 백엔드 예시에 맞춘 STOMP 기반 템플릿 -->
 <div class="chat-container">
   <!-- 채팅 헤더 -->
   <div class="chat-header">
     <div class="channel-info">
-      <h3># {{ channelInfo()?.name || currentChannel() || '채널' }}</h3>
+      <h3># {{ currentChannel().name || '채널' }}</h3>
       <div class="channel-status">
-        <p>{{ channelInfo()?.description || getChannelDescription(currentChannel().name) }}</p>
+        <p>실시간 채팅방 (Club ID: {{ chatRoomId() }})</p>
         <div class="connection-status" [class]="getConnectionStatusClass()">
           <mat-icon class="status-icon">
             {{ connectionStatus() === 'connected' ? 'wifi' : 
@@ -13,39 +12,18 @@
                connectionStatus() === 'reconnecting' ? 'sync' : 'wifi_off' }}
           </mat-icon>
           <span>{{ getConnectionStatusText() }}</span>
-          @if (connectionStatus() === 'connected' && chatRoomId() !== -1) {
-            <span class="room-id">• Club {{ chatRoomId() }}</span>
-          }
         </div>
       </div>
     </div>
     <div class="chat-actions">
-      <button class="header-btn" title="통계 보기"
-              (click)="showStats()">
-        <mat-icon>analytics</mat-icon>
-        @if (messageStats().count > 0) {
-          <span class="message-count-badge">{{ messageStats().count }}</span>
-        }
-      </button>
-      <button class="header-btn" title="연결 테스트"
-              (click)="testConnection()">
+      <button class="header-btn" title="연결 테스트" (click)="testConnection()">
         <mat-icon>network_check</mat-icon>
-      </button>
-      <button class="header-btn" title="현재 채널 이력 삭제" 
-              [disabled]="messages().length === 0"
-              (click)="clearCurrentChannelHistory()">
-        <mat-icon>delete_sweep</mat-icon>
       </button>
       @if (connectionStatus() === 'disconnected') {
         <button class="header-btn reconnect-btn" title="다시 연결" (click)="reconnect()">
           <mat-icon>refresh</mat-icon>
         </button>
       }
-      <button class="header-btn" title="데모 메시지 추가"
-              [disabled]="connectionStatus() !== 'connected'"
-              (click)="addDemoMessage()">
-        <mat-icon>message</mat-icon>
-      </button>
     </div>
   </div>
 
@@ -54,18 +32,22 @@
     @if (messages().length === 0) {
       <div class="welcome-message">
         <div class="welcome-content">
-          <h4>🎉 {{ getWelcomeTitle() }}</h4>
-          <p>{{ getWelcomeMessage() }}</p>
+          <h4>🎉 채팅방에 오신 것을 환영합니다!</h4>
+          <p>STOMP over WebSocket으로 실시간 채팅을 즐겨보세요.</p>
           
           @if (connectionStatus() === 'connected') {
             <div class="conversation-starters">
               <h5>대화 시작하기</h5>
               <div class="starter-buttons">
-                @for (starter of getConversationStarters(); track starter) {
-                  <button class="starter-btn" (click)="sendMessage(starter)">
-                    {{ starter }}
-                  </button>
-                }
+                <button class="starter-btn" (click)="sendMessage('안녕하세요! 👋')">
+                  안녕하세요! 👋
+                </button>
+                <button class="starter-btn" (click)="sendMessage('채팅 테스트입니다.')">
+                  채팅 테스트입니다.
+                </button>
+                <button class="starter-btn" (click)="sendMessage('좋은 하루 보내세요!')">
+                  좋은 하루 보내세요!
+                </button>
               </div>
             </div>
           } @else {
@@ -110,35 +92,9 @@
                 <span class="timestamp">{{ formatTime(message.timestamp) }}</span>
               </div>
               
-              <!-- 일반 채팅 메시지 -->
+              <!-- 채팅 메시지 -->
               @if (message.messageType === 'CHAT') {
                 <div class="message-text">{{ message.content }}</div>
-              }
-              
-              <!-- 이미지/파일 메시지 -->
-              @if (message.messageType === 'IMAGE') {
-                <div class="message-file">
-                  @if (getImageData(message)?.type?.startsWith('image/')) {
-                    <div class="image-preview" (click)="previewImage(message)">
-                      <img [src]="getImageData(message)?.data" 
-                           [alt]="getImageData(message)?.name"
-                           class="preview-image">
-                      <div class="image-info">
-                        <span class="file-name">{{ getImageData(message)?.name }}</span>
-                        <span class="file-size">({{ formatFileSize(getImageData(message)?.size) }})</span>
-                      </div>
-                    </div>
-                  } @else {
-                    <div class="file-preview" (click)="downloadFile(message)">
-                      <mat-icon class="file-icon">attach_file</mat-icon>
-                      <div class="file-info">
-                        <span class="file-name">{{ getImageData(message)?.name }}</span>
-                        <span class="file-size">({{ formatFileSize(getImageData(message)?.size) }})</span>
-                      </div>
-                      <mat-icon class="download-icon">download</mat-icon>
-                    </div>
-                  }
-                </div>
               }
               
               <!-- 입장/퇴장 메시지 -->
@@ -165,30 +121,14 @@
   <!-- 메시지 입력 영역 -->
   <div class="chat-input-area">
     <div class="input-container" [class.disabled]="connectionStatus() !== 'connected'">
-      <input type="file" #fileInput (change)="onFileSelect($event)" 
-             style="display: none;" 
-             accept="image/*,video/*,.pdf,.doc,.docx,.txt,.zip">
-      
-      <button class="input-btn" title="파일 첨부" 
-              [disabled]="connectionStatus() !== 'connected'"
-              (click)="fileInput.click()">
-        <mat-icon>attach_file</mat-icon>
-      </button>
-      
       <textarea
         class="message-input"
         [(ngModel)]="newMessage"
         [placeholder]="getInputPlaceholder()"
         [disabled]="connectionStatus() !== 'connected'"
         (keydown)="onKeyDown($event)"
-        rows="1"
-        #messageInput>
+        rows="1">
       </textarea>
-      
-      <button class="input-btn" title="이모티콘"
-              [disabled]="connectionStatus() !== 'connected'">
-        <mat-icon>emoji_emotions</mat-icon>
-      </button>
       
       <button 
         class="send-btn" 
@@ -202,7 +142,6 @@
     <div class="input-hints">
       @if (connectionStatus() === 'connected') {
         <span><strong>Enter</strong>로 전송, <strong>Shift + Enter</strong>로 줄바꿈</span>
-        <span class="storage-info">• 메모리에 최근 50개 메시지 저장 중 (Club ID: {{ chatRoomId() }})</span>
       } @else {
         <span class="connection-hint">{{ getConnectionStatusText() }} - 메시지를 보낼 수 없습니다</span>
       }
