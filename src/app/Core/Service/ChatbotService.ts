@@ -174,7 +174,6 @@ export class ChatbotService {
 
     try {
       this.loadQAFile(defaultQAData);
-      console.log('기본 Q&A 데이터가 로드되었습니다.');
     } catch (error) {
       console.error('기본 Q&A 데이터 로드 실패:', error);
     }
@@ -189,8 +188,6 @@ export class ChatbotService {
       this.knowledgeBase = processedItems;
       this.buildKeywordIndex();
       this.qaInitialized = true;
-      
-      console.log(`Q&A Knowledge base loaded: ${this.knowledgeBase.length} items`);
     } catch (error) {
       console.error('Failed to load Q&A file:', error);
       throw error;
@@ -511,12 +508,10 @@ export class ChatbotService {
   
   // 사용자 피드백으로부터 학습
   learnFromInteraction(input: string, response: string, feedback: 'helpful' | 'unhelpful', correction?: string): void {
-    console.log('Learning from interaction:', { input, feedback, hasCorrection: !!correction });
     
     if (feedback === 'unhelpful' && correction) {
       // 새로운 Q&A 추가
       this.addQA(input, correction);
-      console.log('New Q&A learned from user correction');
     }
     
     // 로그 데이터 수집 (향후 분석용)
@@ -535,8 +530,6 @@ export class ChatbotService {
       }
       this.keywordIndex.get(keyword)!.push(newItem);
     });
-    
-    console.log('New Q&A added:', { question: question.substring(0, 50), category: newItem.category });
   }
 
   // Q&A 통계 조회
@@ -870,6 +863,5 @@ export class ChatbotService {
   }
 
   logInteraction(input: string, response: string, userFeedback?: 'helpful' | 'unhelpful'): void {
-    console.log('Chatbot Interaction:', { input, response, userFeedback, timestamp: new Date() });
   }
 }

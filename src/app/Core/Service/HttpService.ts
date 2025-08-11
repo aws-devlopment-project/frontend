@@ -81,7 +81,6 @@ export class HttpService {
 
       return this.http.get<{error: {result: string }, data: T}>(url, { headers }).pipe(
         map(response => {
-          console.log(response);
           if (response.error && response.error.result === 'failure')
               return factory();
           return response.data;

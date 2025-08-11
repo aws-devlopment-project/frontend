@@ -38,8 +38,6 @@ export class QAKnowledgeService {
       this.knowledgeBase = processedItems;
       this.buildKeywordIndex();
       this.initialized = true;
-      
-      console.log(`Knowledge base loaded: ${this.knowledgeBase.length} Q&A items`);
     } catch (error) {
       console.error('Failed to load Q&A file:', error);
       throw error;
@@ -100,7 +98,6 @@ export class QAKnowledgeService {
 
     try {
       this.loadQAFile(defaultQAData);
-      console.log('기본 Q&A 데이터가 로드되었습니다.');
     } catch (error) {
       console.error('기본 Q&A 데이터 로드 실패:', error);
     }
@@ -351,8 +348,6 @@ export class QAKnowledgeService {
       }
       this.keywordIndex.get(keyword)!.push(newItem);
     });
-    
-    console.log('New Q&A added:', { question: question.substring(0, 50), category: newItem.category });
   }
 
   // 초기화 상태 확인
@@ -371,7 +366,6 @@ export class QAKnowledgeService {
     if (index !== -1) {
       const removedItem = this.knowledgeBase.splice(index, 1)[0];
       this.buildKeywordIndex(); // 인덱스 재구축
-      console.log('Q&A removed:', removedItem.question);
       return true;
     }
     return false;
@@ -382,6 +376,5 @@ export class QAKnowledgeService {
     this.knowledgeBase = [];
     this.keywordIndex.clear();
     this.initialized = false;
-    console.log('Knowledge base cleared');
   }
 }

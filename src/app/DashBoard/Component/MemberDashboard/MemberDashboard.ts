@@ -320,7 +320,6 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
     this.groupsLoading.set(true);
     try {
       const groupList = await this.managementDashboardService.getGroupList();
-      console.log("management: ", groupList);
       this.joinedGroups.set(groupList?.joinList);
     } catch (error) {
       console.error('그룹 데이터 로드 실패:', error);
@@ -601,7 +600,6 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
   async leaveGroup(groupId: string): Promise<void> {
     if (confirm('정말로 이 그룹에서 탈퇴하시겠습니까? 그룹 내 모든 채널에서도 탈퇴됩니다.')) {
       try {
-        console.log('그룹 탈퇴:', groupId);
         await this.managementDashboardService.leaveGroup(groupId);
         
         await this.loadJoinedGroups();

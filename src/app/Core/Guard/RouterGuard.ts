@@ -19,12 +19,6 @@ export class GroupGuard implements CanActivate {
     const selectedGroup = this.shared.selectedGroup();
     const hasJoinedGroups = this.checkUserHasGroups();
 
-    console.log('GroupGuard 체크:', {
-      selectedGroup,
-      hasJoinedGroups,
-      targetUrl: state.url
-    });
-
     // 1. 선택된 그룹이 있으면 접근 허용
     if (selectedGroup) {
       return true;
@@ -34,7 +28,6 @@ export class GroupGuard implements CanActivate {
     if (hasJoinedGroups) {
       const joinedGroups = this.getJoinedGroups();
       if (joinedGroups.length > 0) {
-        console.log('자동 그룹 선택:', joinedGroups[0].groupId);
         this.shared.setSelectedGroup(joinedGroups[0].groupId);
         
         // 첫 번째 채널도 자동 선택
@@ -47,7 +40,6 @@ export class GroupGuard implements CanActivate {
     }
 
     // 3. 참여한 그룹이 없으면 그룹 참여 페이지로 리다이렉트
-    console.log('참여한 그룹이 없음. 그룹 참여 페이지로 리다이렉트');
     this.router.navigate(['/group/join']);
     return false;
   }

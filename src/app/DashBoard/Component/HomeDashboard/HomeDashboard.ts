@@ -269,8 +269,6 @@ export class HomeDashboardComponent implements OnInit {
         
         // 로컬 시간대로 날짜 문자열 생성
         const dateStr = this.formatDateLocal(date);
-        
-        console.log(`Generating quests for date: ${dateStr}, original date: ${date.toDateString()}`);
 
         const dayQuests = this.generateQuestsForDate(dateStr, questCur, userJoin);
         questData.push({
@@ -280,7 +278,6 @@ export class HomeDashboardComponent implements OnInit {
       }
 
       this.questCalendarData.set(questData);
-      console.log('Quest calendar data loaded:', questData.length, 'days');
     } catch (error) {
       console.error('Error loading quest calendar data:', error);
     }
@@ -368,8 +365,6 @@ export class HomeDashboardComponent implements OnInit {
 
   // 퀘스트 클릭 이벤트 핸들러
   onQuestClick(event: { quest: DailyQuest; date: string }): void {
-    console.log('Quest clicked:', event);
-    
     // 활동 추적
     this.localActivityService.trackActivity(
       'quest_view',
@@ -389,12 +384,6 @@ export class HomeDashboardComponent implements OnInit {
 
   // 날짜 클릭 이벤트 핸들러 (디버그 로그 추가)
   onDayClick(event: { date: string; quests: DailyQuest[] }): void {
-    console.log('Day clicked:', {
-      originalDate: event.date,
-      displayDate: this.formatDateForDisplay(event.date),
-      questCount: event.quests.length
-    });
-    
     // 퀘스트 상세 모달 열기
     const dialogRef = this.dialog.open(QuestDetailModalComponent, {
       width: '600px',
@@ -553,8 +542,6 @@ export class HomeDashboardComponent implements OnInit {
         day: 'numeric',
         weekday: 'long'
       });
-      
-      console.log(`Date formatting: ${dateStr} -> ${formatted}`);
       return formatted;
     } catch (error) {
       console.error('Error formatting date:', dateStr, error);
@@ -623,8 +610,6 @@ export class HomeDashboardComponent implements OnInit {
 
   // 액션 핸들러들
   onQuickAction(action: QuickAction): void {
-    console.log('Quick action clicked:', action.route);
-    
     this.localActivityService.trackActivity(
       'page_visit',
       `${action.title} 페이지 방문`,
@@ -652,8 +637,6 @@ export class HomeDashboardComponent implements OnInit {
   }
 
   onJoinChallenge(challenge: RecommendedChallenge): void {
-    console.log('Join challenge:', challenge.id);
-    
     this.localActivityService.trackActivity(
       'quest_start',
       `${challenge.title} 퀘스트 시작`,
@@ -671,7 +654,6 @@ export class HomeDashboardComponent implements OnInit {
   }
 
   onViewAllChallenges(): void {
-    console.log('View all challenges');
     this.localActivityService.trackActivity(
       'page_visit',
       '전체 챌린지 보기',
@@ -681,7 +663,6 @@ export class HomeDashboardComponent implements OnInit {
   }
 
   onViewAllHighlights(): void {
-    console.log('View all highlights');
     this.localActivityService.trackActivity(
       'page_visit',
       '전체 활동 보기',

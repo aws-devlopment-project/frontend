@@ -14,6 +14,7 @@ import { SharedStateService } from "../Core/Service/SharedService";
 import { environment } from "../../environments/environtment";
 import { RouterModule } from "@angular/router";
 import { ChatbotComponent } from "../Core/Component/Chatbot/Chatbot";
+import { DonationPageComponent } from "../Core/Component/Donation/Donation";
 
 interface ChannelSelectEvent {
     groupId: string;
@@ -37,7 +38,8 @@ interface ChannelSelectEvent {
     MainContainerComponent,
     MemberOptionsComponent,
     ActivityDashboardComponent,
-    ChatbotComponent
+    ChatbotComponent,
+    DonationPageComponent
   ],
   standalone: true
 })
@@ -56,24 +58,12 @@ export class MainComponent implements OnInit, OnDestroy {
   readonly hasJoinedGroups = computed(() => this.sharedState.hasJoinedGroups());
 
   constructor(public sharedState: SharedStateService) {
-    console.log('MainComponent initialized with SharedStateService');
-    
     // 초기화 상태 모니터링
     effect(() => {
       const initialized = this.sharedState.initialized();
       const hasData = this.sharedState.hasValidData();
       const hasGroups = this.sharedState.hasJoinedGroups();
       const error = this.sharedState.error();
-      
-      console.log('MainComponent state:', {
-        initialized,
-        hasData,
-        hasGroups,
-        error,
-        activeTab: this.sharedState.activeTab(),
-        selectedGroup: this.sharedState.selectedGroup(),
-        selectedChannel: this.sharedState.selectedChannel()
-      });
 
       // 초기화 완료 후 첫 방문자 처리
       if (initialized && hasData && !hasGroups && !error) {
@@ -93,19 +83,12 @@ export class MainComponent implements OnInit, OnDestroy {
     // 로딩 상태 모니터링
     effect(() => {
       const loading = this.sharedState.isLoading();
-      console.log('MainComponent loading state:', loading);
     });
 
     // 그룹 참여 상태 변화 모니터링
     effect(() => {
       const hasGroups = this.sharedState.hasJoinedGroups();
       const availableGroups = this.sharedState.availableGroups();
-      
-      console.log('Group participation changed:', {
-        hasGroups,
-        groupCount: availableGroups.length,
-        groups: availableGroups.map(g => g.groupname)
-      });
 
       // 새로 그룹에 참여했을 때 처리
       if (hasGroups && this.sharedState.activeTab() === 'home') {
@@ -115,8 +98,6 @@ export class MainComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    console.log('MainComponent ngOnInit');
-    
     // 컴포넌트가 완전히 초기화된 후 추가 설정
     setTimeout(() => {
       this.checkInitializationStatus();
@@ -124,7 +105,6 @@ export class MainComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    console.log('MainComponent ngOnDestroy');
     this.destroy$.next();
     this.destroy$.complete();
   }
@@ -141,8 +121,6 @@ export class MainComponent implements OnInit, OnDestroy {
       this.handleMissingData();
       return;
     }
-
-    console.log('MainComponent fully initialized with valid data');
   }
 
   // === 새 사용자 처리 ===
@@ -157,9 +135,6 @@ export class MainComponent implements OnInit, OnDestroy {
   }
 
   private suggestGroupJoin(): void {
-    // 사용자에게 그룹 가입을 제안하는 알림 표시
-    console.log('Suggesting group join to new user');
-    
     // 예시: 3초 후 그룹 가입 페이지로 이동 제안
     setTimeout(() => {
       if (!this.sharedState.hasJoinedGroups()) {
@@ -200,8 +175,6 @@ export class MainComponent implements OnInit, OnDestroy {
 
   // === 데이터 부족 처리 ===
   private handleMissingData(): void {
-    console.log('Handling missing data situation');
-    
     if (!this.sharedState.currentUser()) {
       console.log('Missing user data');
       this.retryUserDataLoad();
@@ -215,7 +188,6 @@ export class MainComponent implements OnInit, OnDestroy {
 
   private async retryUserDataLoad(): Promise<void> {
     try {
-      console.log('Retrying user data load...');
       await this.sharedState.refreshUserStatus();
     } catch (error) {
       console.error('Failed to retry user data load:', error);
@@ -224,19 +196,15 @@ export class MainComponent implements OnInit, OnDestroy {
 
   private async retryJoinListLoad(): Promise<void> {
     try {
-      console.log('Retrying join list data load...');
       await this.sharedState.refreshUserJoin();
     } catch (error) {
       console.error('Failed to retry join list data load:', error);
       // 가입 목록 로드 실패는 새 사용자로 처리
-      console.log('Treating join list load failure as new user scenario');
     }
   }
 
   // === 이벤트 핸들러들 (개선됨) ===
   onNavigationChange(tab: string): void {
-    console.log('Navigation change requested:', tab);
-    
     if (!this.sharedState.initialized()) {
       console.warn('Cannot navigate - SharedState not initialized');
       return;
@@ -244,7 +212,6 @@ export class MainComponent implements OnInit, OnDestroy {
 
     try {
       this.sharedState.setActiveTab(tab);
-      console.log('Navigation successful:', tab);
       
       // 그룹 탭으로 이동했는데 참여한 그룹이 없는 경우 안내
       if (tab === 'group' && !this.sharedState.hasJoinedGroups()) {
@@ -257,8 +224,6 @@ export class MainComponent implements OnInit, OnDestroy {
   }
 
   onGroupSelect(groupId: string): void {
-    console.log('Group selection requested:', groupId);
-    
     if (!this.sharedState.initialized()) {
       console.warn('Cannot select group - SharedState not initialized');
       return;
@@ -275,22 +240,12 @@ export class MainComponent implements OnInit, OnDestroy {
 
     try {
       this.sharedState.setSelectedGroup(groupId);
-      console.log('Group selection successful:', groupId);
     } catch (error) {
       console.error('Group selection failed:', error);
     }
   }
 
 onChannelSelect(data: ChannelSelectEvent): void {
-    console.log('🎯 ===== 채널 선택 이벤트 수신 =====');
-    console.log('📋 수신된 데이터:', {
-        groupId: data.groupId,
-        channelId: data.channelId,
-        channelName: data.channelName,
-        clubId: data.clubId,
-        hasClubId: typeof data.clubId === 'number' && data.clubId > 0
-    });
-    
     if (!this.sharedState.initialized()) {
         console.warn('❌ SharedState가 초기화되지 않음 - 채널 선택 불가');
         return;
@@ -308,7 +263,6 @@ onChannelSelect(data: ChannelSelectEvent): void {
     
     if (!isValidGroup) {
         console.warn('❌ 유효하지 않은 그룹:', data.groupId);
-        console.log('사용 가능한 그룹들:', availableGroups.map(g => g.groupname));
         return;
     }
 
@@ -318,17 +272,12 @@ onChannelSelect(data: ChannelSelectEvent): void {
     
     if (!isValidChannel) {
         console.warn('❌ 유효하지 않은 채널:', data.channelId);
-        console.log('해당 그룹의 채널들:', groupChannels);
         return;
     }
-
-    console.log('✅ 유효성 검사 통과');
 
     try {
         // 4. clubId가 있는 경우 우선 처리
         if (data.clubId && data.clubId !== -1) {
-            console.log('🔧 clubId로 채널 설정:', data.clubId);
-            
             // clubId를 사용한 직접 설정 (권장 방법)
             this.sharedState.setSelectedChannelByClubId(
                 data.clubId, 
@@ -336,8 +285,6 @@ onChannelSelect(data: ChannelSelectEvent): void {
                 data.groupId
             );
         } else {
-            console.log('🔧 기존 방식으로 채널 설정');
-            
             // 기존 방식으로 설정 (fallback)
             this.sharedState.setSelectedChannel(
                 data.channelId, 
@@ -348,12 +295,6 @@ onChannelSelect(data: ChannelSelectEvent): void {
 
         // 5. 설정 결과 확인
         const currentChannel = this.sharedState.currentChannelWithId();
-        console.log('📊 설정 결과 확인:', {
-            selectedGroup: this.sharedState.selectedGroup(),
-            selectedChannel: this.sharedState.selectedChannel(),
-            currentChannelWithId: currentChannel,
-            finalClubId: currentChannel.id
-        });
 
         // 6. 성공적으로 설정되었는지 검증
         if (currentChannel.id === -1) {
@@ -369,13 +310,9 @@ onChannelSelect(data: ChannelSelectEvent): void {
     } catch (error) {
         console.error('❌ 채널 선택 처리 중 오류:', error);
     }
-    
-    console.log('🎯 ===== 채널 선택 이벤트 처리 완료 =====');
 }
 
   onSearchQuery(query: string): void {
-    console.log('Search query:', query);
-    
     if (!query.trim()) {
       return;
     }
@@ -401,15 +338,12 @@ onChannelSelect(data: ChannelSelectEvent): void {
 
   // === 액션 메서드들 ===
   async refreshData(): Promise<void> {
-    console.log('Manual data refresh requested');
-    
     try {
       this.sharedState.clearError();
       await Promise.all([
         this.sharedState.refreshUserStatus(),
         this.sharedState.refreshUserJoin()
       ]);
-      console.log('Data refresh completed');
     } catch (error) {
       console.error('Data refresh failed:', error);
     }

@@ -198,17 +198,14 @@ export class LoginComponent implements OnInit {
 
         try {
             const res = await this.auth.confirmUser(email, verificationCode);
-            console.log('인증 결과:', res);
             
             // autoSignIn이 완료되기를 기다림
             if (res.nextStep?.signUpStep === 'COMPLETE_AUTO_SIGN_IN') {
-                console.log('자동 로그인 진행 중...');
                 
                 // 잠시 기다린 후 인증 상태 확인
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 
                 const isAuthenticated = await this.auth.checkAuthState();
-                console.log('자동 로그인 후 인증 상태:', isAuthenticated);
                 
                 if (isAuthenticated) {
                     // 자동 로그인 성공 - 사용자 정보 처리
@@ -240,7 +237,6 @@ export class LoginComponent implements OnInit {
             }
             
             const userInfo = await this.auth.getCurrentUserInfo();
-            console.log('사용자 정보:', userInfo);
             
             // Google OAuth인 경우와 일반 회원가입 구분
             let displayName: string;
@@ -260,8 +256,6 @@ export class LoginComponent implements OnInit {
                             'User';
                 userId = userInfo.userAttributes?.email || userInfo.user.userId;
             }
-
-            console.log('처리된 사용자 정보:', { userId, displayName, authProvider: userInfo.authProvider });
 
             const user: UserCredentials = {
                 id: userId,
@@ -301,7 +295,6 @@ export class LoginComponent implements OnInit {
         try {
             this.isLoading.update(() => true);
             const result = await this.auth.requestPassswordReset(email);
-            console.log("비밀번호 재설정 요청 완료:", result);
             
             alert('비밀번호 재설정 링크가 이메일로 전송되었습니다.');
         } catch (error: any) {

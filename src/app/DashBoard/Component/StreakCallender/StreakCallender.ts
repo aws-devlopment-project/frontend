@@ -95,8 +95,6 @@ export class StreakCalendarComponent {
       const isFuture = dateStr > todayStr;
       const isPast = dateStr < todayStr;
       
-      console.log(`Date processing: ${dateStr}, isToday: ${isToday}, currentDay: ${currentDay.toDateString()}, today: ${today.toDateString()}`);
-      
       days.push({
         date: dateStr,
         dayOfMonth: currentDay.getDate(),

@@ -199,19 +199,12 @@ export class GroupJoinComponent implements OnInit {
     this.isLoading.set(true);
 
     try {
-      console.log('Starting group join process:', {
-        userId: currentUser.id,
-        groupName: group.name,
-        selectedChannels: Array.from(selectedChannelIds)
-      });
-
       const groupSet = this.shared.groupList().filter((g) => g.id === group.id);
       // 1. UserService를 통해 그룹 참여
       const joinGroupSuccess = await this.userService.joinGroup(currentUser.id, group.id, group.name);
       if (!joinGroupSuccess) {
         throw new Error('그룹 참여에 실패했습니다.');
       }
-      console.log('Successfully joined group:', group.name);
 
       // 2. UserService를 통해 채널 참여
       const joinClubSuccess = await this.userService.joinClub(
@@ -222,7 +215,6 @@ export class GroupJoinComponent implements OnInit {
       if (!joinClubSuccess) {
         throw new Error('채널 참여에 실패했습니다.');
       }
-      console.log('Successfully joined channels:', Array.from(selectedChannelIds));
 
       // 3. SharedStateService에 새로운 그룹과 채널 추가
       const clubList = this.shared.clubList().filter((club) => club.groupId === group.id).map((club) => ({
@@ -232,7 +224,6 @@ export class GroupJoinComponent implements OnInit {
         updatedAt: new Date()
       }));
       this.shared.addUserGroupWithChannels(group.id, group.name, clubList);
-      console.log('Updated SharedStateService with new group and channels');
 
       // 4. 그룹 탭으로 전환하고 선택된 그룹/채널 설정
       this.shared.setActiveTab('group');
@@ -243,14 +234,6 @@ export class GroupJoinComponent implements OnInit {
       if (firstSelectedChannel) {
         this.shared.setSelectedChannel(firstSelectedChannel, group.name);
       }
-
-      console.log('Group join process completed successfully:', {
-        group: group.name,
-        channels: Array.from(selectedChannelIds),
-        activeTab: this.shared.activeTab(),
-        selectedGroup: this.shared.selectedGroup(),
-        selectedChannel: this.shared.selectedChannel()
-      });
 
       // 5. 완료 단계로 이동
       this.updateStep(3);
@@ -271,13 +254,6 @@ export class GroupJoinComponent implements OnInit {
   }
 
   goToDashboard(): void {
-    console.log('Navigating to dashboard with current state:', {
-      activeTab: this.shared.activeTab(),
-      selectedGroup: this.shared.selectedGroup(),
-      selectedChannel: this.shared.selectedChannel(),
-      hasJoinedGroups: this.shared.hasJoinedGroups()
-    });
-
     // 메인 페이지로 이동 (이미 그룹 탭으로 설정되어 있음)
     this.router.navigate(['/board']);
   }
@@ -308,11 +284,6 @@ export class GroupJoinComponent implements OnInit {
       .map(channel => channel.name);
   }
 
-  // === 디버깅 및 상태 확인 메서드들 ===
-  
-  /**
-   * 현재 상태를 콘솔에 출력 (디버깅 용도)
-   */
   debugCurrentState(): void {
     console.log('=== GroupJoin Current State ===');
     console.log('Current Step:', this.currentStep());
@@ -345,11 +316,7 @@ export class GroupJoinComponent implements OnInit {
     return true;
   }
 
-  /**
-   * 컴포넌트 상태 리셋 (필요시 사용)
-   */
   resetComponentState(): void {
-    console.log('Resetting GroupJoin component state');
     this.currentStep.set(1);
     this.selectedGroup.set(null);
     this.selectedChannels.set(new Set());
@@ -357,9 +324,6 @@ export class GroupJoinComponent implements OnInit {
     this.availableChannels.set([]);
   }
 
-  /**
-   * SharedStateService와의 동기화 확인
-   */
   checkSharedStateSync(): boolean {
     const sharedGroups = this.shared.availableGroups();
     const selectedGroup = this.selectedGroup();

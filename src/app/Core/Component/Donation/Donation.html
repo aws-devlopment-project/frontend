@@ -1,0 +1,218 @@
+<div class="donation-container">
+    <!-- 헤더 영역 -->
+    <div class="donation-header">
+    <div class="header-content">
+        <h1>Make a Good Friends</h1>
+        <p>작은 관심이 큰 변화를 만듭니다</p>
+    </div>
+    <div class="user-points-card">
+        <div class="points-info">
+        <span class="points-label">보유 포인트</span>
+        <span class="points-amount">{{ userPoints() | number }}P</span>
+        </div>
+        <button class="refresh-btn" (click)="refreshPoints()" [disabled]="isRefreshing()">
+        <mat-icon>refresh</mat-icon>
+        </button>
+    </div>
+    </div>
+
+    <!-- 로딩 상태 -->
+    @if (isLoading()) {
+    <div class="loading-container">
+        <div class="loading-spinner"></div>
+        <p>기부 항목을 불러오는 중...</p>
+    </div>
+    }
+
+    <!-- 에러 상태 -->
+    @else if (hasError()) {
+    <div class="error-container">
+        <mat-icon class="error-icon">error</mat-icon>
+        <h3>항목을 불러올 수 없습니다</h3>
+        <p>네트워크 연결을 확인하고 다시 시도해주세요.</p>
+        <button class="primary-button" (click)="loadDonationItems()">
+        다시 시도
+        </button>
+    </div>
+    }
+
+    <!-- 기부 항목 목록 -->
+    @else {
+    <!-- 필터 및 정렬 -->
+    <div class="filter-section">
+        <div class="filter-buttons">
+        <button 
+            *ngFor="let category of categories" 
+            class="filter-btn"
+            [class.active]="selectedCategory() === category"
+            (click)="setSelectedCategory(category)">
+            {{ category }}
+        </button>
+        </div>
+        
+        <div class="sort-section">
+        <select [(ngModel)]="sortBy" (change)="sortItems()">
+            <option value="urgency">긴급도순</option>
+            <option value="progress">진행률순</option>
+            <option value="amount">목표금액순</option>
+            <option value="remaining">남은기간순</option>
+        </select>
+        </div>
+    </div>
+
+    <div class="donation-grid">
+        <div 
+        *ngFor="let item of filteredItems()" 
+        class="donation-card"
+        [class.urgent]="item.urgency === 'high'"
+        (click)="openDonationDialog(item)">
+        
+        <div class="card-image">
+            <img [src]="item.imageUrl" [alt]="item.title">
+            <div class="category-badge">{{ item.category }}</div>
+            @if (item.urgency === 'high') {
+            <div class="urgency-badge">긴급</div>
+            }
+        </div>
+        
+        <div class="card-content">
+            <h3>{{ item.title }}</h3>
+            <p class="organization">{{ item.organizationName }}</p>
+            <p class="description">{{ item.description }}</p>
+            
+            <div class="progress-section">
+            <div class="progress-info">
+                <span class="current">{{ item.currentAmount | number }}원</span>
+                <span class="target">/ {{ item.targetAmount | number }}원</span>
+            </div>
+            <div class="progress-bar-container">
+                <div 
+                class="progress-bar" 
+                [style.width.%]="getProgressPercentage(item)">
+                </div>
+            </div>
+            <div class="progress-details">
+                <span class="percentage">{{ getProgressPercentage(item) }}% 달성</span>
+                <span class="remaining">{{ getRemainingAmount(item) | number }}원 남음</span>
+            </div>
+            </div>
+            
+            <div class="donation-info">
+            <span class="min-donation">최소: {{ item.minDonation | number }}P</span>
+            @if (item.endDate) {
+                <span class="end-date">{{ getDaysRemaining(item.endDate) }}일 남음</span>
+            }
+            </div>
+        </div>
+        </div>
+    </div>
+
+    <!-- 기부 내역 섹션 -->
+    <div class="donation-history-section">
+        <h2>나의 기부 내역</h2>
+        @if (donationHistory().length > 0) {
+        <div class="history-list">
+            <div *ngFor="let record of donationHistory()" class="history-item">
+            <div class="history-info">
+                <h4>{{ getDonationItemTitle(record.donationItemId) }}</h4>
+                <p>{{ record.donationDate | date:'yyyy.MM.dd HH:mm' }}</p>
+            </div>
+            <div class="history-amount">
+                <span [class]="'status-' + record.status">{{ record.amount | number }}P</span>
+            </div>
+            </div>
+        </div>
+        } @else {
+        <div class="empty-history">
+            <mat-icon>volunteer_activism</mat-icon>
+            <p>아직 기부 내역이 없습니다.<br>첫 번째 기부를 시작해보세요!</p>
+        </div>
+        }
+    </div>
+    }
+</div>
+
+<!-- 기부하기 다이얼로그 -->
+@if (selectedItem()) {
+    <div class="donation-dialog-overlay" (click)="closeDonationDialog()">
+    <div class="donation-dialog" (click)="$event.stopPropagation()">
+        <div class="dialog-header">
+        <h2>{{ selectedItem()?.title }}</h2>
+        <button class="close-btn" (click)="closeDonationDialog()">
+            <mat-icon>close</mat-icon>
+        </button>
+        </div>
+        
+        <div class="dialog-content">
+        <div class="item-summary">
+            <img [src]="selectedItem()?.imageUrl" [alt]="selectedItem()?.title">
+            <div class="summary-info">
+            <p class="organization">{{ selectedItem()?.organizationName }}</p>
+            <p class="description">{{ selectedItem()?.description }}</p>
+            <div class="progress-mini">
+                <span>현재 {{ getProgressPercentage(selectedItem()!) }}% 달성</span>
+            </div>
+            </div>
+        </div>
+        
+        <div class="donation-form">
+            <label>기부할 포인트</label>
+            <div class="amount-input">
+            <input 
+            type="number" 
+            [(ngModel)]="donationAmount"
+            [min]="selectedItem()?.minDonation ?? 0"
+            [max]="userPoints()"
+            placeholder="기부할 포인트를 입력하세요">
+            <span>P</span>
+            </div>
+            
+            <div class="quick-amounts">
+            <button 
+                *ngFor="let amount of getQuickAmounts()"
+                type="button"
+                class="quick-amount-btn"
+                [class.disabled]="amount > userPoints()"
+                (click)="setDonationAmount(amount)"
+                [disabled]="amount > userPoints()">
+                {{ amount | number }}P
+            </button>
+            </div>
+            
+            <div class="donation-summary">
+            <div class="summary-row">
+                <span>기부 포인트:</span>
+                <span class="amount">{{ donationAmount | number }}P</span>
+            </div>
+            <div class="summary-row">
+                <span>기부 후 잔여:</span>
+                <span class="remaining">{{ (userPoints() - donationAmount) | number }}P</span>
+            </div>
+            </div>
+            
+            <div class="dialog-actions">
+            <button 
+                type="button" 
+                class="secondary-button"
+                (click)="closeDonationDialog()">
+                취소
+            </button>
+            <button 
+                type="button" 
+                class="primary-button"
+                (click)="processDonation()"
+                [disabled]="!isValidDonation() || isProcessing()">
+                @if (isProcessing()) {
+                <mat-icon class="spin">hourglass_empty</mat-icon>
+                처리중...
+                } @else {
+                <mat-icon>volunteer_activism</mat-icon>
+                기부하기
+                }
+            </button>
+            </div>
+        </div>
+        </div>
+    </div>
+    </div>
+}

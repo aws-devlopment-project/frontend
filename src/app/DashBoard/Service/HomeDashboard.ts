@@ -39,7 +39,6 @@ export class HomeDashboardService {
         if (!(userInfo && userQuestCur && userQuestContinuous))
             return stat;
         let curQuestSuccessNum = 0;
-        console.log(userQuestCur);
         userQuestCur.curQuestTotalList.forEach((quest) => {
             curQuestSuccessNum += quest.isSuccess ? 1 : 0;
         });

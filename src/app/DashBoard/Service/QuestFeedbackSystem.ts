@@ -84,16 +84,6 @@ export class QuestFeedbackService {
 
       // 저장
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(updatedFeedbacks));
-      
-      console.log('Feedback saved successfully:', {
-        id,
-        quest: feedback.quest,
-        submissionMethod,
-        sentiment,
-        isLike: feedback.isLike,
-        textLength: feedback.feedbackText?.length || 0,
-        score: feedback.feedbackScore
-      });
 
       return id;
 
@@ -313,8 +303,6 @@ export class QuestFeedbackService {
       const updatedFeedbacks = feedbacks.filter(f => f.id !== feedbackId);
       
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(updatedFeedbacks));
-      
-      console.log('Feedback deleted:', feedbackId);
       return true;
 
     } catch (error) {
@@ -335,7 +323,6 @@ export class QuestFeedbackService {
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(recentFeedbacks));
       
       const deletedCount = feedbacks.length - recentFeedbacks.length;
-      console.log(`Cleaned up ${deletedCount} old feedbacks (older than ${daysOld} days)`);
       
       return deletedCount;
 

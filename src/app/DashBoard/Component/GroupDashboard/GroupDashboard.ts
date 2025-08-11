@@ -163,7 +163,6 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
   }
 
   async ngOnInit(): Promise<void> {
-    console.log("GroupDashboard initialized");
     await this.ensureGroupSelected();
     await this.loadGroupData();
     await this.loadRecentActivities();
@@ -309,8 +308,6 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
     this.feedbackText.set('');
     this.feedbackLike.set(null); // 초기화
     this.showFeedback.set(true);
-
-    console.log('Showing floating feedback for quest:', quest.title);
   }
 
   setFeedbackText(text: string): void {
@@ -384,7 +381,6 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
       );
 
       if (success) {
-        console.log('Quest completion with like/dislike feedback sent successfully');
         this.closeFeedback();
         this.showFeedbackSuccessToast(isLike);
         await this.loadRecentActivities();
@@ -475,7 +471,6 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
       const needsUpdate = await this.checkQuestCreateTimeSync(userQuestCur);
       
       if (needsUpdate) {
-        console.log('Quest data is outdated, refreshing UserQuestCur...');
         this.userService['cacheService']?.removeCache('userQuestCur');
         userQuestCur = await this.userService.getUserQuestCur(userId);
       }
@@ -527,7 +522,6 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
         const success = await this.userService.setUserQuestRecord(userId, groupName, [questTitle]);
         
         if (success) {
-          console.log(`Quest completion updated: ${questTitle}`);
           await this.updateGroupCacheQuestSuccess(questTitle);
         } else {
           this.userQuestCache.curQuestTotalList = this.userQuestCache.curQuestTotalList.map(quest => {
@@ -573,7 +567,6 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
       );
 
       if (newlyCompleted.length > 0) {
-        console.log('New quest completions detected:', newlyCompleted.length);
         this.handleQuestCompletions(newlyCompleted);
         
         newlyCompleted.forEach(quest => {
@@ -606,8 +599,6 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
           userId,
           completedAt: new Date()
         };
-
-        console.log('Quest completion event:', completionEvent);
         this.showFloatingFeedback(quest, groupName, channelName);
 
       } catch (error) {
@@ -785,7 +776,6 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
     }
 
     if (this.isQuestCompletedInUserQuest(questToComplete.title)) {
-      console.log('Quest already completed in UserQuestCur:', questId);
       this.selectedQuestIds.update(selected => {
         const newSelected = new Set(selected);
         newSelected.delete(questId);
@@ -978,21 +968,13 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
 
   resetQuestCompletions(): void {
     this.completedQuestIds.clear();
-    console.log('Quest completion tracking reset');
+
   }
 
   logUserQuestStatus(): void {
-    console.group('=== UserQuest Status ===');
-    console.log('UserQuestCur Cache:', this.userQuestCache);
-    console.log('Group Cache:', this.groupCache);
-    console.log('Completed Quest IDs:', Array.from(this.completedQuestIds));
-    
     if (this.userQuestCache && this.groupCache) {
       const groupName = this.shared.selectedGroup();
       const groupQuests = this.userQuestCache.curQuestTotalList.filter(q => q.group === groupName);
-      
-      console.log('Current Group Quests in UserQuestCur:', groupQuests);
-      console.log('Group Quest List:', this.groupCache.questList);
       
       this.quests().forEach(quest => {
         console.log(`Quest ${quest.id} (${quest.title}):`, {
@@ -1002,8 +984,6 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
         });
       });
     }
-    
-    console.groupEnd();
   }
 
   async forceRefreshUserQuest(): Promise<void> {
@@ -1011,8 +991,6 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
     if (!userId) return;
 
     try {
-      console.log('Force refreshing UserQuestCur...');
-      
       this.userService['cacheService']?.removeCache('userQuestCur');
       this.userQuestCache = await this.userService.getUserQuestCur(userId);
       
@@ -1021,16 +999,12 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
         const questsWithStatus = this.applyUserQuestStatus(newQuests);
         this.quests.set(questsWithStatus);
       }
-      
-      console.log('UserQuestCur refreshed successfully');
     } catch (error) {
       console.error('Error force refreshing UserQuestCur:', error);
     }
   }
 
   async syncWithServerQuest(): Promise<void> {
-    console.log('Syncing quest data with server...');
-    
     try {
       const groupName = this.shared.selectedGroup();
       if (groupName) {
@@ -1040,8 +1014,6 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
       
       await this.forceRefreshUserQuest();
       await this.ensureUserQuestCurSync();
-      
-      console.log('Server sync completed');
     } catch (error) {
       console.error('Error syncing with server:', error);
     }

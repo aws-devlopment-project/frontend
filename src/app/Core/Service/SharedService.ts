@@ -110,13 +110,6 @@ export class SharedStateService {
       return { id: -1, name: selectedChannel, groupId: group.id };
     }
     
-    console.log('Current channel resolved:', {
-      clubId: club.id,
-      clubName: club.name,
-      groupId: club.groupId,
-      groupName: selectedGroup
-    });
-    
     return {
       id: club.id,
       name: club.name,
@@ -198,8 +191,6 @@ export class SharedStateService {
       this.setLoadingState('userJoin', true);
       this.setLoadingState('groups', true); // 추가
 
-      console.log('=== SharedStateService 초기화 시작 ===');
-
       // 1. 모든 그룹 목록 먼저 로드 (ID 정보 확보용)
       const groupList = await this.loadGroupList();
       this.processGroupList(groupList);
@@ -213,9 +204,7 @@ export class SharedStateService {
       // 3. 사용자 상태 처리
       if (user.status === 'fulfilled' && user.value) {
         this.setCurrentUser(user.value);
-        console.log('✅ 사용자 정보 로드 완료');
       } else if (user.status === 'rejected') {
-        console.error('❌ 사용자 정보 로드 실패:', user.reason);
         this.setError('사용자 정보를 불러올 수 없습니다.');
       }
 
@@ -226,28 +215,17 @@ export class SharedStateService {
         
         // 가입한 그룹이 있는 경우에만 기본 선택 설정
         if (joinListData.joinList.length > 0) {
-          console.log('✅ 가입 목록 로드 완료:', joinListData.joinList.length, '개 그룹');
           this.processUserJoinList(joinListData);
           this.initializeDefaultSelections(joinListData);
         } else {
-          console.log('ℹ️ 가입한 그룹이 없음 - 새 사용자');
         }
       } else if (joinList.status === 'rejected') {
         console.error('❌ 가입 목록 로드 실패:', joinList.reason);
         this._userJoin.set({ id: '', joinList: [] });
-        console.log('빈 가입 목록으로 초기화');
       }
 
       this._initialized.set(true);
-      console.log('✅ SharedStateService 초기화 완료', {
-        hasUser: !!this.currentUser(),
-        hasJoinedGroups: this.hasJoinedGroups(),
-        totalGroups: this._groupList().length,
-        totalClubs: this._clubList().length
-      });
-
     } catch (error) {
-      console.error('❌ SharedStateService 초기화 중 오류:', error);
       this.setError('초기화 중 오류가 발생했습니다.');
     } finally {
       this.setLoadingState('user', false);
@@ -259,20 +237,15 @@ export class SharedStateService {
   // 새로 추가: 그룹 목록 로드
   private async loadGroupList(): Promise<Group[]> {
     try {
-      console.log('🔄 전체 그룹 목록 로드 중...');
       const groups = await this.groupService.getGroupList();
-      console.log('✅ 그룹 목록 로드 완료:', groups.length, '개 그룹');
       return groups;
     } catch (error) {
-      console.error('❌ 그룹 목록 로드 실패:', error);
       return [];
     }
   }
 
   // 새로 추가: 그룹 목록 처리
   private processGroupList(groups: Group[]): void {
-    console.log('🔄 그룹 목록 처리 중...');
-    
     const groupList: {id: number, name: string}[] = [];
     const clubList: {id: number, name: string, groupId: number}[] = [];
 
@@ -297,28 +270,12 @@ export class SharedStateService {
 
     this._groupList.set(groupList);
     this._clubList.set(clubList);
-
-    console.log('✅ 그룹/클럽 목록 처리 완료:', {
-      groups: groupList.length,
-      clubs: clubList.length
-    });
-
-    // 디버깅용 로그
-    console.log('그룹 목록:', groupList);
-    console.log('클럽 목록:', clubList);
   }
 
   // 새로 추가: 사용자 가입 목록 처리
   private processUserJoinList(joinList: UserJoin): void {
-    console.log('🔄 사용자 가입 목록 처리 중...');
     
     joinList.joinList.forEach(userGroup => {
-      console.log(`처리 중인 그룹: ${userGroup.groupname}`, {
-        groupId: userGroup.groupId,
-        clubCount: userGroup.clubList.length,
-        clubs: userGroup.clubList.map(c => c.name)
-      });
-
       // 이미 groupList에 있는지 확인
       const existingGroup = this._groupList().find(g => g.id === userGroup.groupId);
       if (!existingGroup) {
@@ -468,17 +425,9 @@ export class SharedStateService {
       if (channelId) {
           this.loadChannelMessages(channelId);
       }
-      
-      console.log(`📝 채널 변경 완료: ${previousChannel} → ${channelId}`, { 
-          groupId, 
-          channelName,
-          channelInfo: this._selectedChannelInfo()
-      });
   }
 
   setSelectedChannelByClubId(clubId: number, channelName?: string, groupName?: string): void {
-      console.log('🎯 setSelectedChannelByClubId 호출:', { clubId, channelName, groupName });
-      
       // 클럽 목록에서 clubId로 클럽 찾기
       const club = this._clubList().find(c => c.id === clubId);
       
@@ -504,13 +453,6 @@ export class SharedStateService {
           id: club.id,
           name: channelName || club.name,
           groupId: group.id
-      });
-
-      console.log('✅ clubId로 채널 설정 완료:', {
-          clubId: club.id,
-          clubName: club.name,
-          groupId: group.id,
-          groupName: group.name
       });
   }
 
@@ -572,27 +514,23 @@ export class SharedStateService {
   addListGroup(groupId: number, groupName: string) {
     const existingGroupNames = new Set(this._groupList().map(group => group.name));
     if (existingGroupNames.has(groupName)) {
-      console.log('Group already exists in total list:', groupName);
       return;
     }
 
     const newGroupItem = { id: groupId, name: groupName };
     const updatedGroupList = [...this._groupList(), newGroupItem];
     this._groupList.set(updatedGroupList);
-    console.log('✅ 그룹 추가됨:', newGroupItem);
   }
 
   addListClub(clubId: number, clubName: string, groupId: number) {
     const existingClubNames = new Set(this._clubList().map(club => club.name));
     if (existingClubNames.has(clubName)) {
-      console.log('Club already exists in total list:', clubName);
       return;
     }
 
     const newClubItem = { id: clubId, name: clubName, groupId: groupId };
     const updatedClubList = [...this._clubList(), newClubItem];
     this._clubList.set(updatedClubList);
-    console.log('✅ 클럽 추가됨:', newClubItem);
   }
 
   private async loadChannelMessages(channelId: string): Promise<void> {
@@ -609,9 +547,10 @@ export class SharedStateService {
   private getTabTitle(tab: string): string {
     const titles: { [key: string]: string } = {
       'home': '홈',
-      'group': '그룹',
+      'group': '그룹', 
       'activity': '통계',
-      'member': '관리'
+      'member': '관리',
+      'donation': '기부하기'  // 추가
     };
     return titles[tab] || '홈';
   }
@@ -649,11 +588,6 @@ export class SharedStateService {
     return this.expandedSections().includes(sectionId);
   }
 
-  // === 새로 추가: 그룹/채널 동적 추가 메서드들 ===
-  
-  /**
-   * 새로운 그룹을 사용자 가입 목록에 추가
-   */
   addUserGroup(groupid: number, groupName: string): void {
     const currentJoinList = this._userJoin();
     
@@ -697,9 +631,6 @@ export class SharedStateService {
     }
   }
 
-  /**
-   * 그룹에 새로운 채널들을 추가
-   */
   addUserChannels(groupName: string, clubs: Club[]): void {
     const currentJoinList = this._userJoin();
     
@@ -732,8 +663,6 @@ export class SharedStateService {
     updatedJoinList.joinList[groupIndex] = targetGroup;
     
     this._userJoin.set(updatedJoinList);
-    
-    console.log('Channels added to group:', { groupName, newChannels, totalChannels: targetGroup.clubList.length });
 
     // 첫 번째 채널이라면 자동 선택 (그룹이 현재 선택된 상태에서)
     if (existingChannelSet.size === 0 && 
@@ -751,7 +680,6 @@ export class SharedStateService {
     const clubsName = clubs.map((club: Club) => {
       return club.name;
     })
-    console.log('Adding group with channels:', { groupName, clubsName });
     
     const currentJoinList = this._userJoin();
     
@@ -765,7 +693,6 @@ export class SharedStateService {
     
     if (existingGroupNames.has(groupName)) {
       // 기존 그룹에 채널만 추가 (중복 제거)
-      console.log('Group exists, adding channels only:', groupName);
       this.addUserChannels(groupName, clubs);
     } else {
       // 새 그룹을 채널과 함께 추가 (채널 목록도 중복 제거)
@@ -788,13 +715,6 @@ export class SharedStateService {
       this._expandedSections.update(sections => {
         const sectionSet = new Set([...sections, groupName]);
         return Array.from(sectionSet);
-      });
-      
-      console.log('New group with channels added:', { 
-        groupName, 
-        uniqueChannels, 
-        originalChannelCount: clubsName.length,
-        finalChannelCount: uniqueChannels.length 
       });
 
       // 첫 번째 그룹이거나 그룹 탭에서 선택된 그룹이 없다면 자동 선택
@@ -834,8 +754,6 @@ export class SharedStateService {
       this._selectedGroup.set(null);
       this._selectedChannel.set(null);
     }
-    
-    console.log('Group removed from join list:', groupName);
   }
 
   /**
@@ -867,8 +785,6 @@ export class SharedStateService {
     if (this.selectedChannel() === clubName && this.selectedGroup() === groupName) {
       this._selectedChannel.set(null);
     }
-    
-    console.log('Channel removed from group:', { groupName, clubName });
   }
 
   // === 기존 메서드들 ===
@@ -880,12 +796,10 @@ export class SharedStateService {
       const joinList = await this.loadUserJoin();
       if (joinList) {
         this._userJoin.set(joinList);
-        console.log('User join list refreshed successfully');
         this.validateCurrentSelections();
       } else {
         // API에서 빈 결과가 왔을 때 빈 목록으로 설정
         this._userJoin.set({ id: '', joinList: [] });
-        console.log('User join list refreshed with empty result');
       }
     } catch (error) {
       console.error('Error refreshing user join list:', error);
@@ -903,7 +817,6 @@ export class SharedStateService {
       const user = await this.loadUserStatus();
       if (user) {
         this.setCurrentUser(user);
-        console.log('User status refreshed successfully');
       }
     } catch (error) {
       console.error('Error refreshing user status:', error);
@@ -923,14 +836,12 @@ export class SharedStateService {
     if (selectedGroup) {
       const group = joinList.joinList.find(g => g.groupname === selectedGroup);
       if (!group) {
-        console.log('Selected group no longer exists, clearing selection');
         this._selectedGroup.set(null);
         this._selectedChannel.set(null);
         return;
       }
 
       if (selectedChannel && !group.clubList.some(club => club.name === selectedChannel)) {
-        console.log('Selected channel no longer exists, clearing channel selection');
         this._selectedChannel.set(null);
       }
     }
@@ -955,13 +866,6 @@ export class SharedStateService {
     } else {
       this._sidebarExpanded.set(false);
     }
-    
-    console.log(`Tab changed: ${previousTab} → ${tab}`, {
-      selectedGroup: this._selectedGroup(),
-      selectedChannel: this._selectedChannel(),
-      sidebarExpanded: this._sidebarExpanded(),
-      hasJoinedGroups: this.hasJoinedGroups()
-    });
   }
 
   setSelectedGroup(groupId: string | null): void {
@@ -980,8 +884,6 @@ export class SharedStateService {
         return Array.from(sectionSet);
       });
     }
-    
-    console.log(`Group changed: ${previousGroup} → ${groupId}`);
   }
 
   toggleSidebar(): void {
@@ -1073,7 +975,6 @@ export class SharedStateService {
     this._userJoin.set(null);
     this._initialized.set(false);
     this._error.set(null);
-    console.log('SharedStateService reset completed');
   }
 
   // 그룹 이름으로 그룹 ID 찾기

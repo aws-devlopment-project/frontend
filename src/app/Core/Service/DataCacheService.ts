@@ -410,13 +410,9 @@ export class DataCacheService {
         console.group('=== Cache Status ===');
         
         const stats = this.getCacheStats();
-        console.log('Stats:', stats);
         
         const sessionKeys = this.getAllCacheKeys(sessionStorage);
         const localKeys = this.getAllCacheKeys(localStorage);
-        
-        console.log('Session Storage Keys:', sessionKeys);
-        console.log('Local Storage Keys:', localKeys);
         
         console.groupEnd();
     }
@@ -438,15 +434,6 @@ export class DataCacheService {
             const now = Date.now();
             const isExpired = now > parsedItem.expiry;
             const timeLeft = Math.max(0, parsedItem.expiry - now);
-            
-            console.group(`=== Cache Item: ${key} ===`);
-            console.log('Data:', parsedItem.data);
-            console.log('Created:', new Date(parsedItem.timestamp).toLocaleString());
-            console.log('Expires:', new Date(parsedItem.expiry).toLocaleString());
-            console.log('Time Left:', isExpired ? 'EXPIRED' : `${Math.round(timeLeft / 1000)}s`);
-            console.log('Version:', parsedItem.version);
-            console.log('Size:', `${Math.round(new Blob([item]).size / 1024)}KB`);
-            console.groupEnd();
         } catch (error) {
             console.error('Error logging cache item:', error, { key });
         }

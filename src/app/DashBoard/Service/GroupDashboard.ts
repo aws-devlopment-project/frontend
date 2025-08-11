@@ -56,7 +56,6 @@ export class GroupDashboardService {
 
     processingStat(group: Group | undefined): Stat[] {
         if (!group || !group.questList || !group.questSuccessNum || group.memberNum === 0) {
-            console.log(group);
             return [];
         }
         let totalValue = 0;
@@ -98,12 +97,6 @@ export class GroupDashboardService {
         isLike?: boolean
     ): Promise<boolean> {
         try {
-            console.log('Processing quest success with feedback:', {
-                groupName,
-                username,
-                questList,
-                hasFeedback: !!feedbackText
-            });
             // 1. 사용자 퀘스트 기록 업데이트
             const userQuestResult = await this.userService.setUserQuestRecord(username, groupName, questList);
             const userQuestCur = await this.userService.getUserQuestCur(username);
@@ -122,8 +115,6 @@ export class GroupDashboardService {
                 username, 
                 questVal
             );
-
-            console.log('Quest success with feedback completed successfully');
             return userQuestResult;
 
         } catch (error) {
@@ -142,12 +133,6 @@ export class GroupDashboardService {
             // 피드백 데이터를 questSuccess와 함께 전송하는 확장된 API 호출
             // 피드백과 함께 서버에 전송
             await this.groupService.questSuccessWithFeedback(groupName, username, questList);
-
-            console.log('Feedback integrated with quest success:', {
-                questCount: questList.length,
-                feedbackLength: questList[0].feedback,
-                user: username
-            });
 
         } catch (error) {
             console.error('Error processing feedback with quest success:', error);
