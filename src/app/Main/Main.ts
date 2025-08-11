@@ -15,6 +15,12 @@ import { environment } from "../../environments/environtment";
 import { RouterModule } from "@angular/router";
 import { ChatbotComponent } from "../Core/Component/Chatbot/Chatbot";
 
+interface ChannelSelectEvent {
+    groupId: string;
+    channelId: string;
+    channelName?: string;
+}
+
 @Component({
   selector: 'app-main',
   templateUrl: './Main.html',
@@ -274,29 +280,30 @@ export class MainComponent implements OnInit, OnDestroy {
     }
   }
 
-  onChannelSelect(data: { groupId: string, channelId: string }): void {
-    console.log('Channel selection requested:', data);
-    
-    if (!this.sharedState.initialized()) {
-      console.warn('Cannot select channel - SharedState not initialized');
-      return;
-    }
+  onChannelSelect(data: ChannelSelectEvent): void {
+      console.log('Channel selection requested:', data);
+      
+      if (!this.sharedState.initialized()) {
+          console.warn('Cannot select channel - SharedState not initialized');
+          return;
+      }
 
-    // 유효한 채널인지 확인
-    const groupChannels = this.sharedState.getGroupChannels(data.groupId);
-    const isValidChannel = groupChannels.includes(data.channelId);
-    
-    if (!isValidChannel) {
-      console.warn('Invalid channel selected:', data, 'Available channels:', groupChannels);
-      return;
-    }
+      // 유효한 채널인지 확인
+      const groupChannels = this.sharedState.getGroupChannels(data.groupId);
+      const isValidChannel = groupChannels.includes(data.channelId);
+      
+      if (!isValidChannel) {
+          console.warn('Invalid channel selected:', data, 'Available channels:', groupChannels);
+          return;
+      }
 
-    try {
-      this.sharedState.setSelectedChannel(data.channelId, data.groupId);
-      console.log('Channel selection successful:', data);
-    } catch (error) {
-      console.error('Channel selection failed:', error);
-    }
+      try {
+          // SharedState에 채널 정보 전달 (이름도 함께)
+          this.sharedState.setSelectedChannel(data.channelId, data.groupId, data.channelName);
+          console.log('Channel selection successful:', data);
+      } catch (error) {
+          console.error('Channel selection failed:', error);
+      }
   }
 
   onSearchQuery(query: string): void {

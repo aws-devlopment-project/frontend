@@ -47,6 +47,8 @@ export class SharedStateService {
   private _clubList = signal<({id: number, name: string, groupId: number}[])>([]);
   private _initialized = signal(false);
   private _error = signal<string | null>(null);
+  private _selectedChannelInfo = signal<{id: string, name: string, groupId: string} | null>(null);
+
 
   // === 읽기 전용 Signals ===
   readonly activeTab = this._activeTab.asReadonly();
@@ -61,6 +63,7 @@ export class SharedStateService {
   readonly userJoin = this._userJoin.asReadonly();
   readonly initialized = this._initialized.asReadonly();
   readonly error = this._error.asReadonly();
+  readonly selectedChannelInfo = this._selectedChannelInfo.asReadonly();
 
   // === Computed Signals ===
   readonly isLoading = computed(() => {
@@ -570,31 +573,6 @@ export class SharedStateService {
     console.log(`Group changed: ${previousGroup} → ${groupId}`);
   }
 
-  setSelectedChannel(channelId: string | null, groupId?: string): void {
-    if (groupId && !this.isValidGroup(groupId)) {
-      console.warn('Invalid group ID for channel:', groupId);
-      return;
-    }
-
-    if (channelId && !this.isValidChannel(channelId, groupId || this._selectedGroup())) {
-      console.warn('Invalid channel ID:', channelId);
-      return;
-    }
-
-    const previousChannel = this._selectedChannel();
-    
-    if (groupId) {
-      this._selectedGroup.set(groupId);
-    }
-    this._selectedChannel.set(channelId);
-    
-    if (channelId) {
-      this.loadChannelMessages(channelId);
-    }
-    
-    console.log(`Channel changed: ${previousChannel} → ${channelId}`, { groupId });
-  }
-
   private isValidGroup(groupId: string | null): boolean {
     if (!groupId) return true;
     const joinList = this._userJoin();
@@ -808,5 +786,59 @@ export class SharedStateService {
     const updatedClubList: {id: number, name: string, groupId: number}[] = [...this._clubList(), newGroupItem];
 
     this._clubList.set(updatedClubList);
+  }
+
+  setSelectedChannel(channelId: string | null, groupId?: string, channelName?: string): void {
+    if (groupId && !this.isValidGroup(groupId)) {
+        console.warn('Invalid group ID for channel:', groupId);
+        return;
+    }
+
+    if (channelId && !this.isValidChannel(channelId, groupId || this._selectedGroup())) {
+        console.warn('Invalid channel ID:', channelId);
+        return;
+    }
+
+    const previousChannel = this._selectedChannel();
+    
+    if (groupId) {
+        this._selectedGroup.set(groupId);
+    }
+    this._selectedChannel.set(channelId);
+    
+    // 채널 상세 정보 저장
+    if (channelId && groupId) {
+        // clubList에서 실제 채널 정보 찾기
+        const club = this._clubList().find(club => 
+            club.name === channelId && club.groupId === this.getGroupIdByName(groupId)
+        );
+        
+        this._selectedChannelInfo.set({
+            id: channelId,
+            name: channelName || channelId,
+            groupId: groupId
+        });
+        
+        console.log('Channel info updated:', {
+            id: channelId,
+            name: channelName || channelId,
+            groupId: groupId,
+            clubId: club?.id || -1
+        });
+    } else {
+        this._selectedChannelInfo.set(null);
+    }
+    
+    if (channelId) {
+        this.loadChannelMessages(channelId);
+    }
+    
+    console.log(`Channel changed: ${previousChannel} → ${channelId}`, { groupId, channelName });
+  }
+
+  // 그룹 이름으로 그룹 ID 찾기
+  private getGroupIdByName(groupName: string): number {
+      const group = this._groupList().find(g => g.name === groupName);
+      return group?.id || -1;
   }
 }

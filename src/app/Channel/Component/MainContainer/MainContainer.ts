@@ -36,52 +36,71 @@ export class MainContainerComponent implements OnInit, OnDestroy {
   currentUserEmail = computed(() => this.sharedState.currentUser()?.id || '');
   currentUsername = computed(() => this.sharedState.currentUser()?.name || '');
   currentChannel = computed(() => {
-    return this.sharedState.clubList().find(c => c.name === this.sharedState.selectedChannel()) || {id: -1, name: '', groupId: ''};
+      const channelInfo = this.sharedState.selectedChannelInfo();
+      if (!channelInfo) return { id: -1, name: '', groupId: -1 };
+      
+      // clubList에서 실제 club 정보 찾기
+      const club = this.sharedState.clubList().find(c => 
+          c.name === channelInfo.id && 
+          c.groupId === this.getGroupIdByName(channelInfo.groupId)
+      );
+      
+      return {
+          id: club?.id || -1,
+          name: channelInfo.name,
+          groupId: club?.groupId || -1
+      };
   });
   connectionStatus = computed(() => this.stompWebSocketService.connectionStatus());
-  chatRoomId = computed(() => this.currentChannel().id || -1);
+  chatRoomId = computed(() => this.currentChannel().id);
+  
+  private getGroupIdByName(groupName: string): number {
+      const group = this.sharedState.groupList().find(g => g.name === groupName);
+      return group?.id || -1;
+  }
 
   private subscriptions: Subscription[] = [];
   private messageIdCounter = 0;
 
   constructor(
-    public sharedState: SharedStateService,
-    private stompWebSocketService: StompWebSocketService
+      public sharedState: SharedStateService,
+      private stompWebSocketService: StompWebSocketService
   ) {
-    console.log('MainContainer 초기화');
-    
-    // 메시지 업데이트 시 스크롤
-    effect(() => {
-      if (this.messages().length > 0) {
-        setTimeout(() => this.scrollToBottom(), 100);
-      }
-    });
+      console.log('MainContainer 초기화');
+      
+      // 메시지 업데이트 시 스크롤
+      effect(() => {
+          if (this.messages().length > 0) {
+              setTimeout(() => this.scrollToBottom(), 100);
+          }
+      });
 
-    // 채널 변경 감지
-    effect(() => {
-      const clubId = this.chatRoomId();
-      const userEmail = this.currentUserEmail();
-      const username = this.currentUsername();
-      
-      console.log('채널 변경:', { clubId, userEmail, username });
-      
-      if (clubId !== -1 && userEmail && username) {
-        this.messages.set([]); // 메시지 초기화
-        this.stompWebSocketService.joinRoom(clubId, userEmail, username);
-      }
-    });
-
-    // 연결 상태 변경 감지
-    effect(() => {
-      const status = this.connectionStatus();
-      console.log('연결 상태 변경:', status);
-      
-      if (status === 'connected') {
-        this.addSystemMessage('서버에 연결되었습니다.');
-      } else if (status === 'disconnected') {
-        this.addSystemMessage('서버와의 연결이 끊어졌습니다.');
-      }
-    });
+      // 채널 변경 감지 - 개선된 버전
+      effect(() => {
+          const channel = this.currentChannel();
+          const userEmail = this.currentUserEmail();
+          const username = this.currentUsername();
+          
+          console.log('채널 변경 감지:', { 
+              clubId: channel.id, 
+              channelName: channel.name,
+              groupId: channel.groupId,
+              userEmail, 
+              username 
+          });
+          
+          if (channel.id !== -1 && userEmail && username) {
+              console.log('채팅방 입장 준비:', {
+                  clubId: channel.id,
+                  channelName: channel.name,
+                  userEmail,
+                  username
+              });
+              
+              this.messages.set([]); // 메시지 초기화
+              this.stompWebSocketService.joinRoom(channel.id, userEmail, username);
+          }
+      });
   }
 
   ngOnInit(): void {

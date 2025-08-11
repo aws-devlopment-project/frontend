@@ -6,6 +6,12 @@ import { SharedStateService } from "../../Service/SharedService";
 import { Router } from "@angular/router";
 import { UserService } from "../../Service/UserService";
 
+interface ChannelSelectEvent {
+    groupId: string;
+    channelId: string;
+    channelName?: string;
+}
+
 @Component({
     selector: 'app-sidebar',
     templateUrl: './SideBar.html',
@@ -16,7 +22,7 @@ import { UserService } from "../../Service/UserService";
 export class SideBarComponent implements OnInit {
     navigationChange = output<string>();
     groupSelect = output<string>();
-    channelSelect = output<{ groupId: string, channelId: string }>();
+    channelSelect = output<ChannelSelectEvent>(); 
     userJoin: any;
 
     constructor(
@@ -70,40 +76,42 @@ export class SideBarComponent implements OnInit {
         }
     }
 
-    // === Channel Selection (FIXED) ===
     async selectChannel(channel: any): Promise<void> {
         console.log('Raw channel object received:', channel);
         
         // 채널 객체에서 실제 채널 ID(name) 추출
         let channelId: string;
+        let channelName: string;
         
         if (typeof channel === 'string') {
             channelId = channel;
+            channelName = channel;
         } else if (channel && typeof channel === 'object' && channel.name) {
             // Club 객체인 경우 name 속성을 사용
             channelId = channel.name;
+            channelName = channel.name;
         } else {
             console.error('Invalid channel object:', channel);
             return;
         }
         
-        console.log('Extracted channel ID:', channelId);
+        console.log('Extracted channel info:', { channelId, channelName });
         
         // 현재 선택된 그룹 찾기
         const currentGroup = await this.getCurrentGroupForChannel(channelId);
         if (currentGroup) {
-            console.log('Found group for channel:', { channelId, currentGroup });
+            console.log('Found group for channel:', { channelId, channelName, currentGroup });
             
-            // 부모에게 채널 선택 알림
+            // 부모에게 채널 선택 알림 (채널 ID와 Name 모두 전달)
             this.channelSelect.emit({ 
                 groupId: currentGroup, 
-                channelId: channelId 
+                channelId: channelId,
+                channelName: channelName  // 추가
             });
         } else {
             console.warn('No group found for channel:', channelId);
         }
     }
-
     private async getCurrentGroupForChannel(channelId: string): Promise<string | null> {
         // 이미 로드된 userJoin가 없다면 다시 로드
         if (!this.userJoin) {

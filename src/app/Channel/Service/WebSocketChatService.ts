@@ -10,6 +10,8 @@ import { ChatMessageDto } from '../Models/chatMessage';
 export class StompWebSocketService {
   private stompClient: Client | null = null;
   private currentClubId: number = -1;
+  private currentChannelName: string = '';
+  private currentGroupName: string = '';
   private currentUserEmail: string = '';
   private currentUsername: string = '';
 
@@ -36,7 +38,6 @@ export class StompWebSocketService {
     this.currentUserEmail = userEmail;
     this.currentUsername = username;
     this.connectionStatus.set('connecting');
-
     this.stompClient = new Client({
       webSocketFactory: () => new SockJS(`${serverUrl}/ws`),
       
@@ -89,32 +90,41 @@ export class StompWebSocketService {
     });
   }
 
-  // 채팅방 입장 - 백엔드 예시와 동일
-  joinRoom(clubId: number, userEmail: string, username: string): void {
-    console.log('채팅방 입장:', { clubId, userEmail, username });
-    
-    this.currentClubId = clubId;
-    this.currentUserEmail = userEmail;
-    this.currentUsername = username;
-    
-    if (this.stompClient?.connected) {
-      this.subscribeToClub(clubId);
-      this.sendJoinMessage(clubId, userEmail, username);
-    }
+  // 채팅방 입장 - 채널 정보 포함
+  joinRoom(clubId: number, userEmail: string, username: string, channelName?: string, groupName?: string): void {
+      console.log('채팅방 입장:', { 
+          clubId, 
+          userEmail, 
+          username,
+          channelName,
+          groupName
+      });
+      
+      this.currentClubId = clubId;
+      this.currentUserEmail = userEmail;
+      this.currentUsername = username;
+      this.currentChannelName = channelName || '';
+      this.currentGroupName = groupName || '';
+      
+      if (this.stompClient?.connected) {
+          this.subscribeToClub(clubId);
+          this.sendJoinMessage(clubId, userEmail, username);
+      }
   }
 
-  // JOIN 메시지 전송 - 백엔드 예시와 정확히 동일
+  // JOIN 메시지에 채널 정보 포함
   private sendJoinMessage(clubId: number, userEmail: string, username: string): void {
-    const joinMessage = {
-      clubId: clubId,
-      senderEmail: userEmail,
-      senderUsername: username,
-      message: `${username} joined chat room ${clubId}`,
-      type: 'JOIN' as const
-    };
+      const channelInfo = this.currentChannelName ? ` (#${this.currentChannelName})` : '';
+      const joinMessage = {
+          clubId: clubId,
+          senderEmail: userEmail,
+          senderUsername: username,
+          message: `${username} joined chat room ${clubId}${channelInfo}`,
+          type: 'JOIN' as const
+      };
 
-    console.log('JOIN 메시지 전송:', joinMessage);
-    this.sendMessage('/app/chat.addUser', joinMessage);
+      console.log('JOIN 메시지 전송:', joinMessage);
+      this.sendMessage('/app/chat.addUser', joinMessage);
   }
 
   // 채팅 메시지 전송 - 백엔드 예시와 동일
@@ -178,5 +188,14 @@ export class StompWebSocketService {
   // 현재 클럽 ID 조회
   getCurrentClubId(): number {
     return this.currentClubId;
+  }
+
+  // 현재 채널 정보 조회
+  getCurrentChannelInfo(): { clubId: number, channelName: string, groupName: string } {
+      return {
+          clubId: this.currentClubId,
+          channelName: this.currentChannelName,
+          groupName: this.currentGroupName
+      };
   }
 }
