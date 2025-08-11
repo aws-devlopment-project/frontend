@@ -88,7 +88,7 @@ export class SideBarComponent implements OnInit {
             channelName = channel;
         } else if (channel && typeof channel === 'object' && channel.name) {
             // Club 객체인 경우 name 속성을 사용
-            channelId = channel.name;
+            channelId = channel.id;
             channelName = channel.name;
         } else {
             console.error('Invalid channel object:', channel);

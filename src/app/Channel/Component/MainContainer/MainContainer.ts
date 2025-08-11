@@ -1,3 +1,4 @@
+// MainContainer.ts - 실제 clubId를 사용하도록 수정
 import { Component, signal, computed, effect, OnInit, OnDestroy, ViewChild, ElementRef } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { MatIconModule } from "@angular/material/icon";
@@ -32,79 +33,131 @@ export class MainContainerComponent implements OnInit, OnDestroy {
   newMessage = signal('');
   messages = signal<DisplayMessage[]>([]);
   
-  // Computed properties
+  // Computed properties - SharedService의 currentChannelWithId 사용
   currentUserEmail = computed(() => this.sharedState.currentUser()?.id || '');
   currentUsername = computed(() => this.sharedState.currentUser()?.name || '');
-  currentChannel = computed(() => {
-      const channelInfo = this.sharedState.selectedChannelInfo();
-      if (!channelInfo) return { id: -1, name: '', groupId: -1 };
-      
-      // clubList에서 실제 club 정보 찾기
-      const club = this.sharedState.clubList().find(c => 
-          c.name === channelInfo.id && 
-          c.groupId === this.getGroupIdByName(channelInfo.groupId)
-      );
-      
-      return {
-          id: club?.id || -1,
-          name: channelInfo.name,
-          groupId: club?.groupId || -1
-      };
-  });
-  connectionStatus = computed(() => this.stompWebSocketService.connectionStatus());
-  chatRoomId = computed(() => this.currentChannel().id);
   
-  private getGroupIdByName(groupName: string): number {
-      const group = this.sharedState.groupList().find(g => g.name === groupName);
-      return group?.id || -1;
-  }
+  // 실제 clubId를 반환하는 computed
+  currentChannel = computed(() => {
+    const channelInfo = this.sharedState.currentChannelWithId();
+    console.log('Current channel computed:', channelInfo);
+    return channelInfo;
+  });
+  
+  connectionStatus = computed(() => this.stompWebSocketService.connectionStatus());
+  
+  // 실제 clubId 반환
+  chatRoomId = computed(() => {
+    const channel = this.currentChannel();
+    console.log('Chat room ID computed:', {
+      channelInfo: channel,
+      clubId: channel.id
+    });
+    return channel.id;
+  });
 
   private subscriptions: Subscription[] = [];
   private messageIdCounter = 0;
 
   constructor(
-      public sharedState: SharedStateService,
-      private stompWebSocketService: StompWebSocketService
+    public sharedState: SharedStateService,
+    private stompWebSocketService: StompWebSocketService
   ) {
-      console.log('MainContainer 초기화');
-      
-      // 메시지 업데이트 시 스크롤
-      effect(() => {
-          if (this.messages().length > 0) {
-              setTimeout(() => this.scrollToBottom(), 100);
-          }
-      });
+    console.log('MainContainer 초기화');
+    
+    // 메시지 업데이트 시 스크롤
+    effect(() => {
+      if (this.messages().length > 0) {
+        setTimeout(() => this.scrollToBottom(), 100);
+      }
+    });
 
-      // 채널 변경 감지 - 개선된 버전
-      effect(() => {
-          const channel = this.currentChannel();
-          const userEmail = this.currentUserEmail();
-          const username = this.currentUsername();
+    // 채널 변경 감지 - 더 상세한 로깅
+    effect(() => {
+      const channel = this.currentChannel();
+      const userEmail = this.currentUserEmail();
+      const username = this.currentUsername();
+      
+      console.log('=== 채널 변경 감지 ===');
+      console.log('채널 정보:', channel);
+      console.log('사용자 정보:', { userEmail, username });
+      console.log('SharedState 디버그:');
+      this.sharedState.debugChannelSelection();
+      
+      if (channel.id !== -1 && userEmail && username) {
+        console.log('✅ 채팅방 입장 조건 충족:', {
+          clubId: channel.id,
+          channelName: channel.name,
+          groupId: channel.groupId,
+          userEmail,
+          username
+        });
+        
+        this.messages.set([]); // 메시지 초기화
+        this.stompWebSocketService.joinRoom(
+          channel.id, 
+          userEmail, 
+          username, 
+          channel.name,
+          String(channel.groupId)
+        );
+      } else {
+        console.log('❌ 채팅방 입장 조건 미충족:', {
+          channelId: channel.id,
+          channelName: channel.name,
+          groupId: channel.groupId,
+          hasUserEmail: !!userEmail,
+          hasUsername: !!username,
+          reason: channel.id === -1 ? 'Invalid channel ID (-1)' : 'Missing user info'
+        });
+        
+        // 추가 디버깅 정보
+        if (channel.id === -1) {
+          console.log('🔍 Channel ID가 -1인 이유 분석:');
+          console.log('- 선택된 그룹:', this.sharedState.selectedGroup());
+          console.log('- 선택된 채널:', this.sharedState.selectedChannel());
+          console.log('- 그룹 목록:', this.sharedState.groupList());
+          console.log('- 클럽 목록:', this.sharedState.clubList());
           
-          console.log('채널 변경 감지:', { 
-              clubId: channel.id, 
-              channelName: channel.name,
-              groupId: channel.groupId,
-              userEmail, 
-              username 
-          });
+          const selectedGroup = this.sharedState.selectedGroup();
+          const selectedChannel = this.sharedState.selectedChannel();
           
-          if (channel.id !== -1 && userEmail && username) {
-              console.log('채팅방 입장 준비:', {
-                  clubId: channel.id,
-                  channelName: channel.name,
-                  userEmail,
-                  username
-              });
-              
-              this.messages.set([]); // 메시지 초기화
-              this.stompWebSocketService.joinRoom(channel.id, userEmail, username);
+          if (selectedGroup && selectedChannel) {
+            const group = this.sharedState.groupList().find(g => g.name === selectedGroup);
+            console.log('- 찾은 그룹:', group);
+            
+            if (group) {
+              const club = this.sharedState.clubList().find(c => 
+                c.name === selectedChannel && c.groupId === group.id
+              );
+              console.log('- 찾은 클럽:', club);
+            }
           }
-      });
+        }
+      }
+    });
+
+    // 연결 상태 변경 감지
+    effect(() => {
+      const status = this.connectionStatus();
+      console.log('연결 상태 변경:', status);
+      
+      if (status === 'connected') {
+        this.addSystemMessage('서버에 연결되었습니다.');
+      } else if (status === 'disconnected') {
+        this.addSystemMessage('서버와의 연결이 끊어졌습니다.');
+      }
+    });
   }
 
   ngOnInit(): void {
     console.log('MainContainer ngOnInit');
+    
+    // 디버깅을 위한 초기 상태 로그
+    setTimeout(() => {
+      this.debugCurrentState();
+    }, 1000);
+    
     this.initializeConnection();
     this.setupMessageSubscriptions();
   }
@@ -197,6 +250,14 @@ export class MainContainerComponent implements OnInit, OnDestroy {
     if (clubId !== -1 && userEmail && username) {
       console.log('메시지 전송:', { clubId, userEmail, username, content });
       this.stompWebSocketService.sendChatMessage(clubId, userEmail, username, content);
+    } else {
+      console.warn('메시지 전송 실패:', { 
+        clubId, 
+        userEmail, 
+        username, 
+        reason: clubId === -1 ? 'Invalid club ID' : 'Missing user info' 
+      });
+      this.addSystemMessage('메시지를 전송할 수 없습니다. 채널을 다시 선택해주세요.');
     }
   }
 
@@ -227,12 +288,22 @@ export class MainContainerComponent implements OnInit, OnDestroy {
 
   // 연결 테스트
   testConnection(): void {
+    const clubId = this.chatRoomId();
+    const channelInfo = this.currentChannel();
+    
     if (this.stompWebSocketService.isConnected()) {
-      const clubId = this.chatRoomId();
-      this.addSystemMessage(`✅ 연결 정상 (Club ID: ${clubId})`);
+      this.addSystemMessage(`✅ 연결 정상 (Club ID: ${clubId}, Channel: ${channelInfo.name})`);
     } else {
       this.addSystemMessage('❌ 연결 끊어짐');
     }
+    
+    // 추가 디버깅 정보
+    console.log('연결 테스트 정보:', {
+      isConnected: this.stompWebSocketService.isConnected(),
+      clubId: clubId,
+      channelInfo: channelInfo,
+      connectionStatus: this.connectionStatus()
+    });
   }
 
   private scrollToBottom(): void {
@@ -240,6 +311,28 @@ export class MainContainerComponent implements OnInit, OnDestroy {
       const element = this.messagesContainer.nativeElement;
       element.scrollTop = element.scrollHeight;
     }
+  }
+
+  // 디버깅 메서드
+  debugCurrentState(): void {
+    console.log('=== MainContainer 현재 상태 ===');
+    console.log('현재 채널:', this.currentChannel());
+    console.log('채팅방 ID:', this.chatRoomId());
+    console.log('연결 상태:', this.connectionStatus());
+    console.log('현재 사용자:', {
+      email: this.currentUserEmail(),
+      username: this.currentUsername()
+    });
+    
+    // SharedService 디버그 호출
+    console.log('=== SharedService 디버그 ===');
+    this.sharedState.debugChannelSelection();
+    
+    // WebSocket 서비스 상태
+    console.log('=== WebSocket 상태 ===');
+    console.log('연결됨:', this.stompWebSocketService.isConnected());
+    console.log('현재 클럽 ID:', this.stompWebSocketService.getCurrentClubId());
+    console.log('채널 정보:', this.stompWebSocketService.getCurrentChannelInfo());
   }
 
   // UI 헬퍼 메서드들
@@ -264,11 +357,13 @@ export class MainContainerComponent implements OnInit, OnDestroy {
       return '서버 연결 중...';
     }
     
-    if (this.chatRoomId() === -1) {
+    const clubId = this.chatRoomId();
+    if (clubId === -1) {
       return '채널을 선택해주세요...';
     }
 
-    return '메시지를 입력하세요... (Enter: 전송)';
+    const channelName = this.currentChannel().name;
+    return `#${channelName}에 메시지를 입력하세요... (Enter: 전송)`;
   }
 
   formatTime(date: Date): string {
@@ -276,5 +371,21 @@ export class MainContainerComponent implements OnInit, OnDestroy {
       hour: '2-digit', 
       minute: '2-digit' 
     });
+  }
+
+  // 디버깅용 버튼 (개발 중에만 사용)
+  showDebugInfo(): void {
+    this.debugCurrentState();
+    
+    // 브라우저 알림으로도 표시
+    const channel = this.currentChannel();
+    alert(`디버그 정보:
+채널 이름: ${channel.name}
+클럽 ID: ${channel.id}
+그룹 ID: ${channel.groupId}
+연결 상태: ${this.connectionStatus()}
+사용자: ${this.currentUsername()} (${this.currentUserEmail()})
+
+자세한 정보는 콘솔을 확인하세요.`);
   }
 }
