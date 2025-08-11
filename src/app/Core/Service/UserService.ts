@@ -4,6 +4,7 @@ import { HttpHeaders } from "@angular/common/http";
 import { DataCacheService } from "./DataCacheService";
 import { UserCredentials, UserJoin, UserStatus } from "../Models/user";
 import { UserQuestContinuous, UserQuestCur, UserQuestPrev, UserQuestWeekly } from "../Models/user";
+import { createUserQuestContinuous, createUserJoin, createUserCredentials, createUserQuestCur, createUserQuestPrev, createUserQuestWeekly, createUserStatus } from "../Models/user";
 import { Router } from "@angular/router";
 import { firstValueFrom, throwError } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
@@ -64,7 +65,7 @@ export class UserService {
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
             
             const response = await firstValueFrom(
-                this.httpService.get<UserStatus>(url, headers).pipe(
+                this.httpService.get<UserStatus>(url, createUserStatus, headers).pipe(
                     tap(data => {
                         this.cacheService.setCache('userStatus', data);
                     }),
@@ -106,7 +107,7 @@ export class UserService {
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
             const response = await firstValueFrom(
-                this.httpService.get<UserJoin>(url, headers).pipe(
+                this.httpService.get<UserJoin>(url, createUserJoin, headers).pipe(
                     tap(data => {
                         // ID 정보 추가하여 캐시
                         const dataWithId = { ...data, id };
@@ -145,9 +146,12 @@ export class UserService {
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
             const response = await firstValueFrom(
-                this.httpService.get<UserQuestCur>(url, headers).pipe(
+                this.httpService.get<UserQuestCur>(url, createUserQuestCur, headers).pipe(
                     tap(data => {
-                        this.cacheService.setCache('userQuestCur', data);
+                        if (data.id === 'default')
+                            this.cacheService.setCache('userQuestCur', data, 60 * 3600);
+                        else
+                            this.cacheService.setCache('userQuestCur', data);
                     }),
                     catchError(error => {
                         console.error('[API] getUserQuestCur error:', error);
@@ -155,7 +159,6 @@ export class UserService {
                     })
                 )
             );
-
             return response;
         } catch (error) {
             console.error('[API] getUserQuestCur failed:', error);
@@ -180,9 +183,12 @@ export class UserService {
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
             const response = await firstValueFrom(
-                this.httpService.get<UserQuestContinuous>(url, headers).pipe(
+                this.httpService.get<UserQuestContinuous>(url, createUserQuestContinuous, headers).pipe(
                     tap(data => {
-                        this.cacheService.setCache('userQuestContinuous', data);
+                        if (data.id === 'default')
+                            this.cacheService.setCache('userQuestContinuous', data, 60 * 3600);
+                        else
+                            this.cacheService.setCache('userQuestContinuous', data);
                     }),
                     catchError(error => {
                         console.error('[API] getUserQuestContinuous error:', error);
@@ -215,9 +221,12 @@ export class UserService {
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
             const response = await firstValueFrom(
-                this.httpService.get<UserQuestPrev>(url, headers).pipe(
+                this.httpService.get<UserQuestPrev>(url, createUserQuestPrev, headers).pipe(
                     tap(data => {
-                        this.cacheService.setCache('userQuestPrev', data);
+                        if (data.id === 'default')
+                            this.cacheService.setCache('userQuestPrev', data, 60 * 3600);
+                        else
+                            this.cacheService.setCache('userQuestPrev', data);
                     }),
                     catchError(error => {
                         console.error('[API] getUserQuestPrev error:', error);
@@ -250,9 +259,12 @@ export class UserService {
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
             const response = await firstValueFrom(
-                this.httpService.get<UserQuestWeekly>(url, headers).pipe(
+                this.httpService.get<UserQuestWeekly>(url, createUserQuestWeekly, headers).pipe(
                     tap(data => {
-                        this.cacheService.setCache('userQuestWeekly', data);
+                        if (data.id === 'default')
+                            this.cacheService.setCache('userQuestWeekly', data, 60 * 3600);
+                        else
+                            this.cacheService.setCache('userQuestWeekly', data);
                     }),
                     catchError(error => {
                         console.error('[API] getUserQuestWeekly error:', error);

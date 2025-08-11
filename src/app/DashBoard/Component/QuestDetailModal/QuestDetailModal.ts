@@ -1,4 +1,3 @@
-
 import { Component } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { MatIconModule } from "@angular/material/icon";
@@ -14,6 +13,14 @@ interface DailyQuest {
   dueTime?: string;
 }
 
+// 인터페이스 수정: displayDate 추가
+interface ModalData {
+  date: string;           // 원본 날짜 (YYYY-MM-DD)
+  displayDate?: string;   // 표시용 날짜 (한국어 형식)
+  quests: DailyQuest[];
+  onQuestClick: (quest: DailyQuest) => void;
+}
+
 @Component({
   selector: 'app-quest-detail-modal',
   templateUrl: './QuestDetailModal.html',
@@ -24,11 +31,7 @@ interface DailyQuest {
 export class QuestDetailModalComponent {
   constructor(
     @Inject(MatDialogRef) public dialogRef: MatDialogRef<QuestDetailModalComponent>,
-    @Inject(MAT_DIALOG_DATA) public data: { 
-      date: string; 
-      quests: DailyQuest[]; 
-      onQuestClick: (quest: DailyQuest) => void; 
-    }
+    @Inject(MAT_DIALOG_DATA) public data: ModalData
   ) {}
 
   closeModal(): void {

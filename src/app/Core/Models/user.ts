@@ -4,6 +4,14 @@ export interface UserCredentials {
     idToken: string
 }
 
+export function createUserCredentials(): UserCredentials {
+    return {
+        id: 'default',
+        name: '',
+        idToken: ''
+    };
+}
+
 export interface UserJoin {
     id: string,
     joinList: {
@@ -18,6 +26,13 @@ export interface UserJoin {
     }[]
 }
 
+export function createUserJoin(): UserJoin {
+    return {
+        id: 'default',
+        joinList: []
+    };
+}
+
 export interface UserQuestCur {
     id: string,
     curQuestTotalList: {
@@ -30,6 +45,13 @@ export interface UserQuestCur {
     }[]
 }
 
+export function createUserQuestCur(): UserQuestCur {
+    return {
+        id: 'default',
+        curQuestTotalList: []
+    };
+}
+
 export interface UserQuestContinuous {
     id: string,
     continuousSuccessQuestList: {
@@ -37,6 +59,17 @@ export interface UserQuestContinuous {
         totalQuestNum: number,
         successQuestNum: number
     }
+}
+
+export function createUserQuestContinuous(): UserQuestContinuous {
+    return {
+        id: 'default',
+        continuousSuccessQuestList: {
+            days: 0,
+            totalQuestNum: 0,
+            successQuestNum: 0
+        }
+    };
 }
 
 export interface UserQuestPrev {
@@ -49,6 +82,13 @@ export interface UserQuestPrev {
     }[]
 }
 
+export function createUserQuestPrev() {
+    return {
+        id: 'default',
+        prevQuestTotalList: []
+    };
+}
+
 export interface UserQuestWeekly {
     id: string,
     weeklyQuestList: {
@@ -59,6 +99,13 @@ export interface UserQuestWeekly {
     }[]
 }
 
+export function createUserQuestWeekly() {
+    return {
+        id: 'default',
+        weeklyQuestList: []
+    };
+}
+
 export interface UserStatus {
     id: string;
     name: string;
@@ -66,4 +113,15 @@ export interface UserStatus {
     status: 'online' | 'offline' | 'away';
     joinDate?: Date;
     lastSeen?: Date;
+}
+
+export function createUserStatus(): UserStatus {
+    return {
+        id: 'default',
+        name: '',
+        avatar: '',
+        status: 'offline',
+        joinDate: new Date(),
+        lastSeen: new Date()
+    }
 }

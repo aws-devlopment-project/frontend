@@ -3,6 +3,7 @@ import { DataCacheService } from "./DataCacheService";
 import { HttpService } from "./HttpService";
 import { HttpHeaders } from "@angular/common/http";
 import { Group } from "../Models/group";
+import { createGroup, createGroupList } from "../Models/group";
 
 @Injectable({
     providedIn: 'root'
@@ -33,7 +34,10 @@ export class GroupService {
             'Content-Type': 'application/json'
         });
         try {
-            const response = this.httpService.get(url, headers).subscribe(async (data: Group) => {
+            const response = this.httpService.get(url, createGroup, headers).subscribe(async (data: Group) => {
+                if (data.id === -1) {
+                    return undefined;
+                }
                 this.dataService.setCache(groupname, data);
                 return await this.dataService.getCache(groupname);
             })
@@ -49,13 +53,15 @@ export class GroupService {
             'Content-Type': 'application/json'
         });
         try {
-            const response = await this.httpService.get(url, headers).toPromise();
-            const groupList: Group[] | null = response;
-            if (groupList) {
-                groupList.forEach((group) => {
-                    this.dataService.setCache(group.name, group);
-                });
-            }
+            let groupList: Group[] | undefined = undefined;
+            await this.httpService.get(url, createGroupList, headers).subscribe((data: Group[]) => {
+                groupList = data;
+                if (data.length !== 0) {
+                    data.forEach((group) => {
+                        this.dataService.setCache(group.name, group);
+                    });
+                }
+            })
             return groupList || [];
         } catch (e) {
             console.error("[API] getGroupList: " + e);

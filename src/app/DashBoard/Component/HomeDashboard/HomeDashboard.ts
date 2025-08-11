@@ -245,7 +245,7 @@ export class HomeDashboardComponent implements OnInit {
     }
   }
 
-  // 퀘스트 캘린더 데이터 로드
+  // 퀘스트 캘린더 데이터 로드 (날짜 생성 방식 수정)
   private async loadQuestCalendarData(): Promise<void> {
     try {
       const userCreds = await this.userService.getUserCredentials();
@@ -259,14 +259,18 @@ export class HomeDashboardComponent implements OnInit {
 
       if (!questCur || !userJoin) return;
 
-      // 지난 90일간의 데이터 생성
+      // 지난 90일간의 데이터 생성 (로컬 시간대 기준)
       const questData: { date: string; quests: DailyQuest[] }[] = [];
       const today = new Date();
 
       for (let i = 89; i >= 0; i--) {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
-        const dateStr = this.formatDate(date);
+        
+        // 로컬 시간대로 날짜 문자열 생성
+        const dateStr = this.formatDateLocal(date);
+        
+        console.log(`Generating quests for date: ${dateStr}, original date: ${date.toDateString()}`);
 
         const dayQuests = this.generateQuestsForDate(dateStr, questCur, userJoin);
         questData.push({
@@ -276,9 +280,18 @@ export class HomeDashboardComponent implements OnInit {
       }
 
       this.questCalendarData.set(questData);
+      console.log('Quest calendar data loaded:', questData.length, 'days');
     } catch (error) {
       console.error('Error loading quest calendar data:', error);
     }
+  }
+
+  // 로컬 시간대로 날짜를 YYYY-MM-DD 형식으로 변환
+  private formatDateLocal(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   // 특정 날짜의 퀘스트 생성 (실제 데이터 기반)
@@ -374,16 +387,21 @@ export class HomeDashboardComponent implements OnInit {
     this.sharedState.setActiveTab('group');
   }
 
-  // 날짜 클릭 이벤트 핸들러 (모달 표시, 완료 기능 제거)
+  // 날짜 클릭 이벤트 핸들러 (디버그 로그 추가)
   onDayClick(event: { date: string; quests: DailyQuest[] }): void {
-    console.log('Day clicked:', event);
+    console.log('Day clicked:', {
+      originalDate: event.date,
+      displayDate: this.formatDateForDisplay(event.date),
+      questCount: event.quests.length
+    });
     
-    // 퀘스트 상세 모달 열기 (완료 기능 제거)
+    // 퀘스트 상세 모달 열기
     const dialogRef = this.dialog.open(QuestDetailModalComponent, {
       width: '600px',
       maxHeight: '80vh',
       data: {
-        date: this.formatDateForDisplay(event.date),
+        date: event.date, // 원본 날짜 문자열 (YYYY-MM-DD)
+        displayDate: this.formatDateForDisplay(event.date), // 표시용 날짜
         quests: event.quests,
         onQuestClick: (quest: DailyQuest) => {
           this.onQuestClick({ quest, date: event.date });
@@ -513,17 +531,35 @@ export class HomeDashboardComponent implements OnInit {
   }
 
   private formatDate(date: Date): string {
-    return date.toISOString().split('T')[0];
+    return this.formatDateLocal(date);
   }
 
+ // formatDateForDisplay 메서드도 더 안전하게 수정
   private formatDateForDisplay(dateStr: string): string {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('ko-KR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      weekday: 'long'
-    });
+    try {
+      // YYYY-MM-DD 형식의 문자열을 로컬 날짜로 파싱
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const date = new Date(year, month - 1, day); // month는 0부터 시작하므로 -1
+      
+      // 날짜가 유효한지 확인
+      if (isNaN(date.getTime())) {
+        console.error('Invalid date string:', dateStr);
+        return dateStr; // 원본 문자열 반환
+      }
+      
+      const formatted = date.toLocaleDateString('ko-KR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        weekday: 'long'
+      });
+      
+      console.log(`Date formatting: ${dateStr} -> ${formatted}`);
+      return formatted;
+    } catch (error) {
+      console.error('Error formatting date:', dateStr, error);
+      return dateStr; // 에러 시 원본 문자열 반환
+    }
   }
 
   // UI 메서드들

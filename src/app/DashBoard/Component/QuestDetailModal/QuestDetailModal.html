@@ -1,54 +1,56 @@
-    <div class="quest-modal-container">
-      <div class="modal-header">
-        <h2>{{ data.date }} 퀘스트</h2>
-        <button mat-icon-button (click)="closeModal()">
-          <mat-icon>close</mat-icon>
-        </button>
+<!-- QuestDetailModal.html 수정된 부분 -->
+<div class="quest-modal-container">
+  <div class="modal-header">
+    <!-- displayDate가 있으면 사용하고, 없으면 기존 date 사용 -->
+    <h2>{{ data.displayDate || data.date }} 퀘스트</h2>
+    <button mat-icon-button (click)="closeModal()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+  
+  <div class="modal-content">
+    @if (data.quests.length === 0) {
+      <div class="empty-quests">
+        <mat-icon>event_available</mat-icon>
+        <p>이 날에는 퀘스트가 없습니다.</p>
       </div>
-      
-      <div class="modal-content">
-        @if (data.quests.length === 0) {
-          <div class="empty-quests">
-            <mat-icon>event_available</mat-icon>
-            <p>이 날에는 퀘스트가 없습니다.</p>
-          </div>
-        } @else {
-          <div class="quest-list">
-            @for (quest of data.quests; track quest.id) {
-              <div class="quest-item" 
-                   [class.completed]="quest.isCompleted"
-                   (click)="onQuestClick(quest)">
-                <div class="quest-header">
-                  <span class="priority-icon">{{ getPriorityIcon(quest.priority) }}</span>
-                  <h3>{{ quest.title }}</h3>
-                  <span class="group-badge">{{ quest.groupName }}</span>
-                </div>
-                
-                <div class="quest-meta">
-                  @if (quest.dueTime) {
-                    <span class="due-time">{{ quest.dueTime }}</span>
-                  }
-                  <span class="status" [class]="quest.isCompleted ? 'completed' : 'pending'">
-                    {{ quest.isCompleted ? '완료됨' : '진행중' }}
-                  </span>
-                </div>
-                
-                <div class="quest-actions">
-                  <button class="action-btn primary" (click)="onQuestClick(quest); $event.stopPropagation()">
-                    <mat-icon>arrow_forward</mat-icon>
-                    그룹으로 이동
-                  </button>
-                </div>
-              </div>
-            }
-          </div>
-          
-          <div class="modal-footer">
-            <div class="completion-info">
-              <mat-icon>info</mat-icon>
-              <span>퀘스트 완료는 각 그룹 대시보드에서 할 수 있습니다</span>
+    } @else {
+      <div class="quest-list">
+        @for (quest of data.quests; track quest.id) {
+          <div class="quest-item" 
+               [class.completed]="quest.isCompleted"
+               (click)="onQuestClick(quest)">
+            <div class="quest-header">
+              <span class="priority-icon">{{ getPriorityIcon(quest.priority) }}</span>
+              <h3>{{ quest.title }}</h3>
+              <span class="group-badge">{{ quest.groupName }}</span>
+            </div>
+            
+            <div class="quest-meta">
+              @if (quest.dueTime) {
+                <span class="due-time">{{ quest.dueTime }}</span>
+              }
+              <span class="status" [class]="quest.isCompleted ? 'completed' : 'pending'">
+                {{ quest.isCompleted ? '완료됨' : '진행중' }}
+              </span>
+            </div>
+            
+            <div class="quest-actions">
+              <button class="action-btn primary" (click)="onQuestClick(quest); $event.stopPropagation()">
+                <mat-icon>arrow_forward</mat-icon>
+                그룹으로 이동
+              </button>
             </div>
           </div>
         }
       </div>
-    </div>
+      
+      <div class="modal-footer">
+        <div class="completion-info">
+          <mat-icon>info</mat-icon>
+          <span>퀘스트 완료는 각 그룹 대시보드에서 할 수 있습니다</span>
+        </div>
+      </div>
+    }
+  </div>
+</div>

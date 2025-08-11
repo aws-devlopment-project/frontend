@@ -72,16 +72,31 @@ export class HttpService {
     return new HttpHeaders().set('Authorization', `Bearer ${token}`);
   }
 
-  get<T = any>(url: string, customHeaders?: HttpHeaders): Observable<T> {
+  get<T = any>(url: string, factory: () => T, customHeaders?: HttpHeaders): Observable<T> {
     try {
       const authHeaders = this.getAuthHeaders();
       const headers = customHeaders ? 
         customHeaders.set('Authorization', authHeaders.get('Authorization') || '') : 
         authHeaders;
 
-      return this.http.get<{data: T}>(url, { headers }).pipe(
-        map(response => response.data),
-        catchError(error => this.handleError(error, url))
+      return this.http.get<{error: {result: string }, data: T}>(url, { headers }).pipe(
+        map(response => {
+          console.log(response);
+          if (response.error && response.error.result === 'failure')
+              return factory();
+          return response.data;
+        }),
+        catchError((error: HttpErrorResponse) => {
+          // 400번대 에러인 경우 factory 결과 반환
+          if (error.status >= 400 && error.status < 500) {
+            return new Observable<T>(observer => {
+              observer.next(factory());
+              observer.complete();
+            });
+          }
+          // 다른 에러는 기존 방식으로 처리
+          return this.handleError(error, url);
+        })
       );
     } catch (error) {
       // 토큰이 없는 경우 인증 오류로 처리
