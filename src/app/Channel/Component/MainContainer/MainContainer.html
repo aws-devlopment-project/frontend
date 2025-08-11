@@ -5,7 +5,7 @@
     <div class="channel-info">
       <h3># {{ channelInfo()?.name || currentChannel() || '채널' }}</h3>
       <div class="channel-status">
-        <p>{{ channelInfo()?.description || getChannelDescription(currentChannel()) }}</p>
+        <p>{{ channelInfo()?.description || getChannelDescription(currentChannel().name) }}</p>
         <div class="connection-status" [class]="getConnectionStatusClass()">
           <mat-icon class="status-icon">
             {{ connectionStatus() === 'connected' ? 'wifi' : 

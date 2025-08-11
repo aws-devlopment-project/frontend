@@ -41,14 +41,20 @@ export class MainContainerComponent implements OnInit, OnDestroy {
   channelInfo = computed(() => this.sharedState.channelInfo());
   currentUserEmail = computed(() => this.sharedState.currentUser()?.id || '');
   currentUsername = computed(() => this.sharedState.currentUser()?.name || '');
-  currentChannel = computed(() => this.sharedState.selectedChannel() || '');
-  currentGroup = computed(() => this.sharedState.selectedGroup() || '');
+  currentChannel = computed(() => {
+      return this.sharedState.clubList().find(c => c.name === this.sharedState.selectedChannel()) || {id: -1, name: '', groupId: ''};
+    }
+  );
+  currentGroup = computed(() => {
+      return this.sharedState.groupList().find(g => g.name === this.sharedState.selectedGroup()) || {id: -1, name: ''};
+    }
+  );
   connectionStatus = computed(() => this.stompWebSocketService.connectionStatus());
   
   // 채팅방 ID 생성 (clubId를 숫자로 변환)
   chatRoomId = computed(() => {
-    const group = this.currentGroup();
-    const channel = this.currentChannel();
+    const group = this.currentGroup().id;
+    const channel = this.currentChannel().id;
     if (!group || !channel) return -1;
     
     // group과 channel을 기반으로 숫자 ID 생성 (간단한 해시)
@@ -69,7 +75,7 @@ export class MainContainerComponent implements OnInit, OnDestroy {
     if (!group || !channel) return { count: 0, rooms: [] };
     
     return {
-      count: this.stompWebSocketService.getChatMessageCount(group, channel),
+      count: this.stompWebSocketService.getChatMessageCount(group.name, channel.name),
       rooms: this.stompWebSocketService.getAllChatRooms()
     };
   });
@@ -300,12 +306,12 @@ export class MainContainerComponent implements OnInit, OnDestroy {
       'study': '공부 습관을 만들어가요!'
     };
     
-    return titles[channelId || ''] || '채널에 오신 것을 환영합니다!';
+    return titles[channelId.name || ''] || '채널에 오신 것을 환영합니다!';
   }
 
   getWelcomeMessage(): string {
     const channelId = this.currentChannel();
-    const baseMessage = this.getChannelDescription(channelId);
+    const baseMessage = this.getChannelDescription(channelId.name);
     const stats = this.messageStats();
     const clubId = this.chatRoomId();
     
@@ -347,7 +353,7 @@ export class MainContainerComponent implements OnInit, OnDestroy {
       ]
     };
     
-    return starters[channelId || ''] || ['안녕하세요!', '대화를 시작해볼까요?', '좋은 하루 보내세요!'];
+    return starters[channelId.name || ''] || ['안녕하세요!', '대화를 시작해볼까요?', '좋은 하루 보내세요!'];
   }
 
   getInputPlaceholder(): string {
@@ -443,7 +449,7 @@ export class MainContainerComponent implements OnInit, OnDestroy {
     const channel = this.currentChannel();
     
     if (group && channel) {
-      this.stompWebSocketService.clearChatHistory(group, channel);
+      this.stompWebSocketService.clearChatHistory(group.name, channel.name);
       this.messages.set([]);
       this.addSystemMessage('채팅 이력이 삭제되었습니다.');
     }
