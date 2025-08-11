@@ -41,12 +41,12 @@ export class MainContainerComponent implements OnInit, OnDestroy {
   channelInfo = computed(() => this.sharedState.channelInfo());
   currentUserEmail = computed(() => this.sharedState.currentUser()?.id || '');
   currentUsername = computed(() => this.sharedState.currentUser()?.name || '');
-  currentChannel = computed(() => {
-      return this.sharedState.clubList().find(c => c.name === this.sharedState.selectedChannel()) || {id: -1, name: '', groupId: ''};
-    }
-  );
   currentGroup = computed(() => {
       return this.sharedState.groupList().find(g => g.name === this.sharedState.selectedGroup()) || {id: -1, name: ''};
+    }
+  );
+  currentChannel = computed(() => {
+      return this.sharedState.clubList().find(c => c.name === this.sharedState.selectedChannel()) || {id: -1, name: '', groupId: ''};
     }
   );
   connectionStatus = computed(() => this.stompWebSocketService.connectionStatus());
