@@ -376,69 +376,142 @@ export class SharedStateService {
     }
   }
 
-  // setSelectedChannel 메서드 수정
   setSelectedChannel(channelId: string | null, groupId?: string, channelName?: string): void {
-    if (groupId && !this.isValidGroup(groupId)) {
-      console.warn('Invalid group ID for channel:', groupId);
-      return;
-    }
-
-    if (channelId && !this.isValidChannel(channelId, groupId || this._selectedGroup())) {
-      console.warn('Invalid channel ID:', channelId);
-      return;
-    }
-
-    const previousChannel = this._selectedChannel();
-    
-    if (groupId) {
-      this._selectedGroup.set(groupId);
-    }
-    this._selectedChannel.set(channelId);
-    
-    // 채널 상세 정보 저장 (실제 ID 사용)
-    if (channelId && (groupId || this._selectedGroup())) {
-      const targetGroupName = groupId || this._selectedGroup();
-      const group = this._groupList().find(g => g.name === targetGroupName);
+      console.log('🎯 setSelectedChannel 호출:', { channelId, groupId, channelName });
       
-      if (group) {
-        const club = this._clubList().find(c => 
-          c.name === channelId && c.groupId === group.id
-        );
-        
-        if (club) {
-          this._selectedChannelInfo.set({
-            id: club.id,
-            name: channelName || channelId,
-            groupId: group.id
-          });
-          
-          console.log('✅ 채널 정보 설정 완료:', {
-            channelName: channelId,
-            clubId: club.id,
-            groupName: targetGroupName,
-            groupId: group.id
-          });
-        } else {
-          console.warn('❌ 클럽을 찾을 수 없음:', { channelId, groupId: group.id });
-          this._selectedChannelInfo.set(null);
-        }
-      } else {
-        console.warn('❌ 그룹을 찾을 수 없음:', targetGroupName);
-        this._selectedChannelInfo.set(null);
+      if (groupId && !this.isValidGroup(groupId)) {
+          console.warn('❌ 유효하지 않은 그룹 ID:', groupId);
+          return;
       }
-    } else {
-      this._selectedChannelInfo.set(null);
-    }
-    
-    if (channelId) {
-      this.loadChannelMessages(channelId);
-    }
-    
-    console.log(`Channel changed: ${previousChannel} → ${channelId}`, { 
-      groupId, 
-      channelName,
-      channelInfo: this._selectedChannelInfo()
-    });
+
+      if (channelId && !this.isValidChannel(channelId, groupId || this._selectedGroup())) {
+          console.warn('❌ 유효하지 않은 채널 ID:', channelId);
+          return;
+      }
+
+      const previousChannel = this._selectedChannel();
+      
+      if (groupId) {
+          this._selectedGroup.set(groupId);
+      }
+      this._selectedChannel.set(channelId);
+      
+      // 채널 상세 정보 저장 (실제 clubId 사용)
+      if (channelId && (groupId || this._selectedGroup())) {
+          const targetGroupName = groupId || this._selectedGroup();
+          
+          // 1. 그룹 목록에서 그룹 찾기
+          const group = this._groupList().find(g => g.name === targetGroupName);
+          
+          if (group) {
+              // 2. 클럽 목록에서 해당 그룹의 클럽 찾기
+              const club = this._clubList().find(c => 
+                  c.name === channelId && c.groupId === group.id
+              );
+              
+              if (club) {
+                  this._selectedChannelInfo.set({
+                      id: club.id, // 실제 clubId
+                      name: channelName || channelId,
+                      groupId: group.id // 실제 groupId
+                  });
+                  
+                  console.log('✅ 채널 정보 설정 완료:', {
+                      channelName: channelId,
+                      clubId: club.id, // 실제 clubId
+                      groupName: targetGroupName,
+                      groupId: group.id
+                  });
+              } else {
+                  // 클럽을 찾을 수 없는 경우, 사용자 가입 목록에서 찾기 (fallback)
+                  console.warn('⚠️ 전체 클럽 목록에서 클럽을 찾을 수 없음, 사용자 가입 목록에서 검색...');
+                  
+                  const userJoin = this._userJoin();
+                  if (userJoin) {
+                      const userGroup = userJoin.joinList.find(g => g.groupname === targetGroupName);
+                      if (userGroup) {
+                          const userClub = userGroup.clubList.find(c => c.name === channelId);
+                          if (userClub) {
+                              this._selectedChannelInfo.set({
+                                  id: userClub.clubId, // 사용자 가입 목록의 clubId
+                                  name: channelName || channelId,
+                                  groupId: userGroup.groupId
+                              });
+                              
+                              console.log('✅ 사용자 가입 목록에서 채널 정보 설정:', {
+                                  channelName: channelId,
+                                  clubId: userClub.clubId,
+                                  groupName: targetGroupName,
+                                  groupId: userGroup.groupId
+                              });
+                          } else {
+                              console.error('❌ 사용자 가입 목록에서도 클럽을 찾을 수 없음:', { channelId, groupId: userGroup.groupId });
+                              this._selectedChannelInfo.set(null);
+                          }
+                      } else {
+                          console.error('❌ 사용자 가입 목록에서 그룹을 찾을 수 없음:', targetGroupName);
+                          this._selectedChannelInfo.set(null);
+                      }
+                  } else {
+                      console.error('❌ 사용자 가입 목록이 없음');
+                      this._selectedChannelInfo.set(null);
+                  }
+              }
+          } else {
+              console.warn('❌ 그룹을 찾을 수 없음:', targetGroupName);
+              this._selectedChannelInfo.set(null);
+          }
+      } else {
+          this._selectedChannelInfo.set(null);
+      }
+      
+      if (channelId) {
+          this.loadChannelMessages(channelId);
+      }
+      
+      console.log(`📝 채널 변경 완료: ${previousChannel} → ${channelId}`, { 
+          groupId, 
+          channelName,
+          channelInfo: this._selectedChannelInfo()
+      });
+  }
+
+  setSelectedChannelByClubId(clubId: number, channelName?: string, groupName?: string): void {
+      console.log('🎯 setSelectedChannelByClubId 호출:', { clubId, channelName, groupName });
+      
+      // 클럽 목록에서 clubId로 클럽 찾기
+      const club = this._clubList().find(c => c.id === clubId);
+      
+      if (!club) {
+          console.error('❌ clubId로 클럽을 찾을 수 없음:', clubId);
+          return;
+      }
+
+      // 그룹 찾기
+      const group = this._groupList().find(g => g.id === club.groupId);
+      
+      if (!group) {
+          console.error('❌ 클럽의 그룹을 찾을 수 없음:', { clubId, groupId: club.groupId });
+          return;
+      }
+
+      // 그룹과 채널 선택
+      this._selectedGroup.set(group.name);
+      this._selectedChannel.set(club.name);
+      
+      // 채널 정보 설정
+      this._selectedChannelInfo.set({
+          id: club.id,
+          name: channelName || club.name,
+          groupId: group.id
+      });
+
+      console.log('✅ clubId로 채널 설정 완료:', {
+          clubId: club.id,
+          clubName: club.name,
+          groupId: group.id,
+          groupName: group.name
+      });
   }
 
   // 디버깅 메서드 추가

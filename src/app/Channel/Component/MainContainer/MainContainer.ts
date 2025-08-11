@@ -73,69 +73,106 @@ export class MainContainerComponent implements OnInit, OnDestroy {
     });
 
     // 채널 변경 감지 - 더 상세한 로깅
-    effect(() => {
+  effect(() => {
       const channel = this.currentChannel();
       const userEmail = this.currentUserEmail();
       const username = this.currentUsername();
       
-      console.log('=== 채널 변경 감지 ===');
-      console.log('채널 정보:', channel);
-      console.log('사용자 정보:', { userEmail, username });
-      console.log('SharedState 디버그:');
-      this.sharedState.debugChannelSelection();
-      
-      if (channel.id !== -1 && userEmail && username) {
-        console.log('✅ 채팅방 입장 조건 충족:', {
+      console.log('🔄 ===== 채널 변경 감지 =====');
+      console.log('📋 채널 정보:', {
           clubId: channel.id,
-          channelName: channel.name,
+          clubName: channel.name,
           groupId: channel.groupId,
-          userEmail,
-          username
-        });
-        
-        this.messages.set([]); // 메시지 초기화
-        this.stompWebSocketService.joinRoom(
-          channel.id, 
-          userEmail, 
-          username, 
-          channel.name,
-          String(channel.groupId)
-        );
+          isValidClubId: channel.id !== -1
+      });
+      console.log('📋 사용자 정보:', { userEmail, username });
+      
+      // SharedState 상세 디버깅
+      console.log('🔍 SharedState 상세 정보:');
+      console.log('- 선택된 그룹:', this.sharedState.selectedGroup());
+      console.log('- 선택된 채널:', this.sharedState.selectedChannel());
+      console.log('- 전체 그룹 목록:', this.sharedState.groupList());
+      console.log('- 전체 클럽 목록:', this.sharedState.clubList());
+      console.log('- 사용자 가입 목록:', this.sharedState.userJoin());
+      
+      // 채팅방 입장 조건 체크
+      const canJoinChat = channel.id !== -1 && userEmail && username;
+      console.log('🚪 채팅방 입장 가능:', canJoinChat);
+      
+      if (canJoinChat) {
+          console.log('✅ 채팅방 입장 조건 충족');
+          console.log('📋 입장 정보:', {
+              clubId: channel.id,
+              channelName: channel.name,
+              groupId: channel.groupId,
+              userEmail,
+              username
+          });
+          
+          // 메시지 초기화
+          this.messages.set([]);
+          
+          // WebSocket 서비스에 채팅방 입장 요청
+          this.stompWebSocketService.joinRoom(
+              channel.id,      // 실제 clubId
+              userEmail,       // 사용자 이메일
+              username,        // 사용자 이름
+              channel.name,    // 채널 이름
+              String(channel.groupId) // 그룹 ID
+          );
+          
+          console.log('🚪 채팅방 입장 요청 완료');
       } else {
-        console.log('❌ 채팅방 입장 조건 미충족:', {
-          channelId: channel.id,
-          channelName: channel.name,
-          groupId: channel.groupId,
-          hasUserEmail: !!userEmail,
-          hasUsername: !!username,
-          reason: channel.id === -1 ? 'Invalid channel ID (-1)' : 'Missing user info'
-        });
-        
-        // 추가 디버깅 정보
-        if (channel.id === -1) {
-          console.log('🔍 Channel ID가 -1인 이유 분석:');
-          console.log('- 선택된 그룹:', this.sharedState.selectedGroup());
-          console.log('- 선택된 채널:', this.sharedState.selectedChannel());
-          console.log('- 그룹 목록:', this.sharedState.groupList());
-          console.log('- 클럽 목록:', this.sharedState.clubList());
+          console.log('❌ 채팅방 입장 조건 미충족');
           
-          const selectedGroup = this.sharedState.selectedGroup();
-          const selectedChannel = this.sharedState.selectedChannel();
-          
-          if (selectedGroup && selectedChannel) {
-            const group = this.sharedState.groupList().find(g => g.name === selectedGroup);
-            console.log('- 찾은 그룹:', group);
-            
-            if (group) {
-              const club = this.sharedState.clubList().find(c => 
-                c.name === selectedChannel && c.groupId === group.id
-              );
-              console.log('- 찾은 클럽:', club);
-            }
+          // 상세한 실패 원인 분석
+          if (channel.id === -1) {
+              console.log('❌ 실패 원인: 유효하지 않은 clubId (-1)');
+              console.log('🔍 clubId 문제 분석:');
+              
+              const selectedGroup = this.sharedState.selectedGroup();
+              const selectedChannel = this.sharedState.selectedChannel();
+              
+              if (!selectedGroup || !selectedChannel) {
+                  console.log('- 그룹 또는 채널이 선택되지 않음');
+              } else {
+                  console.log('- 선택된 그룹/채널:', { selectedGroup, selectedChannel });
+                  
+                  // 그룹 목록에서 찾기
+                  const group = this.sharedState.groupList().find(g => g.name === selectedGroup);
+                  console.log('- 그룹 목록에서 찾은 그룹:', group);
+                  
+                  if (group) {
+                      // 클럽 목록에서 찾기
+                      const club = this.sharedState.clubList().find(c => 
+                          c.name === selectedChannel && c.groupId === group.id
+                      );
+                      console.log('- 클럽 목록에서 찾은 클럽:', club);
+                      
+                      if (!club) {
+                          console.log('- 추가 검색: 사용자 가입 목록에서 찾기');
+                          const userJoin = this.sharedState.userJoin();
+                          if (userJoin) {
+                              const userGroup = userJoin.joinList.find(g => g.groupname === selectedGroup);
+                              if (userGroup) {
+                                  const userClub = userGroup.clubList.find(c => c.name === selectedChannel);
+                                  console.log('- 사용자 가입 목록에서 찾은 클럽:', userClub);
+                              }
+                          }
+                      }
+                  }
+              }
           }
-        }
+          
+          if (!userEmail || !username) {
+              console.log('❌ 실패 원인: 사용자 정보 누락');
+              console.log('- userEmail:', userEmail);
+              console.log('- username:', username);
+          }
       }
-    });
+      
+      console.log('🔄 ===== 채널 변경 감지 완료 =====');
+  });
 
     // 연결 상태 변경 감지
     effect(() => {

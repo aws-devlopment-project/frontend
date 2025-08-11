@@ -19,6 +19,7 @@ interface ChannelSelectEvent {
     groupId: string;
     channelId: string;
     channelName?: string;
+    clubId?: number;
 }
 
 @Component({
@@ -280,31 +281,97 @@ export class MainComponent implements OnInit, OnDestroy {
     }
   }
 
-  onChannelSelect(data: ChannelSelectEvent): void {
-      console.log('Channel selection requested:', data);
-      
-      if (!this.sharedState.initialized()) {
-          console.warn('Cannot select channel - SharedState not initialized');
-          return;
-      }
+onChannelSelect(data: ChannelSelectEvent): void {
+    console.log('🎯 ===== 채널 선택 이벤트 수신 =====');
+    console.log('📋 수신된 데이터:', {
+        groupId: data.groupId,
+        channelId: data.channelId,
+        channelName: data.channelName,
+        clubId: data.clubId,
+        hasClubId: typeof data.clubId === 'number' && data.clubId > 0
+    });
+    
+    if (!this.sharedState.initialized()) {
+        console.warn('❌ SharedState가 초기화되지 않음 - 채널 선택 불가');
+        return;
+    }
 
-      // 유효한 채널인지 확인
-      const groupChannels = this.sharedState.getGroupChannels(data.groupId);
-      const isValidChannel = groupChannels.includes(data.channelId);
-      
-      if (!isValidChannel) {
-          console.warn('Invalid channel selected:', data, 'Available channels:', groupChannels);
-          return;
-      }
+    // 1. 기본 유효성 검사
+    if (!data.groupId || !data.channelId) {
+        console.error('❌ 필수 데이터 누락:', { groupId: data.groupId, channelId: data.channelId });
+        return;
+    }
 
-      try {
-          // SharedState에 채널 정보 전달 (이름도 함께)
-          this.sharedState.setSelectedChannel(data.channelId, data.groupId, data.channelName);
-          console.log('Channel selection successful:', data);
-      } catch (error) {
-          console.error('Channel selection failed:', error);
-      }
-  }
+    // 2. 그룹 유효성 확인
+    const availableGroups = this.sharedState.availableGroups();
+    const isValidGroup = availableGroups.some(group => group.groupname === data.groupId);
+    
+    if (!isValidGroup) {
+        console.warn('❌ 유효하지 않은 그룹:', data.groupId);
+        console.log('사용 가능한 그룹들:', availableGroups.map(g => g.groupname));
+        return;
+    }
+
+    // 3. 채널 유효성 확인
+    const groupChannels = this.sharedState.getGroupChannels(data.groupId);
+    const isValidChannel = groupChannels.includes(data.channelId);
+    
+    if (!isValidChannel) {
+        console.warn('❌ 유효하지 않은 채널:', data.channelId);
+        console.log('해당 그룹의 채널들:', groupChannels);
+        return;
+    }
+
+    console.log('✅ 유효성 검사 통과');
+
+    try {
+        // 4. clubId가 있는 경우 우선 처리
+        if (data.clubId && data.clubId !== -1) {
+            console.log('🔧 clubId로 채널 설정:', data.clubId);
+            
+            // clubId를 사용한 직접 설정 (권장 방법)
+            this.sharedState.setSelectedChannelByClubId(
+                data.clubId, 
+                data.channelName || data.channelId, 
+                data.groupId
+            );
+        } else {
+            console.log('🔧 기존 방식으로 채널 설정');
+            
+            // 기존 방식으로 설정 (fallback)
+            this.sharedState.setSelectedChannel(
+                data.channelId, 
+                data.groupId, 
+                data.channelName
+            );
+        }
+
+        // 5. 설정 결과 확인
+        const currentChannel = this.sharedState.currentChannelWithId();
+        console.log('📊 설정 결과 확인:', {
+            selectedGroup: this.sharedState.selectedGroup(),
+            selectedChannel: this.sharedState.selectedChannel(),
+            currentChannelWithId: currentChannel,
+            finalClubId: currentChannel.id
+        });
+
+        // 6. 성공적으로 설정되었는지 검증
+        if (currentChannel.id === -1) {
+            console.error('❌ 채널 설정 실패 - clubId가 -1');
+        } else {
+            console.log('✅ 채널 선택 성공:', {
+                groupName: data.groupId,
+                channelName: data.channelId,
+                clubId: currentChannel.id
+            });
+        }
+
+    } catch (error) {
+        console.error('❌ 채널 선택 처리 중 오류:', error);
+    }
+    
+    console.log('🎯 ===== 채널 선택 이벤트 처리 완료 =====');
+}
 
   onSearchQuery(query: string): void {
     console.log('Search query:', query);
