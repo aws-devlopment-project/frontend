@@ -1,4 +1,3 @@
-// FixedMainContainer.ts - 백엔드 예시에 맞춘 수정
 import { Component, signal, computed, effect, OnInit, OnDestroy, ViewChild, ElementRef } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { MatIconModule } from "@angular/material/icon";
@@ -68,6 +67,7 @@ export class MainContainerComponent implements OnInit, OnDestroy {
 
   private subscriptions: Subscription[] = [];
   private messageIdCounter = 0;
+  private lastJoinedRoomId: number = -1; // 마지막 입장한 방 ID 추적
 
   constructor(
     public sharedState: SharedStateService,
@@ -82,15 +82,33 @@ export class MainContainerComponent implements OnInit, OnDestroy {
       }
     });
 
-    // 채널 변경 감지
+    // 채널 변경 감지 - 개선됨
     effect(() => {
       const clubId = this.chatRoomId();
       const userEmail = this.currentUserEmail();
       const username = this.currentUsername();
       
-      if (clubId !== -1 && userEmail && username) {
+      console.log('Channel change effect triggered:', { clubId, userEmail, username, lastJoinedRoomId: this.lastJoinedRoomId });
+      
+      // 유효한 채널이고 이전과 다른 채널인 경우에만 처리
+      if (clubId !== -1 && userEmail && username && clubId !== this.lastJoinedRoomId) {
+        console.log('Joining new room:', clubId);
+        
+        // 이전 방에서 나가기 (있다면)
+        if (this.lastJoinedRoomId !== -1) {
+          console.log('Leaving previous room:', this.lastJoinedRoomId);
+          this.stompWebSocketService.leaveRoom();
+        }
+        
+        // 새 채널 메시지 로드 및 입장
         this.loadChannelMessages();
         this.stompWebSocketService.joinRoom(clubId, userEmail, username);
+        this.lastJoinedRoomId = clubId;
+      } else if (clubId === -1 && this.lastJoinedRoomId !== -1) {
+        // 채널 선택 해제된 경우
+        console.log('Channel deselected, leaving room:', this.lastJoinedRoomId);
+        this.stompWebSocketService.leaveRoom();
+        this.lastJoinedRoomId = -1;
       }
     });
 
@@ -101,8 +119,21 @@ export class MainContainerComponent implements OnInit, OnDestroy {
       
       if (status === 'connected') {
         this.addSystemMessage('STOMP 서버에 연결되었습니다.');
+        
+        // 연결되었고 현재 선택된 채널이 있다면 즉시 입장
+        const currentRoomId = this.chatRoomId();
+        if (currentRoomId !== -1 && currentRoomId !== this.lastJoinedRoomId) {
+          const userEmail = this.currentUserEmail();
+          const username = this.currentUsername();
+          if (userEmail && username) {
+            console.log('Auto-joining room after connection:', currentRoomId);
+            this.stompWebSocketService.joinRoom(currentRoomId, userEmail, username);
+            this.lastJoinedRoomId = currentRoomId;
+          }
+        }
       } else if (status === 'disconnected') {
         this.addSystemMessage('STOMP 서버와의 연결이 끊어졌습니다.');
+        this.lastJoinedRoomId = -1; // 연결 끊어지면 입장 상태 초기화
       }
     });
   }
@@ -113,6 +144,9 @@ export class MainContainerComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.lastJoinedRoomId !== -1) {
+      this.stompWebSocketService.leaveRoom();
+    }
     this.stompWebSocketService.disconnect();
     this.subscriptions.forEach(sub => sub.unsubscribe());
   }
@@ -122,7 +156,10 @@ export class MainContainerComponent implements OnInit, OnDestroy {
     const user = this.sharedState.currentUser();
     if (user && user.id) {
       const serverUrl = this.getServerUrl();
+      console.log('Initializing STOMP connection:', { userEmail: user.id, username: user.name, serverUrl });
       this.stompWebSocketService.connect(user.id, user.name, serverUrl);
+    } else {
+      console.warn('Cannot initialize STOMP connection - user data not available');
     }
   }
 
@@ -133,6 +170,7 @@ export class MainContainerComponent implements OnInit, OnDestroy {
   // 메시지 구독 설정
   private setupMessageSubscriptions(): void {
     const messagesSub = this.stompWebSocketService.messages$.subscribe((message: ChatMessageDto) => {
+      console.log('Received message from WebSocket service:', message);
       this.addDisplayMessage(message);
     });
 
@@ -146,14 +184,19 @@ export class MainContainerComponent implements OnInit, OnDestroy {
 
   // 채널 메시지 로드
   private loadChannelMessages(): void {
+    // 새 채널 입장 시 메시지 초기화
     this.messages.set([]);
+    console.log('Channel messages cleared for new channel');
   }
 
   // 디스플레이 메시지 추가
   private addDisplayMessage(message: ChatMessageDto): void {
-    if (message.message === 'ping') {
+    // ping 메시지나 빈 메시지 무시
+    if (!message.message || message.message === 'ping') {
       return;
     }
+
+    console.log('Adding display message:', message);
 
     const displayMessage: DisplayMessage = {
       id: this.generateMessageId(),
@@ -168,6 +211,7 @@ export class MainContainerComponent implements OnInit, OnDestroy {
     };
     
     this.messages.update(messages => [...messages, displayMessage]);
+    console.log('Display message added:', displayMessage);
   }
 
   // 메시지 타입을 디스플레이 타입으로 변환
@@ -198,10 +242,14 @@ export class MainContainerComponent implements OnInit, OnDestroy {
 
   // 메시지 전송
   sendMessage(content: string): void {
-    if (!content.trim() || !this.stompWebSocketService.isConnected()) {
-      if (!this.stompWebSocketService.isConnected()) {
-        this.addSystemMessage('서버에 연결되지 않았습니다. 연결을 확인해주세요.');
-      }
+    if (!content.trim()) {
+      console.warn('Empty message content, not sending');
+      return;
+    }
+
+    if (!this.stompWebSocketService.isConnected()) {
+      console.warn('STOMP not connected, cannot send message');
+      this.addSystemMessage('서버에 연결되지 않았습니다. 연결을 확인해주세요.');
       return;
     }
 
@@ -209,14 +257,28 @@ export class MainContainerComponent implements OnInit, OnDestroy {
     const userEmail = this.currentUserEmail();
     const username = this.currentUsername();
 
-    if (clubId !== -1 && userEmail && username) {
-      this.stompWebSocketService.sendChatMessage(clubId, userEmail, username, content);
+    if (clubId === -1) {
+      console.warn('No room selected, cannot send message');
+      this.addSystemMessage('채팅방이 선택되지 않았습니다.');
+      return;
     }
+
+    if (!userEmail || !username) {
+      console.warn('User information not available, cannot send message');
+      this.addSystemMessage('사용자 정보가 없습니다.');
+      return;
+    }
+
+    console.log('Sending message:', { clubId, userEmail, username, content });
+    this.stompWebSocketService.sendChatMessage(clubId, userEmail, username, content);
   }
 
   sendCurrentMessage(): void {
-    this.sendMessage(this.newMessage());
-    this.newMessage.set('');
+    const messageContent = this.newMessage();
+    if (messageContent.trim()) {
+      this.sendMessage(messageContent);
+      this.newMessage.set('');
+    }
   }
 
   // 파일 업로드
@@ -354,6 +416,11 @@ export class MainContainerComponent implements OnInit, OnDestroy {
       return statusText[status] || '연결 중...';
     }
 
+    const currentRoomId = this.chatRoomId();
+    if (currentRoomId === -1) {
+      return '채널을 선택해주세요...';
+    }
+
     return '메시지를 입력하세요... (Enter: 전송, Shift+Enter: 줄바꿈)';
   }
 
@@ -423,6 +490,7 @@ export class MainContainerComponent implements OnInit, OnDestroy {
   // 연결 관리
   reconnect(): void {
     this.addSystemMessage('STOMP 서버에 재연결을 시도합니다...');
+    this.lastJoinedRoomId = -1; // 재연결 시 입장 상태 초기화
     this.stompWebSocketService.disconnect();
     setTimeout(() => {
       this.initializeStompConnection();
@@ -512,7 +580,8 @@ export class MainContainerComponent implements OnInit, OnDestroy {
   testConnection(): void {
     if (this.stompWebSocketService.isConnected()) {
       const clubId = this.chatRoomId();
-      this.addSystemMessage(`✅ STOMP 연결이 정상입니다. (채팅방 ID: ${clubId})`);
+      const roomStatus = clubId !== -1 ? `채팅방 ID: ${clubId}` : '채팅방 미선택';
+      this.addSystemMessage(`✅ STOMP 연결이 정상입니다. (${roomStatus})`);
     } else {
       this.addSystemMessage('❌ STOMP 연결이 끊어졌습니다. 재연결을 시도해주세요.');
     }
