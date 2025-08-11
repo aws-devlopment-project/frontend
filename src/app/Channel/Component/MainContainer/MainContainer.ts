@@ -52,21 +52,7 @@ export class MainContainerComponent implements OnInit, OnDestroy {
   connectionStatus = computed(() => this.stompWebSocketService.connectionStatus());
   
   // 채팅방 ID 생성 (clubId를 숫자로 변환)
-  chatRoomId = computed(() => {
-    const group = this.currentGroup().id;
-    const channel = this.currentChannel().id;
-    if (!group || !channel) return -1;
-    
-    // group과 channel을 기반으로 숫자 ID 생성 (간단한 해시)
-    const combined = `${group}-${channel}`;
-    let hash = 0;
-    for (let i = 0; i < combined.length; i++) {
-      const char = combined.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // 32bit 정수로 변환
-    }
-    return Math.abs(hash);
-  });
+  chatRoomId = computed(() => this.currentChannel().id || -1);
 
   // 저장된 메시지 통계
   messageStats = computed(() => {
