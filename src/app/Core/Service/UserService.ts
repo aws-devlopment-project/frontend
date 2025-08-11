@@ -103,7 +103,7 @@ export class UserService {
             }
 
             // API 호출  
-            const url = environment.apiUrl + `/api/user/getUserJoin?email=${id}`;
+            const url = `/api/user/getUserJoin?email=${id}`;
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
             const response = await firstValueFrom(

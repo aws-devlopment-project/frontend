@@ -3,6 +3,7 @@ import { DataCacheService } from "./DataCacheService";
 import { HttpService } from "./HttpService";
 import { HttpHeaders } from "@angular/common/http";
 import { Group } from "../Models/group";
+import { firstValueFrom } from 'rxjs';
 import { createGroup, createGroupList } from "../Models/group";
 
 @Injectable({
@@ -47,26 +48,28 @@ export class GroupService {
         return undefined;
     }
 
-    async getGroupList(): Promise<Group[] | []> {
+    async getGroupList(): Promise<Group[]> {
         const url = '/api/group/getGroupList';
         const headers: HttpHeaders = new HttpHeaders({
             'Content-Type': 'application/json'
         });
+        
         try {
-            let groupList: Group[] | undefined = undefined;
-            await this.httpService.get(url, createGroupList, headers).subscribe((data: Group[]) => {
-                groupList = data;
-                if (data.length !== 0) {
-                    data.forEach((group) => {
-                        this.dataService.setCache(group.name, group);
-                    });
-                }
-            })
-            return groupList || [];
+            const data = await firstValueFrom(
+                this.httpService.get(url, createGroupList, headers)
+            );
+            
+            if (data && data.length !== 0) {
+                data.forEach((group) => {
+                    this.dataService.setCache(group.name, group);
+                });
+            }
+            
+            return data || [];
         } catch (e) {
             console.error("[API] getGroupList: " + e);
+            return [];
         }
-        return [];
     }
 
     async questSuccessWithFeedback(
@@ -94,7 +97,7 @@ export class GroupService {
                 questList.forEach((quest) => {
                     const questIndex = cacheGroup.questList.indexOf(quest.quest);
                     if (questIndex !== -1) {
-                    cacheGroup.questSuccessNum[questIndex] += 1;
+                        cacheGroup.questSuccessNum[questIndex] += 1;
                     }
                 });
                 this.dataService.setCache(group, cacheGroup);
