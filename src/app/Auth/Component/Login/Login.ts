@@ -36,6 +36,10 @@ export class LoginComponent implements OnInit {
     signInForm: FormGroup = new FormGroup({});
     signUpForm: FormGroup = new FormGroup({});
     emailForm: FormGroup = new FormGroup({});
+
+    currentUsername: string = '';
+    newUsername: string = '';
+    isUpdating: boolean = false;
     
     constructor(
         private fb: FormBuilder, 
@@ -47,6 +51,7 @@ export class LoginComponent implements OnInit {
     ngOnInit(): void {
         this.initializeForms();
         this.handleAuthCallback();
+        this.loadCurrentUsername();
     }
 
     private initializeForms(): void {
@@ -352,14 +357,14 @@ export class LoginComponent implements OnInit {
         // 로컬에서 사용 시 try 내부 코드에서 주석 처리된 코드를 활성화 해주시고 기존에 활성화된 코드는 주석 처리해주세요
         try {
             const user: UserCredentials = {
-                id: "wefwef@wefwefwef.wefwefwef",
-                name: "wefwefwefwefwef",
-                idToken: "1234",
+                id: "dhj118528@gmail.com",
+                name: "載昊周",
+                idToken: "eyJraWQiOiJZMHM3akZQMlJXVGFNY0JlSFhRdHpKQWxGem1TUnhZUkE5VStXMXZURTJVPSIsImFsZyI6IlJTMjU2In0.eyJhdF9oYXNoIjoiSHd5eWFUdVNvUTF5SHdJajA1SEswQSIsInN1YiI6Ijg0MDgxZGNjLTQwYzEtNzAxYy0yYjllLTc3MTU5MWIxN2JhZSIsImNvZ25pdG86Z3JvdXBzIjpbImFwLW5vcnRoZWFzdC0yX3ZxdWQyZWZKSV9Hb29nbGUiXSwiZW1haWxfdmVyaWZpZWQiOmZhbHNlLCJpc3MiOiJodHRwczpcL1wvY29nbml0by1pZHAuYXAtbm9ydGhlYXN0LTIuYW1hem9uYXdzLmNvbVwvYXAtbm9ydGhlYXN0LTJfdnF1ZDJlZkpJIiwiY29nbml0bzp1c2VybmFtZSI6Imdvb2dsZV8xMTA4MDAyNDA2OTM0NTMxNzQ2NzkiLCJub25jZSI6ImZfYy1UMHJXYUFXaENtbVlIbUo2S1VJYXo2RzA2bkFRYVBuWjQxSVJfVzhsaExxdjBval9LdnN1VmdIUUFzdlJQWjlpa1ltdmp2TWt3NmxoUlRXVTUyQlQwRUlSQzN6eXZJVGtEUjFJTDl5S0NFSk5mdktPZFQ2aHJ1RHYxODZNaUdPWmVwa1phUTgtY1pDMlZXM0pkWjZrSUdqMjVnM3hmNVI4ajJ5dGxlYyIsIm9yaWdpbl9qdGkiOiI1YzY4ZmM0NC1hMDE5LTQ2MTctYTYzNy1iMGUyNTA2OTBmZDMiLCJhdWQiOiIzNThraWZ0NWUwaTl0dWtodmQxMHAwb3VpMCIsImlkZW50aXRpZXMiOlt7ImRhdGVDcmVhdGVkIjoiMTc1NDk1NzcwODkzNyIsInVzZXJJZCI6IjExMDgwMDI0MDY5MzQ1MzE3NDY3OSIsInByb3ZpZGVyTmFtZSI6Ikdvb2dsZSIsInByb3ZpZGVyVHlwZSI6Ikdvb2dsZSIsImlzc3VlciI6bnVsbCwicHJpbWFyeSI6InRydWUifV0sInRva2VuX3VzZSI6ImlkIiwiYXV0aF90aW1lIjoxNzU0OTU4MDcyLCJuYW1lIjoi6LyJ5piK5ZGoIiwiZXhwIjoxNzU0OTYxNjcyLCJpYXQiOjE3NTQ5NTgwNzIsImp0aSI6Ijc0Yzg5ZDU4LWZjNTQtNGQyNC1iNDk5LTY2NGEzYjg0NzhkZSIsImVtYWlsIjoiZGhqMTE4NTI4QGdtYWlsLmNvbSJ9.UyLymeSpwHhcUonMaLKNs_QCG_fWaZzPPMg1-ajFt6XXQoVxuL0mi_5VRwhwg8xBwItAaF57aWAnAwU_r7oh4_HVdewnnYH8F7YRlwPz1TjeN8t6NS6-ybjxolk0zNFj0ysY4WaiskX9xiqFsaFDu_i5rWle1DvUITPF-zKl2OcJMg-fbCcrzAX2FuhNn9IrIpLD5pTkgOkPJT3H4RbJPb_5RlqnmWUZDajP4aUN0GJ-RwjIFCKhc7iocK1qL8tZ70msuXE_GuVqzcgJZjcLKGMi4Oghtkt4LGuL3W7G0LEDuyBdoKWNpbZlx5ogAvmWZHshHerVkhsadDnH-NO4EA",
             };
 
             const userStatus: UserStatus = {
-                id: "wefwef@wefwefwef.wefwefwef",
-                name: "wefwefwefwefwef",
+                id: "dhj118528@gmail.com",
+                name: "載昊周",
                 status: 'online',
                 joinDate: new Date(),
                 lastSeen: new Date()
@@ -455,6 +460,34 @@ export class LoginComponent implements OnInit {
             this.errMsg = error.message || '로그인 중 오류가 발생했습니다.';
             this.successLogin.update(() => false);
             throw error;
+        }
+    }
+
+    async loadCurrentUsername() {
+        try {
+            const username = await this.auth.getCustomUsername();
+            this.currentUsername = username || '';
+        } catch (error) {
+        console.error('Failed to load username:', error);
+        }
+    }
+
+    async updateUsername() {
+        if (!this.newUsername.trim()) {
+            alert('Please enter a valid username');
+            return;
+        }
+
+        this.isUpdating = true;
+        
+        try {
+            await this.auth.updateCustomUsername(this.newUsername);
+            this.currentUsername = this.newUsername;
+            this.newUsername = '';
+        } catch (error) {
+            console.error('Failed to update username:', error);
+        } finally {
+            this.isUpdating = false;
         }
     }
 }

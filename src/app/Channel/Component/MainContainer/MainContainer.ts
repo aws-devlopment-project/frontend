@@ -210,7 +210,7 @@ export class MainContainerComponent implements OnInit, OnDestroy {
     const user = this.sharedState.currentUser();
     if (user && user.id) {
       console.log('STOMP 연결 초기화:', { userEmail: user.id, username: user.name });
-      this.stompWebSocketService.connect(user.id, user.name, 'http://localhost:9001');
+      this.stompWebSocketService.connect(user.id, user.name, '');
     }
   }
 

@@ -307,7 +307,7 @@ export class HomeDashboardComponent implements OnInit {
         const shouldInclude = Math.random() < 0.7; // 70% 확률로 포함
         
         if (shouldInclude) {
-          const isCompleted = quest.isSuccess || Math.random() < 0.3; // 실제 완료 상태 또는 30% 확률로 완료
+          const isCompleted = quest.isSuccess;
           
           quests.push({
             id: `quest-${date}-${index}`,
@@ -320,28 +320,6 @@ export class HomeDashboardComponent implements OnInit {
         }
       });
     }
-
-    // 추가로 더미 퀘스트 생성 (데이터가 부족한 경우)
-    if (quests.length === 0 && Math.random() < 0.5) {
-      const dummyQuests = [
-        '아침 운동하기', '독서 30분', '물 8잔 마시기', '일기 쓰기', '명상 10분',
-        '새로운 기술 학습', '친구와 연락하기', '건강한 식사', '스트레칭', '목표 점검'
-      ];
-      
-      const questCount = Math.floor(Math.random() * 3) + 1; // 1-3개
-      for (let i = 0; i < questCount; i++) {
-        const questTitle = dummyQuests[Math.floor(Math.random() * dummyQuests.length)];
-        quests.push({
-          id: `dummy-${date}-${i}`,
-          title: questTitle,
-          groupName: '개인 목표',
-          isCompleted: Math.random() < 0.6,
-          priority: ['high', 'medium', 'low'][Math.floor(Math.random() * 3)] as 'high' | 'medium' | 'low',
-          dueTime: this.generateDueTime()
-        });
-      }
-    }
-
     return quests;
   }
 
@@ -399,12 +377,6 @@ export class HomeDashboardComponent implements OnInit {
     });
   }
 
-  // 퀘스트 완료 표시 메서드 제거 (그룹 대시보드에서 처리)
-  // private onMarkQuestCompleted 메서드 삭제
-
-  // private updateQuestCompletionOnServer 메서드 삭제
-
-  // 기존 메서드들...
   private async loadActivitySummary(): Promise<void> {
     try {
       const activityStats = this.localActivityService.getActivityStats();

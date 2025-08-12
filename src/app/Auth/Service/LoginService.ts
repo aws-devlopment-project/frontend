@@ -1,5 +1,7 @@
 import { Injectable } from "@angular/core";
-import { updatePassword, UpdatePasswordInput } from "@aws-amplify/auth";
+import { DataCacheService } from "../../Core/Service/DataCacheService";
+import { updatePassword, UpdatePasswordInput, updateUserAttributes } from "@aws-amplify/auth";
+import { Router } from "@angular/router";
 
 import { 
   fetchAuthSession, 
@@ -23,6 +25,11 @@ import {
     providedIn: 'root',
 })
 export class LoginService {
+    constructor(
+        private cacheService: DataCacheService,
+        private router: Router
+    ) {}
+
     async signInUser(username: string, password: string) {
         try {
             const user = await signIn({username, password});
@@ -140,7 +147,9 @@ export class LoginService {
         try {
             const session = await fetchAuthSession();
             
+            console.log(session);
             if (!session.tokens?.accessToken) {
+                await this.signOutUser();
                 throw new Error('유효하지 않은 세션입니다.');
             }
             
@@ -320,9 +329,10 @@ export class LoginService {
 
     async signOutUser() {
         try {
-            await signOut();
+            await signOut({global: true});
             // 로컬 저장소 정리
             this.clearLocalData();
+            this.router.navigate(['/board']);
             return { success: true };
         } catch (error: any) {
             console.error('로그아웃 오류:', error);
@@ -526,4 +536,40 @@ export class LoginService {
             throw new Error(error.message || '비밀번호 변경 중 오류가 발생했습니다.');
         }
     }
+
+    async updateCustomUsername(newUsername: string): Promise<boolean> {
+        try {
+            await updateUserAttributes({
+                userAttributes: {
+                    'custom:username': newUsername
+                }
+            });
+
+            console.log('Custom username updated successfully');
+            return true;
+        } catch (e) {
+            console.error('Error updating custom username: ', e);
+            throw e;
+        }
+    }
+
+  async getCurrentUserAttributes() {
+    try {
+      const attributes = await fetchUserAttributes();
+      return attributes;
+    } catch (error) {
+      console.error('Error fetching user attributes:', error);
+      throw error;
+    }
+  }
+
+  async getCustomUsername(): Promise<string | null> {
+    try {
+      const attributes = await fetchUserAttributes();
+      return attributes['custom:username'] || null;
+    } catch (error) {
+      console.error('Error fetching custom username:', error);
+      return null;
+    }
+  }
 }

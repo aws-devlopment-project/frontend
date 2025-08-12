@@ -7,6 +7,8 @@ export const environment = {
   googleClientId: '',
   apiUrl: 'http://localhost:9000',
   webSocketUrl: '',
+  globalGivingAPI: '178b5732-efbc-44e9-9113-7eaafcf08357',
+  globalGivinEndpoint: 'https://api.globalgiving.org/v2/projects',
   cognitoDomain: '',
   redirectSignIn: '',
   redirectSignOut: ''

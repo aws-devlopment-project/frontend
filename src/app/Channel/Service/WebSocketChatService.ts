@@ -30,7 +30,7 @@ export class StompWebSocketService {
   constructor() {}
   
   // STOMP 연결 - 개선된 로깅
-  connect(userEmail: string, username: string, serverUrl: string = 'http://localhost:9001'): void {
+  connect(userEmail: string, username: string, serverUrl: string = ''): void {
     console.log('🔌 STOMP 연결 시작:', { userEmail, username, serverUrl });
     
     if (this.stompClient?.connected) {

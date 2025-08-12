@@ -408,6 +408,7 @@ export class UserService {
 
             const url = `/api/user/joinGroup`;
             const body = { user: id, group: group };
+            console.log("joinGroup: ", body);
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
             await firstValueFrom(
@@ -479,6 +480,7 @@ export class UserService {
 
             const url = `/api/user/joinClub`;
             const body = { user: id, group: group, clubList: clubList };
+            console.log("joinClub: " + body.user, body.group, body.clubList);
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
             await firstValueFrom(

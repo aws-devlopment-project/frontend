@@ -69,13 +69,53 @@ export class ManagementDashboardService {
     }
 
     async setUsername(username: string) {
-        let user = this.shared.currentUser();
-        if (user) {
-            await this.userService.setUsername(user.id, username);
-            user.name = username;
-            this.shared.setCurrentUser(user);
-        } else {
-            await this.userService.setUsername("", username);
+        try {
+            const user = this.shared.currentUser();
+            const userId = user ? user.id : "";
+
+            // 1. Amplify custom:username 속성 업데이트
+            console.log('🔄 Amplify custom:username 업데이트 시작...');
+            await this.loginService.updateCustomUsername(username);
+            console.log('✅ Amplify custom:username 업데이트 완료');
+
+            // 2. 백엔드 API 호출 (기존 로직)
+            console.log('🔄 백엔드 username 업데이트 시작...');
+            if (user) {
+                await this.userService.setUsername(user.id, username);
+            } else {
+                await this.userService.setUsername("", username);
+            }
+            console.log('✅ 백엔드 username 업데이트 완료');
+
+            // 3. 로컬 상태 업데이트
+            if (user) {
+                user.name = username;
+                this.shared.setCurrentUser(user);
+                console.log('✅ 로컬 상태 업데이트 완료');
+            }
+
+            console.log('🎉 사용자명 업데이트 전체 프로세스 완료');
+            
+        } catch (error) {
+            console.error('❌ 사용자명 업데이트 실패:', error);
+            
+            // 에러 타입별 처리
+            if (error && typeof error === 'object' && 'name' in error) {
+                switch (error.name) {
+                    case 'NotAuthorizedException':
+                        throw new Error('인증이 필요합니다. 다시 로그인해 주세요.');
+                    case 'UserNotFoundException':
+                        throw new Error('사용자를 찾을 수 없습니다.');
+                    case 'InvalidParameterException':
+                        throw new Error('잘못된 사용자명입니다. 다른 이름을 시도해 주세요.');
+                    case 'LimitExceededException':
+                        throw new Error('요청 횟수가 초과되었습니다. 잠시 후 다시 시도해 주세요.');
+                    default:
+                        throw new Error(`사용자명 업데이트 중 오류가 발생했습니다: ${error || '알 수 없는 오류'}`);
+                }
+            }
+            
+            throw new Error('사용자명 업데이트에 실패했습니다. 다시 시도해 주세요.');
         }
     }
 
