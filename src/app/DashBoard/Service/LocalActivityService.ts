@@ -68,7 +68,7 @@ export class LocalActivityService {
     if (!userCreds) return;
 
     // 실제 API 호출과 연동
-    const success = await this.userService.setUserQuestRecord(userCreds.id, groupName, questList);
+    const success = await this.userService.getUserQuestCur(userCreds.id);
     
     if (success) {
       questList.forEach(quest => {
@@ -179,13 +179,13 @@ export class LocalActivityService {
       ]);
 
       const currentQuests = questCur?.curQuestTotalList.length || 0;
-      const completedQuests = questCur?.curQuestTotalList.filter(q => q.isSuccess).length || 0;
+      const completedQuests = questCur?.curQuestTotalList.filter(q => q.success).length || 0;
       const completionRate = currentQuests > 0 ? Math.round((completedQuests / currentQuests) * 100) : 0;
 
       // 가장 참여도가 높은 그룹 찾기
       const groupStats: { [key: string]: number } = {};
       questCur?.curQuestTotalList.forEach(quest => {
-        groupStats[quest.group] = (groupStats[quest.group] || 0) + (quest.isSuccess ? 1 : 0);
+        groupStats[quest.group] = (groupStats[quest.group] || 0) + (quest.success ? 1 : 0);
       });
       const favoriteGroup = Object.entries(groupStats)
         .sort(([,a], [,b]) => b - a)[0]?.[0] || '없음';

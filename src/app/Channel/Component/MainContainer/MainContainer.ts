@@ -1,4 +1,4 @@
-// MainContainer.ts - 실제 clubId를 사용하도록 수정
+// MainContainer.ts - 최소한의 이미지 전송 지원 추가
 import { Component, signal, computed, effect, OnInit, OnDestroy, ViewChild, ElementRef } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { MatIconModule } from "@angular/material/icon";
@@ -28,10 +28,12 @@ interface DisplayMessage {
 })
 export class MainContainerComponent implements OnInit, OnDestroy {
   @ViewChild('messagesContainer') messagesContainer!: ElementRef;
+  @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
 
   // Signals
   newMessage = signal('');
   messages = signal<DisplayMessage[]>([]);
+  isUploadingImage = signal(false);
   
   // Computed properties - SharedService의 currentChannelWithId 사용
   currentUserEmail = computed(() => this.sharedState.currentUser()?.id || '');
@@ -73,7 +75,7 @@ export class MainContainerComponent implements OnInit, OnDestroy {
     });
 
     // 채널 변경 감지 - 더 상세한 로깅
-  effect(() => {
+    effect(() => {
       const channel = this.currentChannel();
       const userEmail = this.currentUserEmail();
       const username = this.currentUsername();
@@ -87,27 +89,12 @@ export class MainContainerComponent implements OnInit, OnDestroy {
       });
       console.log('📋 사용자 정보:', { userEmail, username });
       
-      // SharedState 상세 디버깅
-      console.log('🔍 SharedState 상세 정보:');
-      console.log('- 선택된 그룹:', this.sharedState.selectedGroup());
-      console.log('- 선택된 채널:', this.sharedState.selectedChannel());
-      console.log('- 전체 그룹 목록:', this.sharedState.groupList());
-      console.log('- 전체 클럽 목록:', this.sharedState.clubList());
-      console.log('- 사용자 가입 목록:', this.sharedState.userJoin());
-      
       // 채팅방 입장 조건 체크
       const canJoinChat = channel.id !== -1 && userEmail && username;
       console.log('🚪 채팅방 입장 가능:', canJoinChat);
       
       if (canJoinChat) {
           console.log('✅ 채팅방 입장 조건 충족');
-          console.log('📋 입장 정보:', {
-              clubId: channel.id,
-              channelName: channel.name,
-              groupId: channel.groupId,
-              userEmail,
-              username
-          });
           
           // 메시지 초기화
           this.messages.set([]);
@@ -124,55 +111,10 @@ export class MainContainerComponent implements OnInit, OnDestroy {
           console.log('🚪 채팅방 입장 요청 완료');
       } else {
           console.log('❌ 채팅방 입장 조건 미충족');
-          
-          // 상세한 실패 원인 분석
-          if (channel.id === -1) {
-              console.log('❌ 실패 원인: 유효하지 않은 clubId (-1)');
-              console.log('🔍 clubId 문제 분석:');
-              
-              const selectedGroup = this.sharedState.selectedGroup();
-              const selectedChannel = this.sharedState.selectedChannel();
-              
-              if (!selectedGroup || !selectedChannel) {
-                  console.log('- 그룹 또는 채널이 선택되지 않음');
-              } else {
-                  console.log('- 선택된 그룹/채널:', { selectedGroup, selectedChannel });
-                  
-                  // 그룹 목록에서 찾기
-                  const group = this.sharedState.groupList().find(g => g.name === selectedGroup);
-                  console.log('- 그룹 목록에서 찾은 그룹:', group);
-                  
-                  if (group) {
-                      // 클럽 목록에서 찾기
-                      const club = this.sharedState.clubList().find(c => 
-                          c.name === selectedChannel && c.groupId === group.id
-                      );
-                      console.log('- 클럽 목록에서 찾은 클럽:', club);
-                      
-                      if (!club) {
-                          console.log('- 추가 검색: 사용자 가입 목록에서 찾기');
-                          const userJoin = this.sharedState.userJoin();
-                          if (userJoin) {
-                              const userGroup = userJoin.joinList.find(g => g.groupname === selectedGroup);
-                              if (userGroup) {
-                                  const userClub = userGroup.clubList.find(c => c.name === selectedChannel);
-                                  console.log('- 사용자 가입 목록에서 찾은 클럽:', userClub);
-                              }
-                          }
-                      }
-                  }
-              }
-          }
-          
-          if (!userEmail || !username) {
-              console.log('❌ 실패 원인: 사용자 정보 누락');
-              console.log('- userEmail:', userEmail);
-              console.log('- username:', username);
-          }
       }
       
       console.log('🔄 ===== 채널 변경 감지 완료 =====');
-  });
+    });
 
     // 연결 상태 변경 감지
     effect(() => {
@@ -210,7 +152,7 @@ export class MainContainerComponent implements OnInit, OnDestroy {
     const user = this.sharedState.currentUser();
     if (user && user.id) {
       console.log('STOMP 연결 초기화:', { userEmail: user.id, username: user.name });
-      this.stompWebSocketService.connect(user.id, user.name, '');
+      this.stompWebSocketService.connect(user.id, user.name, 'http://k8s-stage-appingre-fec57c3d21-1092138479.ap-northeast-2.elb.amazonaws.com');
     }
   }
 
@@ -229,7 +171,7 @@ export class MainContainerComponent implements OnInit, OnDestroy {
     this.subscriptions.push(messagesSub, errorsSub);
   }
 
-  // 디스플레이 메시지 추가
+  // 디스플레이 메시지 추가 - 이미지 지원
   private addDisplayMessage(message: ChatMessageDto): void {
     if (!message.message || message.message === 'ping') {
       return;
@@ -239,13 +181,19 @@ export class MainContainerComponent implements OnInit, OnDestroy {
       id: this.generateMessageId(),
       senderEmail: message.senderEmail,
       senderUsername: message.senderUsername,
-      content: message.message,
+      content: message.message, // 🖼️ 이미지의 경우 Base64 데이터가 여기에 들어감
       timestamp: new Date(message.timestamp || Date.now()),
       type: (message.type === 'JOIN' || message.type === 'LEAVE') ? 'system' : 'user',
       messageType: message.type,
       isOwn: message.senderEmail === this.currentUserEmail() || 
              message.senderUsername === this.currentUsername()
     };
+    
+    console.log('디스플레이 메시지 추가:', {
+      type: displayMessage.messageType,
+      isImage: displayMessage.messageType === 'IMAGE',
+      contentLength: displayMessage.content.length
+    });
     
     this.messages.update(messages => [...messages, displayMessage]);
   }
@@ -296,6 +244,123 @@ export class MainContainerComponent implements OnInit, OnDestroy {
       });
       this.addSystemMessage('메시지를 전송할 수 없습니다. 채널을 다시 선택해주세요.');
     }
+  }
+
+  // 🖼️ 이미지 선택 트리거
+  triggerImageUpload(): void {
+    if (!this.stompWebSocketService.isConnected()) {
+      this.addSystemMessage('서버에 연결되지 않았습니다.');
+      return;
+    }
+
+    if (this.isUploadingImage()) {
+      this.addSystemMessage('이미지 업로드 중입니다. 잠시 기다려주세요.');
+      return;
+    }
+
+    this.fileInput.nativeElement.click();
+  }
+
+  // 🖼️ 이미지 파일 선택 처리
+  onImageSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    console.log('이미지 파일 선택됨:', {
+      name: file.name,
+      size: file.size,
+      type: file.type
+    });
+
+    this.uploadImage(file);
+    
+    // 파일 입력 초기화 (같은 파일 재선택 가능하도록)
+    input.value = '';
+  }
+
+  // 🖼️ 이미지 업로드 처리
+  private async uploadImage(file: File): Promise<void> {
+    const clubId = this.chatRoomId();
+    const userEmail = this.currentUserEmail();
+    const username = this.currentUsername();
+
+    if (clubId === -1 || !userEmail || !username) {
+      this.addSystemMessage('채널을 선택하고 로그인 후 이미지를 전송할 수 있습니다.');
+      return;
+    }
+
+    this.isUploadingImage.set(true);
+    
+    try {
+      console.log('이미지 업로드 시작:', {
+        fileName: file.name,
+        fileSize: file.size,
+        clubId,
+        userEmail,
+        username
+      });
+
+      // 임시 업로딩 메시지 표시
+      const uploadingMessage: DisplayMessage = {
+        id: this.generateMessageId(),
+        senderEmail: userEmail,
+        senderUsername: username,
+        content: `이미지 업로드 중... (${file.name})`,
+        timestamp: new Date(),
+        type: 'user',
+        messageType: 'CHAT',
+        isOwn: true
+      };
+      
+      this.messages.update(messages => [...messages, uploadingMessage]);
+
+      // WebSocket 서비스를 통해 이미지 전송
+      await this.stompWebSocketService.sendImageMessage(clubId, userEmail, username, file);
+      
+      // 업로딩 메시지 제거
+      this.messages.update(messages => 
+        messages.filter(msg => msg.id !== uploadingMessage.id)
+      );
+
+      console.log('✅ 이미지 업로드 성공');
+      
+    } catch (error) {
+      console.error('❌ 이미지 업로드 실패:', error);
+      
+      // 업로딩 메시지 제거
+      this.messages.update(messages => 
+        messages.filter(msg => msg.content.includes('이미지 업로드 중...'))
+      );
+      
+      this.addSystemMessage(`이미지 업로드 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+    } finally {
+      this.isUploadingImage.set(false);
+    }
+  }
+
+  // 🖼️ 이미지 URL 생성 (Base64 데이터를 img src로 사용)
+  getImageUrl(base64Data: string): string {
+    // 이미 data:image 형태인 경우 그대로 반환
+    if (base64Data.startsWith('data:image/')) {
+      return base64Data;
+    }
+    // 순수 Base64인 경우 접두사 추가
+    return `data:image/jpeg;base64,${base64Data}`;
+  }
+
+  // 🖼️ 이미지인지 확인
+  isImageMessage(message: DisplayMessage): boolean {
+    return message.messageType === 'IMAGE';
+  }
+
+  // 🖼️ 이미지 로드 에러 처리
+  onImageError(event: Event): void {
+    const img = event.target as HTMLImageElement;
+    img.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZSBFcnJvcjwvdGV4dD48L3N2Zz4=';
   }
 
   sendCurrentMessage(): void {
@@ -360,6 +425,7 @@ export class MainContainerComponent implements OnInit, OnDestroy {
       email: this.currentUserEmail(),
       username: this.currentUsername()
     });
+    console.log('이미지 업로드 중:', this.isUploadingImage());
     
     // SharedService 디버그 호출
     console.log('=== SharedService 디버그 ===');
@@ -400,7 +466,7 @@ export class MainContainerComponent implements OnInit, OnDestroy {
     }
 
     const channelName = this.currentChannel().name;
-    return `#${channelName}에 메시지를 입력하세요... (Enter: 전송)`;
+    return `${channelName}에 메시지를 입력하세요... (Enter: 전송)`;
   }
 
   formatTime(date: Date): string {
@@ -408,21 +474,5 @@ export class MainContainerComponent implements OnInit, OnDestroy {
       hour: '2-digit', 
       minute: '2-digit' 
     });
-  }
-
-  // 디버깅용 버튼 (개발 중에만 사용)
-  showDebugInfo(): void {
-    this.debugCurrentState();
-    
-    // 브라우저 알림으로도 표시
-    const channel = this.currentChannel();
-    alert(`디버그 정보:
-채널 이름: ${channel.name}
-클럽 ID: ${channel.id}
-그룹 ID: ${channel.groupId}
-연결 상태: ${this.connectionStatus()}
-사용자: ${this.currentUsername()} (${this.currentUserEmail()})
-
-자세한 정보는 콘솔을 확인하세요.`);
   }
 }

@@ -8,32 +8,30 @@ import { MatFormFieldModule } from "@angular/material/form-field";
 import { FormsModule } from "@angular/forms";
 import { Router } from "@angular/router";
 import { Subject } from "rxjs";
-import { takeUntil } from "rxjs/operators";
 
 import { GroupDashboardService } from "../../Service/GroupDashboard";
 import { Quest, Stat } from "../../Models/GroupDashboardModels";
 import { SharedStateService } from "../../../Core/Service/SharedService";
 import { UserService } from "../../../Core/Service/UserService";
 import { LocalActivityService } from "../../Service/LocalActivityService";
-import { QuestFeedbackService, QuestFeedback } from "../../Service/QuestFeedbackSystem";
+import { QuestFeedbackService } from "../../Service/QuestFeedbackSystem";
 import { Group } from "../../../Core/Models/group";
 import { UserQuestCur } from "../../../Core/Models/user";
+import { OfflineQuestService } from "../../../Core/Service/OfflineQuestService";
+import { GroupService } from "../../../Core/Service/GroupService";
 
-interface QuestCompletionEvent {
-  questId: string;
-  questTitle: string;
-  groupName: string;
-  channelName: string;
-  userId: string;
-  completedAt: Date;
+// === 인터페이스 정의 ===
+interface QuestCompletionState {
+  completedQuestIds: Set<string>;
+  completedQuestTitles: Set<string>;
+  lastSyncTime: number;
 }
 
-interface FloatingFeedbackData {
+interface FeedbackData {
   questId: string;
   questTitle: string;
   groupName: string;
   clubName: string;
-  visible: boolean;
 }
 
 interface RecentActivity {
@@ -68,29 +66,81 @@ interface RecentActivity {
     MatFormFieldModule,
     FormsModule
   ],
-  providers: [GroupDashboardService],
+  providers: [
+    GroupDashboardService,
+    GroupService,        // 추가
+    UserService         // 추가 (필요한 경우)
+  ],
   standalone: true
 })
 export class GroupDashboardComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
-  private completedQuestIds = new Set<string>();
   private groupCache: Group | undefined = undefined;
   private userQuestCache: UserQuestCur | null = null;
+  private lastDataSyncTime = 0;
+  private readonly DATA_SYNC_DEBOUNCE_MS = 1000;
 
-  // 데이터 signals
-  title = signal<string>("");
-  quests = signal<Quest[]>([]);
-  selectedQuestIds = signal<Set<string>>(new Set());
-  stats = signal<Stat[]>([
+  // === UserQuestCur 중심의 상태 관리 ===
+  private questState = signal<QuestCompletionState>({
+    completedQuestIds: new Set(),
+    completedQuestTitles: new Set(),
+    lastSyncTime: 0
+  });
+
+  // === 기본 데이터 signals ===
+  readonly title = signal<string>("");
+  readonly quests = signal<Quest[]>([]);
+  readonly selectedQuestIds = signal<Set<string>>(new Set());
+  readonly stats = signal<Stat[]>([
     { id: '1', label: '전체 멤버', value: 0, icon: 'group', unit: '명' },
     { id: '2', label: '퀘스트 달성률', value: 0, icon: 'thumb_up', unit: '%' },
     { id: '3', label: '소모임 수', value: 0, icon: 'star', unit: '개' }
   ]);
+  readonly recentActivities = signal<RecentActivity[]>([]);
 
-  // 최근 활동 데이터
-  recentActivities = signal<RecentActivity[]>([]);
+  // === 상태 signals ===
+  readonly isLoading = signal<boolean>(true);
+  readonly error = signal<string | null>(null);
 
-  // 활동 통계를 위한 computed signals
+  // === 피드백 관련 signals ===
+  readonly showFeedback = signal<boolean>(false);
+  readonly feedbackData = signal<FeedbackData | null>(null);
+  readonly feedbackText = signal<string>('');
+  readonly feedbackLike = signal<boolean | null>(null);
+  readonly isSubmittingFeedback = signal<boolean>(false);
+
+  // === 모달 관련 signals ===
+  readonly showConfirmModal = signal<boolean>(false);
+  readonly confirmModalData = signal<{
+    questNames: string[];
+    questCount: number;
+  } | null>(null);
+
+  // === Computed signals ===
+  readonly hasCompletedQuests = computed(() => {
+    return this.quests().some(quest => this.isQuestCompletedInUserQuestCur(quest.title));
+  });
+
+  readonly hasSelectedQuests = computed(() => {
+    return this.selectedQuestIds().size > 0;
+  });
+
+  readonly isFeedbackValid = computed(() => {
+    const hasLikeSelection = this.feedbackLike() !== null;
+    const text = this.feedbackText()?.trim() || '';
+    const hasValidText = text.length >= 5 && text.length <= 200;
+    return hasLikeSelection && hasValidText;
+  });
+
+  readonly feedbackTextLength = computed(() => 
+    this.feedbackText()?.length || 0
+  );
+
+  readonly feedbackDataTitle = computed(() => 
+    this.feedbackData()?.questTitle || ''
+  );
+
+  // === 활동 통계 computed signals ===
   readonly recentQuestCompletions = computed(() => 
     this.recentActivities().filter(a => a.type === 'quest_complete').length
   );
@@ -103,69 +153,27 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
     this.recentActivities().filter(a => a.type === 'user_join').length
   );
 
-  // 상태 signals
-  readonly isLoading = signal<boolean>(true);
-  readonly error = signal<string | null>(null);
-  
-  // 피드백 관련 signals (좋아요/싫어요 + 텍스트)
-  readonly showFeedback = signal<boolean>(false);
-  readonly feedbackData = signal<FloatingFeedbackData | null>(null);
-  readonly feedbackText = signal<string>('');
-  readonly feedbackLike = signal<boolean | null>(null); // true=좋아요, false=싫어요, null=미선택
-  readonly isSubmittingFeedback = signal<boolean>(false);
-
-  // 퀘스트 완료 확인 모달 관련
-  readonly showConfirmModal = signal<boolean>(false);
-  readonly confirmModalData = signal<{
-    questNames: string[];
-    questCount: number;
-  } | null>(null);
-
-  // Computed signals
-  readonly hasCompletedQuests = computed(() => {
-    return this.quests().some(quest => this.isQuestCompletedInUserQuest(quest.title));
-  });
-
-  readonly availableQuestsForSelection = computed(() => {
-    return this.quests().filter(quest => 
-      !this.isQuestCompletedInUserQuest(quest.title) && 
-      quest.status !== 'completed'
-    );
-  });
-
-  // 피드백 유효성 검사 (좋아요/싫어요 선택 + 텍스트)
-  readonly isFeedbackValid = computed(() => {
-    const hasLikeSelection = this.feedbackLike() !== null;
-    const text = this.feedbackText()?.trim() || '';
-    const hasValidText = text.length >= 5 && text.length <= 200;
-    return hasLikeSelection && hasValidText;
-  });
-
-  // 안전한 접근자들
-  readonly feedbackTextLength = computed(() => 
-    this.feedbackText()?.length || 0
-  );
-
-  readonly feedbackDataTitle = computed(() => 
-    this.feedbackData()?.questTitle || ''
-  );
-
   constructor(
     private groupDashboardService: GroupDashboardService,
     private shared: SharedStateService,
     private router: Router,
     private userService: UserService,
-    public activityService: LocalActivityService, // public으로 변경
+    private activityService: LocalActivityService,
     private feedbackService: QuestFeedbackService,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private offlineQuestService: OfflineQuestService
   ) {
-    this.monitorQuestChanges();
+    this.setupQuestMonitoring();
+    this.setupOfflineEventListeners();
   }
 
+  // === 생명주기 메서드 ===
   async ngOnInit(): Promise<void> {
-    await this.ensureGroupSelected();
-    await this.loadGroupData();
-    await this.loadRecentActivities();
+    try {
+      await this.initializeComponent();
+    } catch (error) {
+      this.handleError(error, '컴포넌트 초기화');
+    }
   }
 
   ngOnDestroy(): void {
@@ -173,118 +181,823 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  // === 최근 활동 데이터 로딩 (새로 추가) ===
-  
+  // === 초기화 메서드들 ===
+  private async initializeComponent(): Promise<void> {
+    await this.ensureGroupSelected();
+    await this.loadAllData();
+    this.scheduleAutoSync();
+    this.cleanupOldData();
+  }
+
+  private async ensureGroupSelected(): Promise<void> {
+    const selectedGroup = this.shared.selectedGroup();
+    if (selectedGroup) return;
+
+    const joinedGroups = await this.getJoinedGroups();
+    if (joinedGroups.length > 0) {
+      this.shared.setSelectedGroup(joinedGroups[0]);
+    } else {
+      this.navigateToGroupJoin();
+    }
+  }
+
+  private async loadAllData(): Promise<void> {
+    this.isLoading.set(true);
+    
+    try {
+      // UserQuestCur를 먼저 로드 (핵심 데이터)
+      await this.loadUserQuestData();
+      
+      // 그룹 데이터 로드
+      await this.loadGroupData();
+      
+      // UserQuestCur 기반으로 퀘스트 처리
+      this.processQuestsFromUserQuestCur();
+      
+      // 활동 데이터 로드
+      await this.loadRecentActivities();
+      
+    } catch (error) {
+      this.handleError(error, '데이터 로딩');
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
+
+  // === UserQuestCur 중심 데이터 로딩 ===
+  private async loadUserQuestData(): Promise<void> {
+    const userId = this.shared.currentUser()?.id;
+    if (!userId) return;
+
+    this.userQuestCache = await this.userService.getUserQuestCur(userId);
+    this.syncQuestStateFromUserQuestCur();
+  }
+
+  private async loadGroupData(): Promise<void> {
+    const selectedGroup = this.shared.selectedGroup();
+    if (!selectedGroup) {
+      throw new Error('선택된 그룹이 없습니다.');
+    }
+
+    this.groupCache = await this.groupDashboardService.getGroupData(selectedGroup);
+    if (!this.groupCache) {
+      throw new Error('그룹 데이터를 찾을 수 없습니다.');
+    }
+
+    this.title.set(this.groupCache.name);
+    this.updateStats();
+  }
+
+  // === UserQuestCur 기반 퀘스트 처리 (핵심) ===
+  private processQuestsFromUserQuestCur(): void {
+    if (!this.userQuestCache || !this.groupCache) {
+      this.quests.set([]);
+      return;
+    }
+
+    const groupName = this.shared.selectedGroup();
+    if (!groupName) return;
+
+    // UserQuestCur에서 현재 그룹의 퀘스트들만 필터링
+    const currentGroupQuests = this.userQuestCache.curQuestTotalList.filter(
+      quest => quest.group === groupName
+    );
+
+    // UserQuestCur 기반으로 Quest 객체 생성 (questId 정확히 매핑)
+    const questsFromUserData = currentGroupQuests.map(questRecord => {
+      // 그룹 캐시에서 성공 횟수 정보 가져오기
+      const questIndex = this.groupCache!.questList.indexOf(questRecord.quest);
+      const successCount = questIndex !== -1 ? (this.groupCache!.questSuccessNum[questIndex] || 0) : 0;
+      const progress = this.calculateProgress(successCount, this.groupCache!.memberNum);
+
+      return {
+        id: questRecord.questId.toString(), // ✅ UserQuestCur의 실제 questId 사용
+        title: questRecord.quest,
+        description: questRecord.descriptions || `${questRecord.quest} 퀘스트를 완료하세요`,
+        icon: this.getQuestIcon(questRecord.quest),
+        progress: progress,
+        status: this.determineQuestStatus(questRecord.success, progress)
+      } as Quest;
+    });
+
+    this.quests.set(questsFromUserData);
+    setTimeout(() => this.animateProgress(), 500);
+  }
+
+  private calculateProgress(successCount: number, memberCount: number): number {
+    if (memberCount === 0) return 0;
+    return Math.min(Math.floor((successCount / memberCount) * 100), 100);
+  }
+
+  private determineQuestStatus(isCompleted: boolean, progress: number): Quest['status'] {
+    if (isCompleted) return 'completed';
+    if (progress >= 100) return 'completed';
+    if (progress > 0) return 'in-progress';
+    return 'not-started';
+  }
+
+  private getQuestIcon(questTitle: string): string {
+    const iconMap: { [key: string]: string } = {
+      'quest1': '💪',
+      'quest2': '📚', 
+      'quest3': '💧',
+      'a': '💪',
+      'b': '📚', 
+      'c': '💧',
+    };
+    return iconMap[questTitle] || '⭐';
+  }
+
+  // === UserQuestCur 기반 상태 관리 ===
+  private syncQuestStateFromUserQuestCur(): void {
+    if (!this.userQuestCache) return;
+    
+    const groupName = this.shared.selectedGroup();
+    if (!groupName) return;
+
+    const newCompletedTitles = new Set<string>();
+    const newCompletedIds = new Set<string>();
+
+    // UserQuestCur에서 완료된 퀘스트 찾기
+    this.userQuestCache.curQuestTotalList.forEach(questRecord => {
+      if (questRecord.group === groupName && questRecord.success) {
+        newCompletedTitles.add(questRecord.quest);
+        newCompletedIds.add(questRecord.questId.toString()); // ✅ 실제 questId 사용
+      }
+    });
+
+    this.questState.set({
+      completedQuestIds: newCompletedIds,
+      completedQuestTitles: newCompletedTitles,
+      lastSyncTime: Date.now()
+    });
+
+    console.log('🔄 UserQuestCur 기반 상태 동기화:', {
+      completedTitles: Array.from(newCompletedTitles),
+      completedIds: Array.from(newCompletedIds)
+    });
+  }
+
+  // === UserQuestCur 기반 퀘스트 완료 상태 확인 ===
+  private isQuestCompletedInUserQuestCur(questTitle: string): boolean {
+    if (!this.userQuestCache) {
+      return this.questState().completedQuestTitles.has(questTitle);
+    }
+    
+    const groupName = this.shared.selectedGroup();
+    if (!groupName) {
+      return this.questState().completedQuestTitles.has(questTitle);
+    }
+
+    // UserQuestCur에서 직접 확인
+    const questRecord = this.userQuestCache.curQuestTotalList.find(
+      quest => quest.quest === questTitle && quest.group === groupName
+    );
+
+    const isCompleted = questRecord?.success || false;
+    
+    // 로컬 상태도 동기화
+    if (isCompleted && questRecord) {
+      const currentState = this.questState();
+      const newCompletedTitles = new Set(currentState.completedQuestTitles);
+      const newCompletedIds = new Set(currentState.completedQuestIds);
+      
+      newCompletedTitles.add(questTitle);
+      newCompletedIds.add(questRecord.questId.toString());
+      
+      this.questState.set({
+        ...currentState,
+        completedQuestTitles: newCompletedTitles,
+        completedQuestIds: newCompletedIds
+      });
+    }
+    return isCompleted;
+  }
+
+  public isQuestCompletable(quest: Quest): boolean {
+    return !this.isQuestCompletedInUserQuestCur(quest.title) && quest.status !== 'completed';
+  }
+
+  // === 퀘스트 완료 처리 (UserQuestCur 중심) ===
+  async onQuestAction(): Promise<void> {
+    const selectedIds = Array.from(this.selectedQuestIds());
+    const selectedQuests = this.quests()
+      .filter(quest => selectedIds.includes(quest.id) && this.isQuestCompletable(quest));
+    
+    if (selectedQuests.length === 0) {
+      this.showErrorToast('완료할 퀘스트를 선택해주세요.');
+      return;
+    }
+
+    this.showConfirmationModal(selectedQuests);
+  }
+
+  private showConfirmationModal(quests: Quest[]): void {
+    this.confirmModalData.set({
+      questNames: quests.map(q => q.title),
+      questCount: quests.length
+    });
+    this.showConfirmModal.set(true);
+  }
+
+  async confirmQuestCompletion(): Promise<void> {
+    this.closeConfirmModal();
+    
+    const selectedIds = Array.from(this.selectedQuestIds());
+    const selectedQuests = this.quests()
+      .filter(quest => selectedIds.includes(quest.id) && this.isQuestCompletable(quest));
+
+    for (const [index, quest] of selectedQuests.entries()) {
+      setTimeout(() => this.completeQuest(quest), index * 300);
+    }
+  }
+
+  private async completeQuest(quest: Quest): Promise<void> {
+    try {
+      await this.processQuestCompletion(quest);
+      this.updateQuestUI(quest);
+      this.showQuestCompletionFeedback(quest);
+    } catch (error) {
+      this.handleQuestCompletionError(quest, error);
+    }
+  }
+
+private async processQuestCompletion(quest: Quest): Promise<void> {
+    const userId = this.shared.currentUser()?.id;
+    const groupName = this.shared.selectedGroup();
+    
+    if (!userId || !groupName) {
+      throw new Error('사용자 또는 그룹 정보가 없습니다.');
+    }
+
+    // ✅ GroupService의 questSuccessWithFeedback 사용 (UserQuestCur도 함께 업데이트됨)
+    const success = await this.groupDashboardService.questSuccessWithFeedback(
+      groupName, 
+      userId, 
+      [quest.title],
+      '', // 빈 피드백 (실제 피드백은 나중에 별도로 전송)
+      undefined
+    );
+
+    if (!success) {
+      throw new Error('퀘스트 완료 처리에 실패했습니다.');
+    }
+
+    // UserQuestCur 캐시 갱신 및 상태 동기화
+    await this.refreshUserQuestData();
+  }
+
+ private rollbackQuestUI(questTitle: string): void {
+    const quest = this.quests().find(q => q.title === questTitle);
+    if (!quest) return;
+
+    // 퀘스트 상태 롤백
+    this.quests.update(quests => 
+      quests.map(q => 
+        q.title === questTitle 
+          ? { ...q, status: 'not-started' as const, progress: q.progress } // 원래 상태로 복원
+          : q
+      )
+    );
+
+    // 완료 상태에서 제거
+    this.questState.update(state => ({
+      ...state,
+      completedQuestIds: new Set([...state.completedQuestIds].filter(id => id !== quest.id)),
+      completedQuestTitles: new Set([...state.completedQuestTitles].filter(title => title !== questTitle))
+    }));
+
+    console.log(`🔄 퀘스트 UI 롤백: ${questTitle}`);
+  }
+
+  private async trackQuestCompletionLocal(groupName: string, questList: string[]): Promise<void> {
+    // LocalActivityService의 trackQuestCompletion은 실제 API 호출을 하므로
+    // 이미 GroupService로 완료 처리가 된 상태에서는 로컬 추적만 수행
+    questList.forEach(quest => {
+      this.activityService.trackActivity(
+        'quest_complete',
+        `${quest} 퀘스트 완료`,
+        `${groupName} 그룹에서 "${quest}" 퀘스트를 성공적으로 완료했습니다!`,
+        {
+          groupName,
+          questName: quest,
+          questList
+        }
+      );
+    });
+  }
+
+  private updateQuestUI(quest: Quest): void {
+    // 선택 해제
+    this.selectedQuestIds.update(selected => {
+      const newSelected = new Set(selected);
+      newSelected.delete(quest.id);
+      return newSelected;
+    });
+
+    // 퀘스트 상태 업데이트
+    this.quests.update(quests => 
+      quests.map(q => 
+        q.id === quest.id 
+          ? { ...q, status: 'completed' as const, progress: 100 }
+          : q
+      )
+    );
+
+    // 완료 상태 추가
+    this.questState.update(state => ({
+      ...state,
+      completedQuestIds: new Set([...state.completedQuestIds, quest.id]),
+      completedQuestTitles: new Set([...state.completedQuestTitles, quest.title])
+    }));
+  }
+
+  private handleQuestCompletionError(quest: Quest, error: any): void {
+    if (this.offlineQuestService.shouldUseOfflineMode(error)) {
+      this.handleOfflineQuestCompletion(quest);
+    } else {
+      this.showErrorToast('퀘스트 완료 처리에 실패했습니다.');
+    }
+  }
+
+  // === UserQuestCur 데이터 새로고침 ===
+  private async refreshUserQuestData(): Promise<void> {
+    const userId = this.shared.currentUser()?.id;
+    if (!userId) return;
+
+    try {
+      // UserQuestCur 캐시 무효화 후 재로드
+      this.userService['cacheService']?.removeCache('userQuestCur');
+      this.userQuestCache = await this.userService.getUserQuestCur(userId);
+      
+      // 상태 동기화
+      this.syncQuestStateFromUserQuestCur();
+      
+      // 퀘스트 재처리
+      this.processQuestsFromUserQuestCur();
+      
+      console.log('✅ UserQuestCur 데이터 새로고침 완료');
+    } catch (error) {
+      console.error('❌ UserQuestCur 새로고침 실패:', error);
+    }
+  }
+
+  // === 피드백 시스템 ===
+  private showQuestCompletionFeedback(quest: Quest): void {
+    const groupName = this.shared.selectedGroup();
+    const clubName = this.shared.selectedChannel() || 'general';
+    
+    if (!groupName) return;
+
+    this.feedbackData.set({
+      questId: quest.id,
+      questTitle: quest.title,
+      groupName,
+      clubName
+    });
+
+    this.resetFeedbackForm();
+    this.showFeedback.set(true);
+  }
+
+  async submitFeedback(): Promise<void> {
+    const data = this.feedbackData();
+    const text = this.feedbackText()?.trim();
+    const isLike = this.feedbackLike();
+    const userId = this.shared.currentUser()?.id;
+
+    if (!data || !this.isFeedbackValid() || !userId || isLike === null || !text) {
+      return;
+    }
+
+    this.isSubmittingFeedback.set(true);
+
+    try {
+      // ✅ 여기서 실제 questSuccess 호출 (피드백 포함)
+      const success = await this.groupDashboardService.questSuccessWithFeedback(
+        data.groupName,
+        userId,
+        [data.questTitle],
+        text,
+        isLike
+      );
+
+      if (success) {
+        this.closeFeedback();
+        this.showFeedbackSuccessToast(isLike);
+        
+        // 성공 후 데이터 새로고침
+        await this.refreshUserQuestData();
+        await this.trackQuestCompletionLocal(data.groupName, [data.questTitle]);
+      } else {
+        throw new Error('피드백 전송에 실패했습니다.');
+      }
+    } catch (error) {
+      this.handleError(error, '피드백 전송');
+      // 실패시 UI 롤백
+      this.rollbackQuestUI(data.questTitle);
+    } finally {
+      this.isSubmittingFeedback.set(false);
+    }
+  }
+
+  private resetFeedbackForm(): void {
+    this.feedbackText.set('');
+    this.feedbackLike.set(null);
+  }
+
+  // === UI 이벤트 핸들러 ===
+  onQuestClick(quest: Quest): void {
+    if (!this.isQuestCompletable(quest)) return;
+    
+    this.selectedQuestIds.update(selected => {
+      const newSelected = new Set(selected);
+      if (newSelected.has(quest.id)) {
+        newSelected.delete(quest.id);
+      } else {
+        newSelected.add(quest.id);
+      }
+      return newSelected;
+    });
+  }
+
+  onFeedbackTextChange(event: Event): void {
+    const target = event.target as HTMLTextAreaElement;
+    if (target) {
+      this.feedbackText.set(target.value);
+    }
+  }
+
+  setFeedbackLike(isLike: boolean): void {
+    this.feedbackLike.set(isLike);
+  }
+
+  // === 모달 관리 ===
+  closeFeedback(): void {
+    const data = this.feedbackData();
+    
+    // 피드백 없이 건너뛰는 경우에도 questSuccess 호출
+    if (data) {
+      this.submitQuestWithoutFeedback(data);
+    }
+    
+    this.showFeedback.set(false);
+    this.feedbackData.set(null);
+    this.resetFeedbackForm();
+  }
+
+  private async submitQuestWithoutFeedback(data: FeedbackData): Promise<void> {
+    const userId = this.shared.currentUser()?.id;
+    if (!userId) return;
+
+    try {
+      const success = await this.groupDashboardService.questSuccessWithFeedback(
+        data.groupName,
+        userId,
+        [data.questTitle],
+        '', // 빈 피드백
+        undefined
+      );
+
+      if (success) {
+        await this.refreshUserQuestData();
+        await this.trackQuestCompletionLocal(data.groupName, [data.questTitle]);
+      } else {
+        this.rollbackQuestUI(data.questTitle);
+      }
+    } catch (error) {
+      console.error('퀘스트 완료 처리 실패:', error);
+      this.rollbackQuestUI(data.questTitle);
+    }
+  }
+
+  closeConfirmModal(): void {
+    this.showConfirmModal.set(false);
+    this.confirmModalData.set(null);
+  }
+
+  cancelQuestCompletion(): void {
+    this.closeConfirmModal();
+  }
+
+  // === 데이터 새로고침 ===
+  async refreshData(): Promise<void> {
+    try {
+      await this.loadAllData();
+    } catch (error) {
+      this.handleError(error, '데이터 새로고침');
+    }
+  }
+
+  private scheduleDataRefresh(): void {
+    setTimeout(async () => {
+      await this.refreshUserQuestData();
+      await this.loadRecentActivities();
+    }, 1000);
+  }
+
+  // === 통계 및 상태 관리 ===
+  private updateStats(): void {
+    if (!this.groupCache) return;
+
+    const totalQuests = this.quests().length;
+    const completedQuests = this.quests().filter(q => 
+      q.status === 'completed' || this.isQuestCompletedInUserQuestCur(q.title)
+    ).length;
+    
+    const achievementRate = totalQuests > 0 ? Math.round((completedQuests / totalQuests) * 100) : 0;
+    
+    this.stats.update(currentStats => currentStats.map(stat => {
+      switch (stat.label) {
+        case '전체 멤버':
+          return { ...stat, value: this.groupCache!.memberNum };
+        case '퀘스트 달성률':
+          return { ...stat, value: achievementRate };
+        case '소모임 수':
+          return { ...stat, value: this.groupCache!.clubList?.length || 0 };
+        default:
+          return stat;
+      }
+    }));
+  }
+
+  // === 상태 확인 메서드들 ===
+  isQuestSelected(questId: string): boolean {
+    return this.selectedQuestIds().has(questId);
+  }
+
+  isQuestCompletedInCache(questId: string): boolean {
+    console.log(this.questState().completedQuestIds);
+    return this.questState().completedQuestIds.has(questId);
+  }
+
+  getTodayAchievementRate(): number {
+    const statsList = this.stats();
+    const achievementStat = statsList.find(stat => stat.label === '퀘스트 달성률');
+    return achievementStat?.value || 0;
+  }
+
+  // === 스타일 헬퍼들 ===
+  getStatusColor(status: string): string {
+    const colorMap = {
+      'completed': '#48bb78',
+      'in-progress': '#4299e1',
+      'pending': '#a0aec0',
+      'not-started': '#a0aec0'
+    };
+    return colorMap[status as keyof typeof colorMap] || '#a0aec0';
+  }
+
+  getStatusText(status: string): string {
+    const textMap = {
+      'completed': '완료',
+      'in-progress': '진행중',
+      'pending': '대기중',
+      'not-started': '시작 전'
+    };
+    return textMap[status as keyof typeof textMap] || '알 수 없음';
+  }
+
+  // === 유틸리티 메서드들 ===
+  private async getJoinedGroups(): Promise<string[]> {
+    try {
+      const userJoin = await this.userService.getUserJoin(this.shared.currentUser()?.id);
+      return userJoin ? userJoin.joinList.map(join => join.groupname) : [];
+    } catch (error) {
+      console.error('참여 그룹 조회 실패:', error);
+      return [];
+    }
+  }
+
+  private navigateToGroupJoin(): void {
+    this.router.navigate(['/group/join']);
+  }
+
+  // === 애니메이션 ===
+  private animateProgress(): void {
+    const progressBars = document.querySelectorAll('.quest-progress-bar') as NodeListOf<HTMLElement>;
+    
+    progressBars.forEach((bar, index) => {
+      const targetWidth = bar.getAttribute('data-progress') + '%';
+      bar.style.width = '0%';
+      
+      setTimeout(() => {
+        bar.style.width = targetWidth;
+        bar.style.transition = 'width 0.8s ease-out';
+      }, index * 200);
+    });
+  }
+
+  // === 에러 처리 ===
+  private handleError(error: any, context: string): void {
+    console.error(`Error in ${context}:`, error);
+    const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+    this.error.set(message);
+  }
+
+  retry(): void {
+    this.error.set(null);
+    this.loadAllData();
+  }
+
+  // === 토스트 메시지들 ===
+  private showFeedbackSuccessToast(isLike?: boolean): void {
+    const likeText = isLike !== undefined 
+      ? (isLike ? ' 👍 좋은 피드백 감사합니다!' : ' 👎 소중한 의견 감사합니다!')
+      : '';
+    
+    this.showToast('success', `✨ 피드백이 저장되었습니다!${likeText}`);
+  }
+
+  private showErrorToast(message: string): void {
+    this.showToast('error', message);
+  }
+
+  private showToast(type: 'success' | 'error', message: string): void {
+    const toast = document.createElement('div');
+    const isSuccess = type === 'success';
+    
+    toast.className = isSuccess ? 'feedback-success-toast' : 'error-toast';
+    toast.innerHTML = `
+      <div class="toast-content">
+        <div class="toast-icon">${isSuccess ? '✅' : '⚠️'}</div>
+        <div class="toast-message">${message}</div>
+      </div>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+      toast.classList.add('fade-out');
+      setTimeout(() => {
+        if (document.body.contains(toast)) {
+          document.body.removeChild(toast);
+        }
+      }, 300);
+    }, 3000);
+  }
+
+  // === 오프라인 관련 메서드들 ===
+  private setupOfflineEventListeners(): void {
+    window.addEventListener('offline-quest-auto-sync', () => {
+      this.syncOfflineQuests();
+    });
+  }
+
+  private async syncOfflineQuests(): Promise<void> {
+    const userId = this.shared.currentUser()?.id;
+    if (!userId) return;
+
+    try {
+      const result = await this.offlineQuestService.syncOfflineQuests(
+        async (syncUserId: string, groupName: string, questTitles: string[]) => {
+          // ✅ GroupService 기반 동기화 메서드 사용
+          return await this.groupDashboardService.syncOfflineQuestCompletion(syncUserId, groupName, questTitles);
+        }
+      );
+
+      if (result.success > 0) {
+        this.showToast('success', `✅ ${result.success}개의 오프라인 퀘스트가 동기화되었습니다.`);
+        this.scheduleDataRefresh();
+      }
+
+      if (result.failed > 0) {
+        this.showToast('error', `⚠️ ${result.failed}개 퀘스트 동기화에 실패했습니다.`);
+      }
+    } catch (error) {
+      console.error('오프라인 퀘스트 동기화 오류:', error);
+    }
+  }
+
+  private handleOfflineQuestCompletion(quest: Quest): void {
+    const userId = this.shared.currentUser()?.id;
+    const groupName = this.shared.selectedGroup();
+    
+    if (!userId || !groupName) return;
+
+    try {
+      this.updateQuestUI(quest);
+      this.showToast('success', '📱 오프라인 모드로 퀘스트가 저장되었습니다.');
+    } catch (error) {
+      this.showErrorToast('오프라인 저장에 실패했습니다.');
+    }
+  }
+
+  // === 자동 동기화 및 정리 ===
+  private scheduleAutoSync(): void {
+    setTimeout(async () => {
+      await this.syncOfflineQuests();
+    }, 10000);
+  }
+
+  private cleanupOldData(): void {
+    this.offlineQuestService.cleanupOldOfflineData(30);
+  }
+
+  // === 퀘스트 모니터링 ===
+  private setupQuestMonitoring(): void {
+    effect(() => {
+      const currentQuests = this.quests();
+      const completedQuests = currentQuests.filter(quest => quest.status === 'completed');
+      
+      const questState = this.questState();
+      const newlyCompleted = completedQuests.filter(quest => 
+        !questState.completedQuestIds.has(quest.id)
+      );
+
+      if (newlyCompleted.length > 0) {
+        this.handleNewQuestCompletions(newlyCompleted);
+      }
+    });
+  }
+
+  private async handleNewQuestCompletions(completedQuests: Quest[]): Promise<void> {
+    for (const quest of completedQuests) {
+      try {
+        await this.activityService.trackQuestCompletion(
+          this.shared.selectedGroup() || '',
+          [quest.title]
+        );
+      } catch (error) {
+        console.error('활동 추적 실패:', quest.title, error);
+      }
+    }
+  }
+
+  // === 활동 생성 ===
   private async loadRecentActivities(): Promise<void> {
     try {
-      const groupName = this.shared.selectedGroup();
-      if (!groupName) return;
-
-      const activities: RecentActivity[] = [];
-
-      // 1. 로컬 활동 서비스에서 최근 퀘스트 완료 기록 가져오기
-      const localActivities = this.activityService.activities();
-      const recentQuestCompletions = localActivities
-        .filter(activity => 
-          activity.type === 'quest_complete' && 
-          activity.context?.groupName === groupName &&
-          this.isRecentActivity(activity.timestamp)
-        )
-        .slice(0, 5);
-
-      recentQuestCompletions.forEach(activity => {
-        activities.push({
-          id: activity.id,
-          type: 'quest_complete',
-          title: `${activity.context?.questName || '퀘스트'} 완료`,
-          description: `${activity.title}를 성공적으로 완료했습니다`,
-          timestamp: activity.timestamp,
-          user: this.shared.currentUser()?.name || '사용자',
-          avatar: '🎯',
-          badge: {
-            text: '완료',
-            type: 'success'
-          },
-          metadata: {
-            questTitle: activity.context?.questName
-          }
-        });
-      });
-
-      // 2. 연속 퀘스트 달성 기록
-      const streakData = this.activityService.getCurrentStreak();
-      if (streakData >= 3) {
-        activities.push({
-          id: 'streak-' + Date.now(),
-          type: 'achievement',
-          title: `${streakData}일 연속 활동!`,
-          description: '꾸준한 노력이 빛을 발하고 있습니다',
-          timestamp: new Date(),
-          user: this.shared.currentUser()?.name || '사용자',
-          avatar: '🔥',
-          badge: {
-            text: '연속',
-            type: 'warning'
-          },
-          metadata: {
-            streakDays: streakData
-          }
-        });
-      }
-
-      // 3. 그룹 통계 기반 마일스톤
-      if (this.groupCache) {
-        const totalCompletions = this.groupCache.questSuccessNum.reduce((sum, num) => sum + num, 0);
-        
-        // 100단위 마일스톤 체크
-        if (totalCompletions > 0 && totalCompletions % 100 < this.groupCache.questList.length) {
-          const milestone = Math.floor(totalCompletions / 100) * 100;
-          activities.push({
-            id: 'milestone-' + milestone,
-            type: 'milestone',
-            title: `그룹 마일스톤 달성!`,
-            description: `전체 ${milestone}회의 퀘스트 완료를 달성했습니다`,
-            timestamp: new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000), // 최근 24시간 내 랜덤
-            avatar: '🏆',
-            badge: {
-              text: '마일스톤',
-              type: 'info'
-            }
-          });
-        }
-      }
-
-      // 4. 사용자 참여 기반 활동
-      const joinActivities = localActivities
-        .filter(activity => activity.type === 'group_join' && this.isRecentActivity(activity.timestamp))
-        .slice(0, 2);
-
-      joinActivities.forEach(activity => {
-        activities.push({
-          id: activity.id,
-          type: 'user_join',
-          title: '새로운 멤버 합류',
-          description: `${activity.context?.groupName || groupName} 그룹에 새로운 멤버가 합류했습니다`,
-          timestamp: activity.timestamp,
-          avatar: '👋',
-          badge: {
-            text: '참여',
-            type: 'info'
-          }
-        });
-      });
-
-      // 시간순 정렬 및 최대 8개로 제한
-      const sortedActivities = activities
-        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-        .slice(0, 8);
-
-      this.recentActivities.set(sortedActivities);
-
+      const activities = await this.generateRecentActivities();
+      this.recentActivities.set(activities);
     } catch (error) {
       console.error('Error loading recent activities:', error);
       this.recentActivities.set([]);
     }
+  }
+
+  private async generateRecentActivities(): Promise<RecentActivity[]> {
+    const groupName = this.shared.selectedGroup();
+    if (!groupName) return [];
+
+    const activities: RecentActivity[] = [];
+    
+    // 로컬 활동에서 최근 퀘스트 완료 기록
+    const localActivities = this.activityService.activities()
+      .filter(activity => 
+        activity.type === 'quest_complete' && 
+        activity.context?.groupName === groupName &&
+        this.isRecentActivity(activity.timestamp)
+      )
+      .slice(0, 5);
+
+    localActivities.forEach(activity => {
+      activities.push({
+        id: activity.id,
+        type: 'quest_complete',
+        title: `${activity.context?.questName || '퀘스트'} 완료`,
+        description: `${activity.title}를 성공적으로 완료했습니다`,
+        timestamp: activity.timestamp,
+        user: this.shared.currentUser()?.name || '사용자',
+        badge: { text: '완료', type: 'success' },
+        metadata: { questTitle: activity.context?.questName }
+      });
+    });
+
+    // 연속 퀘스트 달성 기록
+    const streakData = this.currentStreak();
+    if (streakData >= 3) {
+      activities.push({
+        id: 'streak-' + Date.now(),
+        type: 'achievement',
+        title: `${streakData}일 연속 활동!`,
+        description: '꾸준한 노력이 빛을 발하고 있습니다',
+        timestamp: new Date(),
+        user: this.shared.currentUser()?.name || '사용자',
+        badge: { text: '연속', type: 'warning' },
+        metadata: { streakDays: streakData }
+      });
+    }
+
+    // 그룹 통계 기반 마일스톤
+    if (this.groupCache) {
+      const totalCompletions = this.groupCache.questSuccessNum.reduce((sum, num) => sum + num, 0);
+      
+      if (totalCompletions > 0 && totalCompletions % 100 < this.groupCache.questList.length) {
+        const milestone = Math.floor(totalCompletions / 100) * 100;
+        activities.push({
+          id: 'milestone-' + milestone,
+          type: 'milestone',
+          title: `그룹 마일스톤 달성!`,
+          description: `전체 ${milestone}회의 퀘스트 완료를 달성했습니다`,
+          timestamp: new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000),
+          badge: { text: '마일스톤', type: 'info' }
+        });
+      }
+    }
+
+    return activities
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+      .slice(0, 8);
   }
 
   private isRecentActivity(timestamp: Date): boolean {
@@ -293,118 +1006,7 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
     return timestamp >= sevenDaysAgo;
   }
 
-  // === 좋아요/싫어요 + 텍스트 피드백 시스템 ===
-
-  private showFloatingFeedback(quest: Quest, groupName: string, clubName: string): void {
-    const feedbackData: FloatingFeedbackData = {
-      questId: quest.id,
-      questTitle: quest.title,
-      groupName,
-      clubName,
-      visible: true
-    };
-
-    this.feedbackData.set(feedbackData);
-    this.feedbackText.set('');
-    this.feedbackLike.set(null); // 초기화
-    this.showFeedback.set(true);
-  }
-
-  setFeedbackText(text: string): void {
-    this.feedbackText.set(text);
-  }
-
-  // 이벤트 핸들러 (타입 안전)
-  onFeedbackTextChange(event: Event): void {
-    const target = event.target as HTMLTextAreaElement;
-    if (target) {
-      this.setFeedbackText(target.value);
-    }
-  }
-
-  setFeedbackLike(isLike: boolean): void {
-    this.feedbackLike.set(isLike);
-  }
-
-  async submitFeedback(): Promise<void> {
-    const data = this.feedbackData();
-    const text = this.feedbackText()?.trim() || '';
-    const isLike = this.feedbackLike();
-    const userId = this.shared.currentUser()?.id;
-
-    if (!data || !this.isFeedbackValid() || !userId || isLike === null) {
-      console.warn('Invalid feedback data:', { 
-        hasData: !!data, 
-        isValid: this.isFeedbackValid(), 
-        hasUser: !!userId, 
-        hasLikeSelection: isLike !== null 
-      });
-      return;
-    }
-
-    this.isSubmittingFeedback.set(true);
-
-    try {
-      // 안전한 타입으로 피드백 생성
-      const feedbackData = {
-        quest: data.questTitle || '',
-        group: data.groupName || '',
-        club: data.clubName || '',
-        user: userId,
-        feedbackScore: isLike ? 1 : 0,
-        feedbackText: text,
-        isLike: isLike,
-        metadata: {
-          submissionMethod: 'like_text' as const,
-          isLike: isLike,
-          sentiment: isLike ? 'positive' as const : 'negative' as const,
-          source: 'dashboard',
-          version: '2.0'
-        }
-      };
-
-      // QuestFeedback 타입으로 변환하여 저장
-      const feedback = feedbackData as Omit<QuestFeedback, 'id' | 'createTime'>;
-      const feedbackId = this.feedbackService.saveFeedback(feedback);
-      
-      if (!feedbackId) {
-        throw new Error('Failed to save feedback');
-      }
-
-      // questSuccess 함수 호출
-      const success = await this.groupDashboardService.questSuccessWithFeedback(
-        data.groupName || '',
-        userId,
-        [data.questTitle || ''],
-        text,
-        isLike
-      );
-
-      if (success) {
-        this.closeFeedback();
-        this.showFeedbackSuccessToast(isLike);
-        await this.loadRecentActivities();
-      } else {
-        throw new Error('Failed to submit quest success with feedback');
-      }
-
-    } catch (error) {
-      console.error('Error submitting feedback:', error);
-      this.showErrorToast('피드백 저장에 실패했습니다. 다시 시도해주세요.');
-    } finally {
-      this.isSubmittingFeedback.set(false);
-    }
-  }
-
-  closeFeedback(): void {
-    this.showFeedback.set(false);
-    this.feedbackData.set(null);
-    this.feedbackText.set('');
-    this.feedbackLike.set(null);
-  }
-
-  // === 최근 활동 관련 유틸리티 메서드 ===
-
+  // === 활동 관련 유틸리티 ===
   getActivityIcon(activity: RecentActivity): string {
     const iconMap = {
       'quest_complete': '✅',
@@ -412,7 +1014,7 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
       'achievement': '🏆',
       'milestone': '🎯'
     };
-    return activity.avatar || iconMap[activity.type] || '📝';
+    return activity.avatar || iconMap[activity.type] || '📋';
   }
 
   getActivityBadgeClass(badgeType: string): string {
@@ -438,537 +1040,21 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
     return timestamp.toLocaleDateString();
   }
 
-  // === 기존 메서드들 유지 (UserQuestCur 관련) ===
-
-  private isQuestCompletedInUserQuest(questTitle: string): boolean {
-    if (!this.userQuestCache || !this.groupCache) return false;
-    
-    const userId = this.shared.currentUser()?.id;
-    const groupName = this.shared.selectedGroup();
-    if (!userId || !groupName) return false;
-
-    const questRecord = this.userQuestCache.curQuestTotalList.find(
-      quest => quest.quest === questTitle && quest.group === groupName
-    );
-
-    return questRecord?.isSuccess || false;
-  }
-
-  private async ensureUserQuestCurSync(): Promise<void> {
-    const userId = this.shared.currentUser()?.id;
-    const groupName = this.shared.selectedGroup();
-    
-    if (!userId || !groupName || !this.groupCache) return;
-
-    try {
-      let userQuestCur = await this.userService.getUserQuestCur(userId);
-      
-      if (!userQuestCur) {
-        console.warn('No UserQuestCur data found');
-        return;
-      }
-
-      const needsUpdate = await this.checkQuestCreateTimeSync(userQuestCur);
-      
-      if (needsUpdate) {
-        this.userService['cacheService']?.removeCache('userQuestCur');
-        userQuestCur = await this.userService.getUserQuestCur(userId);
-      }
-
-      this.userQuestCache = userQuestCur;
-      
-    } catch (error) {
-      console.error('Error synchronizing UserQuestCur:', error);
-    }
-  }
-
-  private async checkQuestCreateTimeSync(userQuestCur: UserQuestCur): Promise<boolean> {
-    if (!this.groupCache) return false;
-
-    try {
-      const groupQuestCreateTime = new Date(this.groupCache.questCreateTime);
-      const cacheExpiry = this.userService['cacheService']?.getCacheExpiry('userQuestCur');
-      
-      if (!cacheExpiry) return true;
-
-      const cacheTime = new Date(cacheExpiry - (45 * 60 * 1000));
-      const needsUpdate = groupQuestCreateTime > cacheTime;
-      
-      return needsUpdate;
-
-    } catch (error) {
-      console.error('Error checking quest create time sync:', error);
-      return true;
-    }
-  }
-
-  private async updateUserQuestCompletion(questTitle: string, isCompleted: boolean): Promise<void> {
-    if (!this.userQuestCache) return;
-
-    const userId = this.shared.currentUser()?.id;
-    const groupName = this.shared.selectedGroup();
-    
-    if (!userId || !groupName) return;
-
-    try {
-      this.userQuestCache.curQuestTotalList = this.userQuestCache.curQuestTotalList.map(quest => {
-        if (quest.quest === questTitle && quest.group === groupName) {
-          return { ...quest, isSuccess: isCompleted };
-        }
-        return quest;
-      });
-
-      if (isCompleted) {
-        const success = await this.userService.setUserQuestRecord(userId, groupName, [questTitle]);
-        
-        if (success) {
-          await this.updateGroupCacheQuestSuccess(questTitle);
-        } else {
-          this.userQuestCache.curQuestTotalList = this.userQuestCache.curQuestTotalList.map(quest => {
-            if (quest.quest === questTitle && quest.group === groupName) {
-              return { ...quest, isSuccess: false };
-            }
-            return quest;
-          });
-          throw new Error('Failed to update quest completion on server');
-        }
-      }
-
-    } catch (error) {
-      console.error('Error updating quest completion:', error);
-      throw error;
-    }
-  }
-
-  private async updateGroupCacheQuestSuccess(questTitle: string): Promise<void> {
-    if (!this.groupCache) return;
-
-    const questIndex = this.groupCache.questList.findIndex(quest => quest === questTitle);
-    if (questIndex === -1) return;
-
-    try {
-      this.groupCache.questSuccessNum[questIndex] = (this.groupCache.questSuccessNum[questIndex] || 0) + 1;
-      this.userService['cacheService']?.setCache(this.groupCache.name, this.groupCache);
-      
-    } catch (error) {
-      console.error('Error updating group cache:', error);
-    }
-  }
-
-  // === 퀘스트 변화 모니터링 및 완료 처리 ===
-  
-  private monitorQuestChanges(): void {
-    effect(() => {
-      const currentQuests = this.quests();
-      const completedQuests = currentQuests.filter(quest => quest.status === 'completed');
-      
-      const newlyCompleted = completedQuests.filter(quest => 
-        !this.completedQuestIds.has(quest.id)
-      );
-
-      if (newlyCompleted.length > 0) {
-        this.handleQuestCompletions(newlyCompleted);
-        
-        newlyCompleted.forEach(quest => {
-          this.completedQuestIds.add(quest.id);
-        });
-      }
-    });
-  }
-
-  private async handleQuestCompletions(completedQuests: Quest[]): Promise<void> {
-    const groupName = this.shared.selectedGroup();
-    const channelName = this.shared.selectedChannel() || 'general';
-    const userId = this.shared.currentUser()?.id;
-
-    if (!groupName || !userId) {
-      console.warn('Missing group or user information for quest completion');
-      return;
-    }
-
-    for (const quest of completedQuests) {
-      try {
-        await this.updateUserQuestCompletion(quest.title, true);
-        await this.activityService.trackQuestCompletion(groupName, [quest.title]);
-
-        const completionEvent: QuestCompletionEvent = {
-          questId: quest.id,
-          questTitle: quest.title,
-          groupName,
-          channelName,
-          userId,
-          completedAt: new Date()
-        };
-        this.showFloatingFeedback(quest, groupName, channelName);
-
-      } catch (error) {
-        console.error('Error handling quest completion:', quest.title, error);
-      }
-    }
-  }
-
-  // === 나머지 기존 메서드들 (생략 - 동일하게 유지) ===
-  
-  // 데이터 로딩, 퀘스트 관련, UI 관련 메서드들은 동일하게 유지...
-  
-  private async loadGroupData(): Promise<void> {
-    this.isLoading.set(true);
-    this.error.set(null);
-
-    try {
-      const selectedGroup = this.shared.selectedGroup();
-      
-      if (!selectedGroup) {
-        throw new Error('선택된 그룹이 없습니다.');
-      }
-
-      const [group, userQuestCur] = await Promise.allSettled([
-        this.groupDashboardService.getGroupData(selectedGroup),
-        this.loadUserQuestData()
-      ]);
-
-      if (group.status === 'fulfilled' && group.value) {
-        this.groupCache = group.value;
-        this.title.set(group.value.name);
-      } else {
-        throw new Error('그룹 데이터를 찾을 수 없습니다.');
-      }
-
-      if (userQuestCur.status === 'fulfilled') {
-        this.userQuestCache = userQuestCur.value;
-      }
-
-      await this.ensureUserQuestCurSync();
-
-      const newQuests = this.groupDashboardService.processingQuest(this.groupCache);
-      const questsWithStatus = this.applyUserQuestStatus(newQuests);
-
-      this.quests.set(questsWithStatus);
-      this.stats.set(this.groupDashboardService.processingStat(this.groupCache));
-
-      this.completedQuestIds.clear();
-      questsWithStatus.forEach(quest => {
-        if (quest.status === 'completed' || this.isQuestCompletedInUserQuest(quest.title)) {
-          this.completedQuestIds.add(quest.id);
-        }
-      });
-
-      setTimeout(() => this.animateProgress(), 500);
-
-    } catch (error) {
-      console.error('그룹 데이터 로딩 실패:', error);
-      this.error.set(error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.');
-    } finally {
-      this.isLoading.set(false);
-    }
-  }
-
-  private async loadUserQuestData(): Promise<UserQuestCur | null> {
-    const userId = this.shared.currentUser()?.id;
-    if (!userId) return null;
-
-    try {
-      return await this.userService.getUserQuestCur(userId);
-    } catch (error) {
-      console.error('Error loading user quest data:', error);
-      return null;
-    }
-  }
-
-  private applyUserQuestStatus(quests: Quest[]): Quest[] {
-    return quests.map(quest => {
-      const isCompleted = this.isQuestCompletedInUserQuest(quest.title);
-      
-      if (isCompleted) {
-        return {
-          ...quest,
-          status: 'completed' as const,
-          progress: 100
-        };
-      }
-      
-      return quest;
-    });
-  }
-
-  // 퀘스트 관련 메서드들...
-  onQuestClick(quest: Quest): void {
-    if (this.isQuestCompletedInUserQuest(quest.title) || quest.status === 'completed') {
-      return;
-    }
-    
-    const currentSelected = this.selectedQuestIds();
-    const newSelected = new Set(currentSelected);
-    
-    if (newSelected.has(quest.id)) {
-      newSelected.delete(quest.id);
-    } else {
-      newSelected.add(quest.id);
-    }
-    
-    this.selectedQuestIds.set(newSelected);
-  }
-
-  isQuestSelected(questId: string): boolean {
-    return this.selectedQuestIds().has(questId);
-  }
-
-  hasSelectedQuests(): boolean {
-    return this.selectedQuestIds().size > 0;
-  }
-
-  isQuestCompletable(quest: Quest): boolean {
-    return !this.isQuestCompletedInUserQuest(quest.title) && quest.status !== 'completed';
-  }
-
-  isQuestCompletedInCache(questId: string): boolean {
-    const quest = this.quests().find(q => q.id === questId);
-    return quest ? this.isQuestCompletedInUserQuest(quest.title) : false;
-  }
-
-  onQuestAction(): void {
-    const selectedIds = Array.from(this.selectedQuestIds());
-    const selectedQuests = this.availableQuestsForSelection()
-      .filter(quest => selectedIds.includes(quest.id));
-    
-    if (selectedQuests.length === 0) {
-      this.showErrorToast('완료할 퀘스트를 선택해주세요.');
-      return;
-    }
-
-    this.confirmModalData.set({
-      questNames: selectedQuests.map(q => q.title),
-      questCount: selectedQuests.length
-    });
-    
-    this.showConfirmModal.set(true);
-  }
-
-  confirmQuestCompletion(): void {
-    const selectedIds = Array.from(this.selectedQuestIds());
-    const selectedQuests = this.availableQuestsForSelection()
-      .filter(quest => selectedIds.includes(quest.id));
-
-    this.showConfirmModal.set(false);
-    this.confirmModalData.set(null);
-
-    if (selectedQuests.length === 0) return;
-
-    selectedQuests.forEach((quest, index) => {
-      setTimeout(() => {
-        this.completeQuest(quest.id);
-      }, index * 300);
-    });
-  }
-
-  cancelQuestCompletion(): void {
-    this.showConfirmModal.set(false);
-    this.confirmModalData.set(null);
-  }
-
-  private async completeQuest(questId: string): Promise<void> {
-    const currentQuests = this.quests();
-    const questToComplete = currentQuests.find(q => q.id === questId);
-    
-    if (!questToComplete) {
-      console.error('Quest not found:', questId);
-      return;
-    }
-
-    if (this.isQuestCompletedInUserQuest(questToComplete.title)) {
-      this.selectedQuestIds.update(selected => {
-        const newSelected = new Set(selected);
-        newSelected.delete(questId);
-        return newSelected;
-      });
-      return;
-    }
-
-    try {
-      await this.updateUserQuestCompletion(questToComplete.title, true);
-
-      const updatedQuests = currentQuests.map(quest => {
-        if (quest.id === questId) {
-          return {
-            ...quest,
-            status: 'completed' as const,
-            progress: 100
-          };
-        }
-        return quest;
-      });
-
-      this.quests.set(updatedQuests);
-      
-      this.selectedQuestIds.update(selected => {
-        const newSelected = new Set(selected);
-        newSelected.delete(questId);
-        return newSelected;
-      });
-      
-      this.updateStats();
-      
-    } catch (error) {
-      console.error('Failed to complete quest:', questId, error);
-      this.showErrorToast('퀘스트 완료 처리에 실패했습니다.');
-    }
-  }
-
-  // 유틸리티 메서드들...
-  private async ensureGroupSelected(): Promise<void> {
-    let selectedGroup = this.shared.selectedGroup();
-    
-    if (!selectedGroup) {
-      const joinedGroups = await this.getJoinedGroups();
-      if (joinedGroups.length > 0) {
-        const firstGroup = joinedGroups[0];
-        this.shared.setSelectedGroup(firstGroup);
-      } else {
-        this.navigateToGroupJoin();
-        return;
-      }
-    }
-  }
-
-  private async getJoinedGroups(): Promise<string[]> {
-    try {
-      const userJoin = await this.userService.getUserJoin(this.shared.currentUser()?.id);
-      return userJoin ? userJoin.joinList.map(join => join.groupname) : [];
-    } catch (error) {
-      console.error('참여 그룹 조회 실패:', error);
-      return [];
-    }
-  }
-
-  private navigateToGroupJoin(): void {
-    this.router.navigate(['/group/join']);
-  }
-
-  getStatusColor(status: string): string {
-    switch (status) {
-      case 'completed': return '#48bb78';
-      case 'in-progress': return '#4299e1';
-      case 'pending': return '#a0aec0';
-      default: return '#a0aec0';
-    }
-  }
-
-  getStatusText(status: string): string {
-    switch (status) {
-      case 'completed': return '완료';
-      case 'in-progress': return '진행중';
-      case 'pending': return '대기중';
-      default: return '알 수 없음';
-    }
-  }
-
-  getTodayAchievementRate(): number {
-    const statsList = this.stats();
-    if (statsList.length > 1 && statsList[1]) {
-      return statsList[1].value;
-    }
-    return 0;
-  }
-
-  private updateStats(): void {
-    const totalQuests = this.quests().length;
-    const completedQuests = this.quests().filter(q => 
-      q.status === 'completed' || this.isQuestCompletedInUserQuest(q.title)
-    ).length;
-    const achievementRate = totalQuests > 0 ? Math.round((completedQuests / totalQuests) * 100) : 0;
-    
-    const currentStats = this.stats();
-    const updatedStats = currentStats.map(stat => {
-      if (stat.label === '퀘스트 달성률') {
-        return { ...stat, value: achievementRate };
-      }
-      return stat;
-    });
-    
-    this.stats.set(updatedStats);
-  }
-
-  private animateProgress(): void {
-    const progressBars = document.querySelectorAll('.quest-progress-bar') as NodeListOf<HTMLElement>;
-    
-    progressBars.forEach((bar, index) => {
-      const targetWidth = bar.getAttribute('data-progress') + '%';
-      bar.style.width = '0%';
-      
-      setTimeout(() => {
-        bar.style.width = targetWidth;
-        bar.style.transition = 'width 0.8s ease-out';
-      }, index * 200);
-    });
-  }
-
-  retry(): void {
-    this.loadGroupData();
-  }
-
-  refreshData(): void {
-    this.loadGroupData();
-    this.loadRecentActivities();
-  }
-
-  private showFeedbackSuccessToast(isLike?: boolean): void {
-    const toast = document.createElement('div');
-    toast.className = 'feedback-success-toast';
-    
-    const likeText = isLike !== undefined 
-      ? (isLike ? ' 👍 좋은 피드백 감사합니다!' : ' 👎 소중한 의견 감사합니다!')
-      : '';
-    
-    toast.innerHTML = `
-      <div class="toast-content">
-        <div class="toast-icon">✨</div>
-        <div class="toast-message">피드백이 저장되었습니다!${likeText}</div>
-      </div>
-    `;
-    
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-      toast.classList.add('fade-out');
-      setTimeout(() => {
-        if (document.body.contains(toast)) {
-          document.body.removeChild(toast);
-        }
-      }, 300);
-    }, 3000); // 좋아요/싫어요 메시지는 조금 더 오래 표시
-  }
-
-  private showErrorToast(message: string): void {
-    const toast = document.createElement('div');
-    toast.className = 'error-toast';
-    toast.innerHTML = `
-      <div class="toast-content">
-        <div class="toast-icon">⚠️</div>
-        <div class="toast-message">${message}</div>
-      </div>
-    `;
-    
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-      toast.classList.add('fade-out');
-      setTimeout(() => {
-        if (document.body.contains(toast)) {
-          document.body.removeChild(toast);
-        }
-      }, 300);
-    }, 3000);
-  }
-
-  // === 디버깅 메서드들 ===
-
+  // === 디버깅 및 관리 메서드들 (UserQuestCur 기반) ===
   getCompletedQuestIds(): string[] {
-    return Array.from(this.completedQuestIds);
+    return Array.from(this.questState().completedQuestIds);
+  }
+
+  getCompletedQuestTitles(): string[] {
+    return Array.from(this.questState().completedQuestTitles);
   }
 
   resetQuestCompletions(): void {
-    this.completedQuestIds.clear();
-
+    this.questState.set({
+      completedQuestIds: new Set(),
+      completedQuestTitles: new Set(),
+      lastSyncTime: 0
+    });
   }
 
   logUserQuestStatus(): void {
@@ -976,13 +1062,33 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
       const groupName = this.shared.selectedGroup();
       const groupQuests = this.userQuestCache.curQuestTotalList.filter(q => q.group === groupName);
       
+      console.group('=== UserQuestCur 기반 퀘스트 상태 ===');
+      console.log('그룹명:', groupName);
+      console.log('전체 퀘스트:', this.quests().length);
+      console.log('UserQuestCur 데이터:', {
+        totalQuests: this.userQuestCache.curQuestTotalList.length,
+        groupQuests: groupQuests.length,
+        completedInGroup: groupQuests.filter(q => q.success).length
+      });
+      console.log('완료된 퀘스트 (로컬):', Array.from(this.questState().completedQuestTitles));
+      console.log('완료된 퀘스트 ID:', Array.from(this.questState().completedQuestIds));
+      
+      console.group('퀘스트별 상세 정보');
       this.quests().forEach(quest => {
-        console.log(`Quest ${quest.id} (${quest.title}):`, {
+        const userQuestRecord = groupQuests.find(q => q.questId.toString() === quest.id);
+        console.log(`퀘스트 ${quest.id} (${quest.title}):`, {
           localStatus: quest.status,
-          userQuestCompleted: this.isQuestCompletedInUserQuest(quest.title),
-          completable: this.isQuestCompletable(quest)
+          userQuestCompleted: userQuestRecord?.success || false,
+          questId: userQuestRecord?.questId,
+          completable: this.isQuestCompletable(quest),
+          inCompletedTitles: this.questState().completedQuestTitles.has(quest.title),
+          inCompletedIds: this.questState().completedQuestIds.has(quest.id)
         });
       });
+      console.groupEnd();
+      
+      console.log('UserQuestCur 그룹 퀘스트:', groupQuests);
+      console.groupEnd();
     }
   }
 
@@ -991,31 +1097,274 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
     if (!userId) return;
 
     try {
-      this.userService['cacheService']?.removeCache('userQuestCur');
-      this.userQuestCache = await this.userService.getUserQuestCur(userId);
+      console.log('🔄 UserQuestCur 강제 새로고침 시작...');
       
-      if (this.groupCache) {
-        const newQuests = this.groupDashboardService.processingQuest(this.groupCache);
-        const questsWithStatus = this.applyUserQuestStatus(newQuests);
-        this.quests.set(questsWithStatus);
-      }
+      // 캐시 완전 삭제
+      this.userService['cacheService']?.removeCache('userQuestCur');
+      
+      // 새로운 데이터 로드
+      await this.loadUserQuestData();
+      
+      // 퀘스트 재처리
+      this.processQuestsFromUserQuestCur();
+      
+      console.log('✅ UserQuestCur 강제 새로고침 완료');
     } catch (error) {
-      console.error('Error force refreshing UserQuestCur:', error);
+      console.error('❌ Error force refreshing UserQuestCur:', error);
     }
   }
 
   async syncWithServerQuest(): Promise<void> {
     try {
+      console.log('🔄 서버와 동기화 시작...');
+      
+      const groupName = this.shared.selectedGroup();
+      if (groupName) {
+        // 그룹 캐시도 새로고침
+        this.userService['cacheService']?.removeCache(groupName);
+        await this.loadGroupData();
+      }
+      
+      // UserQuestCur 강제 새로고침
+      await this.forceRefreshUserQuest();
+      
+      console.log('✅ 서버와 동기화 완료');
+    } catch (error) {
+      console.error('❌ Error syncing with server:', error);
+    }
+  }
+
+  async fullDataReset(): Promise<void> {
+    try {
+      console.log('🔄 전체 데이터 리셋 시작...');
+      
+      // 모든 로컬 상태 초기화
+      this.resetQuestCompletions();
+      this.groupCache = undefined;
+      this.userQuestCache = null;
+      this.selectedQuestIds.set(new Set());
+      
+      // 모든 관련 캐시 삭제
       const groupName = this.shared.selectedGroup();
       if (groupName) {
         this.userService['cacheService']?.removeCache(groupName);
-        this.groupCache = await this.groupDashboardService.getGroupData(groupName);
       }
+      this.userService['cacheService']?.removeCache('userQuestCur');
+      this.userService['cacheService']?.removeCache('userStatus');
       
-      await this.forceRefreshUserQuest();
-      await this.ensureUserQuestCurSync();
+      // 전체 데이터 재로드
+      await this.loadAllData();
+      
+      console.log('✅ 전체 데이터 리셋 완료');
     } catch (error) {
-      console.error('Error syncing with server:', error);
+      console.error('❌ Error during full data reset:', error);
+    }
+  }
+
+  // === 오프라인 관련 추가 메서드들 ===
+  async manualSyncOfflineQuests(): Promise<void> {
+    console.log('🔄 수동 오프라인 동기화 시작');
+    await this.syncOfflineQuests();
+  }
+
+  getOfflineQuestCount(): number {
+    const userId = this.shared.currentUser()?.id;
+    const groupName = this.shared.selectedGroup();
+    
+    if (!userId) return 0;
+    
+    const stats = this.offlineQuestService.getOfflineStats(userId, groupName ? groupName : undefined);
+    return stats.totalPending;
+  }
+
+  isOfflineMode(): boolean {
+    const stats = this.offlineQuestService.getOfflineStats();
+    return !stats.isOnline || stats.totalPending > 0;
+  }
+
+  retryFailedOfflineQuests(): void {
+    const retryCount = this.offlineQuestService.retryFailedQuests();
+    
+    if (retryCount > 0) {
+      this.showToast('success', `🔄 ${retryCount}개의 실패한 퀘스트를 재시도 대기열에 추가했습니다.`);
+      setTimeout(() => this.syncOfflineQuests(), 1000);
+    } else {
+      this.showToast('success', '재시도할 실패한 퀘스트가 없습니다.');
+    }
+  }
+
+  // === UserQuestCur 기반 퀘스트 매칭 유틸리티 ===
+  
+  /**
+   * questId로 UserQuestCur에서 퀘스트 정보 찾기
+   */
+  private findUserQuestByQuestId(questId: string): any | null {
+    if (!this.userQuestCache) return null;
+    
+    const groupName = this.shared.selectedGroup();
+    if (!groupName) return null;
+
+    return this.userQuestCache.curQuestTotalList.find(
+      quest => quest.questId.toString() === questId && quest.group === groupName
+    ) || null;
+  }
+
+  /**
+   * 퀘스트 제목으로 UserQuestCur에서 퀘스트 정보 찾기
+   */
+  private findUserQuestByTitle(questTitle: string): any | null {
+    if (!this.userQuestCache) return null;
+    
+    const groupName = this.shared.selectedGroup();
+    if (!groupName) return null;
+
+    return this.userQuestCache.curQuestTotalList.find(
+      quest => quest.quest === questTitle && quest.group === groupName
+    ) || null;
+  }
+
+  /**
+   * UserQuestCur 데이터 검증
+   */
+  private validateUserQuestCur(): boolean {
+    if (!this.userQuestCache) {
+      console.warn('❌ UserQuestCur 데이터가 없습니다.');
+      return false;
+    }
+
+    const groupName = this.shared.selectedGroup();
+    if (!groupName) {
+      console.warn('❌ 선택된 그룹이 없습니다.');
+      return false;
+    }
+
+    const groupQuests = this.userQuestCache.curQuestTotalList.filter(
+      quest => quest.group === groupName
+    );
+
+    if (groupQuests.length === 0) {
+      console.warn('❌ 현재 그룹에 대한 퀘스트 데이터가 없습니다.');
+      return false;
+    }
+
+    console.log('✅ UserQuestCur 데이터 검증 완료:', {
+      totalQuests: this.userQuestCache.curQuestTotalList.length,
+      groupQuests: groupQuests.length,
+      completedQuests: groupQuests.filter(q => q.success).length
+    });
+
+    return true;
+  }
+
+  /**
+   * UserQuestCur와 Group 데이터 일관성 검사
+   */
+  async validateDataConsistency(): Promise<{
+    isConsistent: boolean;
+    issues: string[];
+    recommendations: string[];
+  }> {
+    const issues: string[] = [];
+    const recommendations: string[] = [];
+
+    try {
+      // UserQuestCur 검증
+      if (!this.validateUserQuestCur()) {
+        issues.push('UserQuestCur 데이터가 유효하지 않습니다.');
+        recommendations.push('forceRefreshUserQuest()를 실행하세요.');
+      }
+
+      // Group 데이터 검증
+      if (!this.groupCache) {
+        issues.push('Group 캐시 데이터가 없습니다.');
+        recommendations.push('loadGroupData()를 실행하세요.');
+      }
+
+      // 퀘스트 매칭 검증
+      if (this.userQuestCache && this.groupCache) {
+        const groupName = this.shared.selectedGroup();
+        const userGroupQuests = this.userQuestCache.curQuestTotalList.filter(
+          quest => quest.group === groupName
+        );
+
+        const groupQuestTitles = new Set(this.groupCache.questList);
+        const userQuestTitles = new Set(userGroupQuests.map(q => q.quest));
+
+        // Group에 있지만 UserQuestCur에 없는 퀘스트
+        const missingInUser = this.groupCache.questList.filter(
+          title => !userQuestTitles.has(title)
+        );
+
+        // UserQuestCur에 있지만 Group에 없는 퀘스트
+        const extraInUser = userGroupQuests.filter(
+          quest => !groupQuestTitles.has(quest.quest)
+        );
+
+        if (missingInUser.length > 0) {
+          issues.push(`UserQuestCur에 누락된 퀘스트: ${missingInUser.join(', ')}`);
+          recommendations.push('서버에서 최신 사용자 퀘스트 데이터를 다시 로드하세요.');
+        }
+
+        if (extraInUser.length > 0) {
+          issues.push(`Group에 없는 사용자 퀘스트: ${extraInUser.map(q => q.quest).join(', ')}`);
+          recommendations.push('Group 데이터를 새로고침하거나 사용자 퀘스트 데이터를 동기화하세요.');
+        }
+      }
+
+      const isConsistent = issues.length === 0;
+
+      console.log(isConsistent ? '✅ 데이터 일관성 검사 통과' : '❌ 데이터 일관성 문제 발견');
+
+      return {
+        isConsistent,
+        issues,
+        recommendations
+      };
+
+    } catch (error) {
+      console.error('데이터 일관성 검사 중 오류:', error);
+      return {
+        isConsistent: false,
+        issues: ['데이터 일관성 검사 중 오류가 발생했습니다.'],
+        recommendations: ['fullDataReset()을 실행하여 전체 데이터를 다시 로드하세요.']
+      };
+    }
+  }
+
+  /**
+   * 데이터 일관성 검사 및 자동 수정
+   */
+  async autoFixDataInconsistency(): Promise<boolean> {
+    try {
+      const validation = await this.validateDataConsistency();
+      
+      if (validation.isConsistent) {
+        console.log('✅ 데이터가 일관성 있음, 수정할 필요 없음');
+        return true;
+      }
+
+      console.log('🔧 데이터 불일치 감지, 자동 수정 시작...');
+      console.log('문제점:', validation.issues);
+
+      // 자동 수정 시도
+      await this.fullDataReset();
+      
+      // 수정 후 재검증
+      const revalidation = await this.validateDataConsistency();
+      
+      if (revalidation.isConsistent) {
+        console.log('✅ 데이터 불일치 자동 수정 완료');
+        this.showToast('success', '데이터 불일치가 자동으로 수정되었습니다.');
+        return true;
+      } else {
+        console.log('❌ 자동 수정 실패, 수동 개입 필요');
+        this.showToast('error', '데이터 불일치 자동 수정에 실패했습니다.');
+        return false;
+      }
+
+    } catch (error) {
+      console.error('자동 수정 중 오류:', error);
+      return false;
     }
   }
 }

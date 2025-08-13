@@ -280,51 +280,6 @@ export class UserService {
         }
     }
 
-    // === 개선된 사용자 상태 업데이트 메서드들 ===
-    async setUserQuestRecord(id: string = "", group: string, userQuest: string[]): Promise<boolean> {
-        try {
-            if (!id) {
-                const user = await this.getUserCredentials();
-                if (!user) return false;
-                id = user.id;
-            }
-
-            let uq: UserQuestCur | null = this.cacheService.getCache('userQuestCur');
-
-            if (!uq || uq.id !== id) {
-                uq = await this.getUserQuestCur(id);
-                if (!uq) return false;
-            }
-
-            // 퀘스트 상태 업데이트
-            uq.curQuestTotalList = uq.curQuestTotalList.map(quest => ({
-                ...quest,
-                isSuccess: userQuest.includes(quest.quest) ? true : quest.isSuccess
-            }));
-
-            const url = `/api/user/setUserQuestRecord`;
-            const body = { user: id, group: group, quest: userQuest };
-            const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
-
-            await firstValueFrom(
-                this.httpService.post(url, body, headers).pipe(
-                    tap(() => {
-                        this.cacheService.setCache('userQuestCur', uq);
-                    }),
-                    catchError(error => {
-                        console.error('[API] setUserQuestRecord error:', error);
-                        return throwError(error);
-                    })
-                )
-            );
-
-            return true;
-        } catch (error) {
-            console.error('[API] setUserQuestRecord failed:', error);
-            return false;
-        }
-    }
-
     async setUserStatus(id: string = "", userStatus: UserStatus): Promise<boolean> {
         try {
             if (!id) {
@@ -772,7 +727,7 @@ export class UserService {
 
     async departUser(id: string) {
         try {
-            const url = `/api/user?email=${id}`;
+            const url = `/api/user`;
             const val = await this.loginService.deleteCurrentUser();
 
             if (val) {

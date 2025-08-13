@@ -33,7 +33,7 @@
       <div class="welcome-message">
         <div class="welcome-content">
           <h4>🎉 채팅방에 오신 것을 환영합니다!</h4>
-          <p>STOMP over WebSocket으로 실시간 채팅을 즐겨보세요.</p>
+          <p>STOMP over WebSocket으로 실시간 채팅과 이미지를 즐겨보세요.</p>
           
           @if (connectionStatus() === 'connected') {
             <div class="conversation-starters">
@@ -45,8 +45,8 @@
                 <button class="starter-btn" (click)="sendMessage('채팅 테스트입니다.')">
                   채팅 테스트입니다.
                 </button>
-                <button class="starter-btn" (click)="sendMessage('좋은 하루 보내세요!')">
-                  좋은 하루 보내세요!
+                <button class="starter-btn" (click)="triggerImageUpload()">
+                  이미지 업로드 📷
                 </button>
               </div>
             </div>
@@ -71,7 +71,8 @@
       @for (message of messages(); track message.id) {
         <div class="message-group" 
              [class.own-message]="message.isOwn"
-             [class.system-message]="message.type === 'system'">
+             [class.system-message]="message.type === 'system'"
+             [class.image-message]="isImageMessage(message)">
           
           @if (message.type !== 'system') {
             <div class="message-avatar">
@@ -92,7 +93,21 @@
                 <span class="timestamp">{{ formatTime(message.timestamp) }}</span>
               </div>
               
-              <!-- 채팅 메시지 -->
+              <!-- 🖼️ 이미지 메시지 -->
+              @if (isImageMessage(message)) {
+                <div class="image-message-container">
+                  <div class="image-wrapper">
+                    <img 
+                      [src]="getImageUrl(message.content)" 
+                      alt="Shared image"
+                      class="chat-image"
+                      (error)="onImageError($event)"
+                    />
+                  </div>
+                </div>
+              }
+              
+              <!-- 일반 채팅 메시지 -->
               @if (message.messageType === 'CHAT') {
                 <div class="message-text">{{ message.content }}</div>
               }
@@ -120,7 +135,29 @@
 
   <!-- 메시지 입력 영역 -->
   <div class="chat-input-area">
+    <!-- 🖼️ 숨겨진 파일 입력 -->
+    <input 
+      #fileInput
+      type="file" 
+      accept="image/*" 
+      style="display: none"
+      (change)="onImageSelected($event)"
+    />
+    
     <div class="input-container" [class.disabled]="connectionStatus() !== 'connected'">
+      <!-- 🖼️ 이미지 업로드 버튼 -->
+      <button 
+        class="image-upload-btn" 
+        [disabled]="connectionStatus() !== 'connected' || isUploadingImage()"
+        (click)="triggerImageUpload()"
+        title="이미지 업로드">
+        @if (isUploadingImage()) {
+          <mat-icon class="spinning">hourglass_empty</mat-icon>
+        } @else {
+          <mat-icon>image</mat-icon>
+        }
+      </button>
+      
       <textarea
         class="message-input"
         [(ngModel)]="newMessage"
@@ -141,7 +178,7 @@
     
     <div class="input-hints">
       @if (connectionStatus() === 'connected') {
-        <span><strong>Enter</strong>로 전송, <strong>Shift + Enter</strong>로 줄바꿈</span>
+        <span><strong>Enter</strong>로 전송, <strong>Shift + Enter</strong>로 줄바꿈 | 📷 버튼으로 이미지 업로드</span>
       } @else {
         <span class="connection-hint">{{ getConnectionStatusText() }} - 메시지를 보낼 수 없습니다</span>
       }

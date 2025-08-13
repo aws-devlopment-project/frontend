@@ -1,7 +1,7 @@
-// WebSocketChatService.ts - 채널 정보 관리 개선
+// WebSocketChatService.ts - 최소한의 이미지 전송 지원 추가
 import { Injectable, signal } from '@angular/core';
 import { Subject } from 'rxjs';
-import { Client, IFrame, IMessage } from '@stomp/stompjs';
+import { Client, IFrame, IMessage, StompSubscription } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { ChatMessageDto } from '../Models/chatMessage';
 
@@ -15,6 +15,9 @@ export class StompWebSocketService {
   private currentUsername: string = '';
   private currentChannelName: string = '';
   private currentGroupId: string = '';
+  
+  // 중복 구독 방지를 위한 구독 관리
+  private currentSubscription: StompSubscription | null = null;
 
   // Signals
   connectionStatus = signal<'connecting' | 'connected' | 'disconnected' | 'reconnecting'>('disconnected');
@@ -29,8 +32,8 @@ export class StompWebSocketService {
 
   constructor() {}
   
-  // STOMP 연결 - 개선된 로깅
-  connect(userEmail: string, username: string, serverUrl: string = ''): void {
+  // STOMP 연결
+  connect(userEmail: string, username: string, serverUrl: string = 'http://k8s-stage-appingre-fec57c3d21-1092138479.ap-northeast-2.elb.amazonaws.com'): void {
     console.log('🔌 STOMP 연결 시작:', { userEmail, username, serverUrl });
     
     if (this.stompClient?.connected) {
@@ -43,7 +46,10 @@ export class StompWebSocketService {
     this.connectionStatus.set('connecting');
 
     this.stompClient = new Client({
-      webSocketFactory: () => new SockJS(`${serverUrl}/ws`),
+      webSocketFactory: () => new SockJS(`${serverUrl}`, null, {
+        transports: ['websocket', 'xhr-streaming', 'xhr-polling'],
+        timeout: 30000,
+      }),
       
       onConnect: (frame: IFrame) => {
         console.log('✅ STOMP 연결 성공:', frame);
@@ -65,9 +71,9 @@ export class StompWebSocketService {
       onWebSocketClose: (event: CloseEvent) => {
         console.log('🔌 WebSocket 연결 해제:', event.code, event.reason);
         this.connectionStatus.set('disconnected');
+        this.currentSubscription = null;
       },
 
-      // 디버그 로깅 추가
       debug: (str: string) => {
         console.log('STOMP Debug:', str);
       }
@@ -76,8 +82,8 @@ export class StompWebSocketService {
     this.stompClient.activate();
   }
 
-// 채팅방 입장 - 개선된 정보 관리 및 디버깅
-joinRoom(clubId: number, userEmail: string, username: string, channelName?: string, groupId?: string): void {
+  // 채팅방 입장 - 중복 구독 방지 로직 추가
+  joinRoom(clubId: number, userEmail: string, username: string, channelName?: string, groupId?: string): void {
     console.log('🚪 ===== 채팅방 입장 요청 =====');
     console.log('📋 입력 매개변수:', { 
         clubId, 
@@ -113,6 +119,12 @@ joinRoom(clubId: number, userEmail: string, username: string, channelName?: stri
         this.leaveRoom();
     }
     
+    // 같은 채팅방에 이미 있는 경우 중복 처리 방지
+    if (this.currentClubId === clubId && this.currentSubscription) {
+        console.log('⚠️ 이미 같은 채팅방에 접속 중:', clubId);
+        return;
+    }
+    
     // 새로운 채팅방 정보 설정
     this.currentClubId = clubId;
     this.currentUserEmail = userEmail;
@@ -145,15 +157,16 @@ joinRoom(clubId: number, userEmail: string, username: string, channelName?: stri
     }
     
     console.log('🚪 ===== 채팅방 입장 요청 완료 =====');
-}
+  }
 
-// 클럽 구독 - 개선된 디버깅
-private subscribeToClub(clubId: number): void {
+  // 클럽 구독 - 중복 구독 방지 및 이미지 지원 추가
+  private subscribeToClub(clubId: number): void {
     console.log('📡 ===== 클럽 구독 시작 =====');
     console.log('📋 구독 정보:', {
         clubId,
         type: typeof clubId,
-        isValidNumber: !isNaN(clubId) && clubId > 0
+        isValidNumber: !isNaN(clubId) && clubId > 0,
+        existingSubscription: !!this.currentSubscription
     });
     
     if (!this.stompClient?.connected) {
@@ -161,18 +174,34 @@ private subscribeToClub(clubId: number): void {
         return;
     }
 
+    // 기존 구독이 있다면 먼저 해제
+    if (this.currentSubscription) {
+        console.log('🔄 기존 구독 해제');
+        try {
+            this.currentSubscription.unsubscribe();
+        } catch (error) {
+            console.warn('⚠️ 기존 구독 해제 중 오류:', error);
+        }
+        this.currentSubscription = null;
+    }
+
     const topic = `/topic/chatroom/${clubId}`;
     console.log('📡 구독 토픽:', topic);
 
     try {
-        this.stompClient.subscribe(topic, (message: IMessage) => {
+        // 새로운 구독 생성 및 저장
+        this.currentSubscription = this.stompClient.subscribe(topic, (message: IMessage) => {
             console.log('📨 ===== 메시지 수신 =====');
             console.log('📋 메시지 정보:', {
                 topic: topic,
                 clubId: clubId,
                 bodyLength: message.body?.length || 0,
-                headers: message.headers
+                headers: message.headers,
+                subscriptionId: this.currentSubscription?.id
             });
+            
+            const contentType = message.headers['content-type'] || 'text/plain';
+            console.log('📄 Content-Type:', contentType);
             
             // 메시지 내용 미리보기
             const bodyPreview = message.body?.substring(0, 100) + (message.body?.length > 100 ? '...' : '');
@@ -181,13 +210,20 @@ private subscribeToClub(clubId: number): void {
             try {
                 const chatMessage: ChatMessageDto = JSON.parse(message.body);
                 
+                // 🖼️ Content-Type이 이미지인 경우 type을 IMAGE로 설정
+                if (contentType.includes('image') || contentType.includes('base64')) {
+                    console.log('🖼️ 이미지 메시지 감지');
+                    chatMessage.type = 'IMAGE';
+                }
+                
                 // 파싱된 메시지 검증
                 console.log('✅ 메시지 파싱 성공:', {
                     clubId: chatMessage.clubId,
                     senderEmail: chatMessage.senderEmail,
                     senderUsername: chatMessage.senderUsername,
                     type: chatMessage.type,
-                    messageLength: chatMessage.message?.length || 0
+                    messageLength: chatMessage.message?.length || 0,
+                    isImage: chatMessage.type === 'IMAGE'
                 });
                 
                 // 타임스탬프 추가
@@ -206,20 +242,24 @@ private subscribeToClub(clubId: number): void {
             console.log('📨 ===== 메시지 수신 처리 완료 =====');
         });
         
-        console.log('✅ 구독 성공:', topic);
+        console.log('✅ 구독 성공:', { 
+            topic, 
+            subscriptionId: this.currentSubscription?.id 
+        });
     } catch (error) {
         console.error('❌ 구독 실패:', error);
+        this.currentSubscription = null;
         this.errorSubject.next('채널 구독 실패');
     }
     console.log('📡 ===== 클럽 구독 완료 =====');
-}
+  }
 
-// JOIN 메시지 전송 - 개선된 디버깅
-private sendJoinMessage(clubId: number, userEmail: string, username: string): void {
+  // JOIN 메시지 전송
+  private sendJoinMessage(clubId: number, userEmail: string, username: string): void {
     console.log('📤 ===== JOIN 메시지 전송 시작 =====');
     
     const channelInfo = this.currentChannelName ? ` (#${this.currentChannelName})` : '';
-    const groupInfo = this.currentGroupId ? ` in ${this.currentGroupId}` : '';
+    const groupInfo = this.currentGroupId ? ` in ${this.currentChannelName}` : '';
     
     const joinMessage = {
         clubId: clubId,
@@ -240,9 +280,9 @@ private sendJoinMessage(clubId: number, userEmail: string, username: string): vo
 
     this.sendMessage('/app/chat.addUser', joinMessage);
     console.log('📤 ===== JOIN 메시지 전송 완료 =====');
-}
+  }
 
-  // 채팅 메시지 전송 - 개선된 디버깅
+  // 채팅 메시지 전송
   sendChatMessage(clubId: number, userEmail: string, username: string, messageContent: string): void {
       console.log('📤 ===== CHAT 메시지 전송 시작 =====');
       console.log('📋 전송 요청 정보:', {
@@ -283,13 +323,99 @@ private sendJoinMessage(clubId: number, userEmail: string, username: string): vo
       console.log('📤 ===== CHAT 메시지 전송 완료 =====');
   }
 
-  // STOMP 메시지 전송 - 개선된 에러 처리 및 디버깅
-  private sendMessage(destination: string, message: any): void {
+  // 🖼️ 이미지 메시지 전송 메서드 - 기존 구조 활용
+  sendImageMessage(clubId: number, userEmail: string, username: string, imageFile: File): Promise<void> {
+    return new Promise((resolve, reject) => {
+        console.log('🖼️ ===== 이미지 메시지 전송 시작 =====');
+        console.log('📋 이미지 전송 정보:', {
+            clubId,
+            userEmail,
+            username,
+            fileName: imageFile.name,
+            fileSize: imageFile.size,
+            fileType: imageFile.type
+        });
+
+        // 파일 크기 검증 (예: 5MB 제한)
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        if (imageFile.size > maxSize) {
+            const error = '이미지 파일 크기는 5MB 이하여야 합니다.';
+            console.error('❌ 파일 크기 초과:', imageFile.size);
+            this.errorSubject.next(error);
+            reject(new Error(error));
+            return;
+        }
+
+        // 파일 타입 검증
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+        if (!allowedTypes.includes(imageFile.type)) {
+            const error = '지원하지 않는 이미지 형식입니다. (JPEG, PNG, GIF, WebP만 지원)';
+            console.error('❌ 지원하지 않는 파일 타입:', imageFile.type);
+            this.errorSubject.next(error);
+            reject(new Error(error));
+            return;
+        }
+
+        const reader = new FileReader();
+        
+        reader.onload = () => {
+            try {
+                const base64Data = reader.result as string;
+                console.log('✅ 이미지 Base64 변환 완료:', {
+                    originalSize: imageFile.size,
+                    base64Length: base64Data.length
+                });
+
+                // 🖼️ 기존 ChatMessageDto 구조 활용 - message 필드에 Base64 저장
+                const imageMessage = {
+                    clubId: clubId,
+                    senderEmail: userEmail,
+                    senderUsername: username,
+                    message: base64Data, // Base64 이미지 데이터를 message 필드에 저장
+                    type: 'IMAGE' as const
+                };
+
+                console.log('📋 이미지 메시지 객체:', {
+                    clubId: imageMessage.clubId,
+                    senderEmail: imageMessage.senderEmail,
+                    senderUsername: imageMessage.senderUsername,
+                    type: imageMessage.type,
+                    base64Length: base64Data.length,
+                    destination: '/app/chat.sendMessage' // 기존 엔드포인트 사용
+                });
+
+                // 기존 sendMessage 메서드 사용 - content-type만 다르게 설정
+                this.sendMessage('/app/chat.sendMessage', imageMessage, 'image/base64');
+                console.log('🖼️ ===== 이미지 메시지 전송 완료 =====');
+                resolve();
+                
+            } catch (error) {
+                console.error('❌ 이미지 메시지 생성 오류:', error);
+                this.errorSubject.next('이미지 메시지 생성 실패');
+                reject(error);
+            }
+        };
+
+        reader.onerror = () => {
+            const error = '이미지 파일 읽기에 실패했습니다.';
+            console.error('❌ 파일 읽기 오류:', reader.error);
+            this.errorSubject.next(error);
+            reject(new Error(error));
+        };
+
+        // Base64로 변환 시작
+        reader.readAsDataURL(imageFile);
+    });
+  }
+
+  // STOMP 메시지 전송 - content-type 파라미터 추가
+  private sendMessage(destination: string, message: any, contentType: string = 'application/json'): void {
       console.log('📤 ===== STOMP 메시지 전송 =====');
       console.log('📋 전송 정보:', {
           destination,
           messageType: message.type,
           clubId: message.clubId,
+          contentType: contentType,
           connected: this.stompClient?.connected || false
       });
       
@@ -308,12 +434,16 @@ private sendJoinMessage(clubId: number, userEmail: string, username: string): vo
           const messageJson = JSON.stringify(message);
           console.log('📋 전송할 JSON:', {
               size: messageJson.length,
+              contentType: contentType,
               preview: messageJson.substring(0, 200) + (messageJson.length > 200 ? '...' : '')
           });
           
           this.stompClient.publish({
               destination: destination,
-              body: messageJson
+              body: messageJson,
+              headers: {
+                  'content-type': contentType // 🖼️ 이미지의 경우 'image/base64'
+              }
           });
           
           console.log('✅ 메시지 전송 성공');
@@ -325,8 +455,10 @@ private sendJoinMessage(clubId: number, userEmail: string, username: string): vo
       console.log('📤 ===== STOMP 메시지 전송 완료 =====');
   }
 
-  // 채팅방 퇴장 - 개선된 로직
+  // 채팅방 퇴장 - 구독 해제 추가
   leaveRoom(): void {
+    console.log('🚪 ===== 채팅방 퇴장 시작 =====');
+    
     if (this.currentClubId !== -1 && this.stompClient?.connected) {
       const channelInfo = this.currentChannelName ? ` (#${this.currentChannelName})` : '';
       const leaveMessage = {
@@ -341,17 +473,31 @@ private sendJoinMessage(clubId: number, userEmail: string, username: string): vo
       this.sendMessage('/app/chat.sendMessage', leaveMessage);
     }
     
+    // 기존 구독 해제
+    if (this.currentSubscription) {
+        console.log('📡 기존 구독 해제:', this.currentSubscription.id);
+        try {
+            this.currentSubscription.unsubscribe();
+        } catch (error) {
+            console.warn('⚠️ 구독 해제 중 오류:', error);
+        }
+        this.currentSubscription = null;
+    }
+    
     // 채팅방 정보 초기화
     console.log('🔄 채팅방 정보 초기화');
     this.currentClubId = -1;
     this.currentChannelName = '';
     this.currentGroupId = '';
+    
+    console.log('🚪 ===== 채팅방 퇴장 완료 =====');
   }
 
-  // 연결 해제 - 개선된 정리
+  // 연결 해제 - 구독 정리 추가
   disconnect(): void {
     console.log('🔌 WebSocket 연결 해제 시작');
     
+    // 퇴장 처리 (구독 해제 포함)
     this.leaveRoom();
     
     if (this.stompClient) {
@@ -364,11 +510,14 @@ private sendJoinMessage(clubId: number, userEmail: string, username: string): vo
       this.stompClient = null;
     }
     
+    // 구독 정보 확실히 정리
+    this.currentSubscription = null;
+    
     this.connectionStatus.set('disconnected');
     console.log('🔌 WebSocket 연결 해제 완료');
   }
 
-  // 연결 상태 확인 - 개선된 체크
+  // 연결 상태 확인
   isConnected(): boolean {
     const connected = this.connectionStatus() === 'connected' && !!this.stompClient?.connected;
     
@@ -388,19 +537,22 @@ private sendJoinMessage(clubId: number, userEmail: string, username: string): vo
     return this.currentClubId;
   }
 
+  // 현재 채널 정보 조회
   getCurrentChannelInfo(): { 
       clubId: number, 
       channelName: string, 
       groupId: string,
       userEmail: string,
-      username: string
+      username: string,
+      hasSubscription: boolean
   } {
       const info = {
           clubId: this.currentClubId,
           channelName: this.currentChannelName,
           groupId: this.currentGroupId,
           userEmail: this.currentUserEmail,
-          username: this.currentUsername
+          username: this.currentUsername,
+          hasSubscription: !!this.currentSubscription
       };
       
       console.log('ℹ️ 현재 채널 정보 조회:', info);
@@ -416,6 +568,8 @@ private sendJoinMessage(clubId: number, userEmail: string, username: string): vo
     console.log('현재 클럽 ID:', this.currentClubId);
     console.log('현재 채널 이름:', this.currentChannelName);
     console.log('현재 그룹 ID:', this.currentGroupId);
+    console.log('현재 구독 상태:', !!this.currentSubscription);
+    console.log('현재 구독 ID:', this.currentSubscription?.id);
     console.log('현재 사용자:', {
       email: this.currentUserEmail,
       username: this.currentUsername

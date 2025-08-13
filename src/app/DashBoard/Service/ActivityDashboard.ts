@@ -35,7 +35,7 @@ export class ActivityDashboardService {
         totalSuccess = userQuestContinuous.continuousSuccessQuestList.successQuestNum;
         let totalSuccessInWeeks = 0;
         userQuestPrev.prevQuestTotalList.forEach((quest) => {
-            if (quest.isSuccess) {
+            if (quest.success) {
                 totalSuccessInWeeks++;
             }
         })
@@ -66,7 +66,7 @@ export class ActivityDashboardService {
         userQuestPrev.prevQuestTotalList.forEach((quest) => {
             let date = new Date(quest.completeTime).getDay();
             successCount[date].target += 1;
-            if (quest.isSuccess)
+            if (quest.success)
                 successCount[date].completed += 1;
         })
         return successCount;

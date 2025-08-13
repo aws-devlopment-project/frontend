@@ -72,8 +72,7 @@ export class DataCacheService {
 
             const storage = this.getStorage(key);
             storage.setItem(this.getCacheKey(key), serializedItem);
-            
-            console.debug(`Cache set: ${key} (TTL: ${ttl}ms)`);
+
             return true;
 
         } catch (error) {
@@ -113,8 +112,6 @@ export class DataCacheService {
                 this.removeCache(key);
                 return null;
             }
-
-            console.debug(`Cache hit: ${key}`);
             return parsedItem.data;
 
         } catch (error) {
@@ -139,7 +136,6 @@ export class DataCacheService {
             
             if (storage.getItem(cacheKey)) {
                 storage.removeItem(cacheKey);
-                console.debug(`Cache removed: ${key}`);
                 return true;
             }
             

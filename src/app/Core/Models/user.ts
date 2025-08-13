@@ -36,12 +36,13 @@ export function createUserJoin(): UserJoin {
 export interface UserQuestCur {
     id: string,
     curQuestTotalList: {
+        questId: number,
         quest: string,
         group: string,
         club: string,
         tag?: [],
         descriptions?: string
-        isSuccess: boolean
+        success: boolean
     }[]
 }
 
@@ -77,7 +78,7 @@ export interface UserQuestPrev {
     prevQuestTotalList: {
         quest: string,
         group: string,
-        isSuccess: boolean,
+        success: boolean,
         completeTime: Date,
     }[]
 }

@@ -245,19 +245,16 @@ export class HomeDashboardComponent implements OnInit {
     }
   }
 
-  // 퀘스트 캘린더 데이터 로드 (날짜 생성 방식 수정)
   private async loadQuestCalendarData(): Promise<void> {
     try {
       const userCreds = await this.userService.getUserCredentials();
       if (!userCreds) return;
 
       // 현재 사용자의 퀘스트 데이터 가져오기
-      const [questCur, userJoin] = await Promise.all([
+      const [questCur, questPrev] = await Promise.all([
         this.userService.getUserQuestCur(userCreds.id),
-        this.userService.getUserJoin(userCreds.id)
+        this.userService.getUserQuestPrev(userCreds.id)
       ]);
-
-      if (!questCur || !userJoin) return;
 
       // 지난 90일간의 데이터 생성 (로컬 시간대 기준)
       const questData: { date: string; quests: DailyQuest[] }[] = [];
@@ -270,7 +267,7 @@ export class HomeDashboardComponent implements OnInit {
         // 로컬 시간대로 날짜 문자열 생성
         const dateStr = this.formatDateLocal(date);
 
-        const dayQuests = this.generateQuestsForDate(dateStr, questCur, userJoin);
+        const dayQuests = this.generateQuestsForDate(dateStr, questCur, questPrev);
         questData.push({
           date: dateStr,
           quests: dayQuests
@@ -283,49 +280,104 @@ export class HomeDashboardComponent implements OnInit {
     }
   }
 
-  // 로컬 시간대로 날짜를 YYYY-MM-DD 형식으로 변환
-  private formatDateLocal(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-
-  // 특정 날짜의 퀘스트 생성 (실제 데이터 기반)
-  private generateQuestsForDate(date: string, questCur: any, userJoin: any): DailyQuest[] {
-    const quests: DailyQuest[] = [];
+  // 날짜별 퀘스트 생성 로직 (시뮬레이션 완전 제거)
+  private generateQuestsForDate(
+    date: string, 
+    questCur: any, 
+    questPrev: any
+  ): DailyQuest[] {
     const dateObj = new Date(date);
     const today = new Date();
     
-    // 오늘 이후의 날짜는 퀘스트 없음
-    if (dateObj > today) return [];
+    // 오늘 이후의 날짜는 현재 진행중인 퀘스트만 표시
+    if (dateObj > today) {
+      return this.getFutureQuests(questCur);
+    }
+    
+    // 오늘은 현재 진행중인 퀘스트 표시
+    if (this.isSameDate(dateObj, today)) {
+      return this.getCurrentQuests(questCur);
+    }
+    
+    // 과거 날짜는 실제 기록만 표시 (시뮬레이션 없음)
+    return this.getPastQuestsFromHistory(date, questPrev, questCur);
+  }
 
-    // 현재 진행중인 퀘스트들을 기반으로 생성
-    if (questCur.curQuestTotalList) {
-      questCur.curQuestTotalList.forEach((quest: any, index: number) => {
-        // 모든 날짜에 모든 퀘스트를 표시하지 않고, 랜덤하게 일부만 표시
-        const shouldInclude = Math.random() < 0.7; // 70% 확률로 포함
+  // 미래 날짜의 퀘스트 (현재 진행중인 퀘스트들)
+  private getFutureQuests(questCur: any): DailyQuest[] {
+    if (!questCur?.curQuestTotalList) return [];
+    
+    return questCur.curQuestTotalList.map((quest: any, index: number) => ({
+      id: `future-${quest.group}-${index}`,
+      title: quest.quest,
+      groupName: quest.group,
+      isCompleted: false, // 미래 날짜는 아직 완료되지 않음
+      priority: this.getQuestPriority(quest.quest),
+      dueTime: this.generateDueTime()
+    }));
+  }
+
+  // 현재 날짜의 퀘스트 (실제 현재 상태 반영)
+  private getCurrentQuests(questCur: any): DailyQuest[] {
+    if (!questCur?.curQuestTotalList) return [];
+    
+    return questCur.curQuestTotalList.map((quest: any, index: number) => ({
+      id: `current-${quest.group}-${index}`,
+      title: quest.quest,
+      groupName: quest.group,
+      isCompleted: quest.success || false,
+      priority: this.getQuestPriority(quest.quest),
+      dueTime: this.generateDueTime()
+    }));
+  }
+
+  // 과거 날짜의 퀘스트 (UserQuestPrev에서 실제 기록 조회)
+  private getPastQuestsFromHistory(
+    date: string, 
+    questPrev: any, 
+    questCur: any
+  ): DailyQuest[] {
+    const quests: DailyQuest[] = [];
+    
+    // UserQuestPrev에서 해당 날짜의 실제 기록 찾기
+    if (questPrev?.prevQuestTotalList) {
+      // completeTime이 해당 날짜와 일치하는 퀘스트들 찾기
+      const dayQuests = questPrev.prevQuestTotalList.filter((prevQuest: any) => {
+        if (!prevQuest.completeTime) return false;
         
-        if (shouldInclude) {
-          const isCompleted = quest.isSuccess;
-          
-          quests.push({
-            id: `quest-${date}-${index}`,
-            title: quest.quest,
-            groupName: quest.group,
-            isCompleted: isCompleted,
-            priority: this.getQuestPriority(quest.quest),
-            dueTime: this.generateDueTime()
-          });
-        }
+        const completeDate = new Date(prevQuest.completeTime);
+        const targetDate = new Date(date);
+        
+        return this.isSameDate(completeDate, targetDate);
+      });
+      
+      // 찾은 퀘스트들을 DailyQuest 형태로 변환
+      dayQuests.forEach((prevQuest: any, index: number) => {
+        quests.push({
+          id: `past-${date}-${index}`,
+          title: prevQuest.quest,
+          groupName: prevQuest.group,
+          isCompleted: prevQuest.success,
+          priority: this.getQuestPriority(prevQuest.quest),
+          dueTime: this.generateDueTime()
+        });
       });
     }
+    
     return quests;
   }
 
+  // 날짜가 같은지 확인하는 유틸리티 메서드 (시간 무시)
+  private isSameDate(date1: Date, date2: Date): boolean {
+    return date1.getFullYear() === date2.getFullYear() &&
+          date1.getMonth() === date2.getMonth() &&
+          date1.getDate() === date2.getDate();
+  }
+
+  // 기존 메서드들 유지...
   private getQuestPriority(questTitle: string): 'high' | 'medium' | 'low' {
-    const highPriorityKeywords = ['운동', '건강', '중요', '필수'];
-    const lowPriorityKeywords = ['선택', '여가', '취미'];
+    const highPriorityKeywords = ['운동', '건강', '중요', '필수', '매일'];
+    const lowPriorityKeywords = ['선택', '여가', '취미', '가끔'];
     
     if (highPriorityKeywords.some(keyword => questTitle.includes(keyword))) {
       return 'high';
@@ -339,6 +391,14 @@ export class HomeDashboardComponent implements OnInit {
   private generateDueTime(): string {
     const times = ['오전 9시', '오후 2시', '오후 6시', '오후 9시'];
     return Math.random() < 0.7 ? times[Math.floor(Math.random() * times.length)] : '';
+  }
+
+  // 로컬 시간대로 날짜를 YYYY-MM-DD 형식으로 변환
+  private formatDateLocal(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   // 퀘스트 클릭 이벤트 핸들러

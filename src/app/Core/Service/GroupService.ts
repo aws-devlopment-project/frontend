@@ -5,13 +5,15 @@ import { HttpHeaders } from "@angular/common/http";
 import { Group } from "../Models/group";
 import { firstValueFrom } from 'rxjs';
 import { createGroup, createGroupList } from "../Models/group";
+import { UserQuestCur } from "../Models/user";
+import { UserService } from "./UserService";
 
 @Injectable({
     providedIn: 'root'
 })
 export class GroupService {
 
-    constructor(private httpService: HttpService, private dataService: DataCacheService) {}
+    constructor(private httpService: HttpService, private dataService: DataCacheService, private userService: UserService) {}
 
     async checkQuestCreateTime(groupname: string) : Promise<boolean> {
         const group: Group | null = await this.dataService.getCache(groupname);
@@ -102,7 +104,22 @@ export class GroupService {
                 });
                 this.dataService.setCache(group, cacheGroup);
             }
-            
+            let userQuestCur: UserQuestCur | null = await this.dataService.getCache('userQuestCur');
+            if (!userQuestCur)
+                userQuestCur = await this.userService.getUserQuestCur(user);
+            if (userQuestCur) {
+                questList.forEach((quest) => {
+                    const questIndex = userQuestCur.curQuestTotalList.findIndex(
+                        (q) => q.quest === quest.quest && q.group === group && q.club === quest.club
+                    );
+                    console.log("questIndex: " + questIndex);
+                    console.log("quest: " + quest.quest);
+                    if (questIndex !== -1) {
+                        userQuestCur.curQuestTotalList[questIndex].success = true;
+                    }
+                });
+                this.dataService.setCache('userQuestCur', userQuestCur);
+            }
             return true;
         } catch (error) {
             console.error('Error in questSuccessWithFeedback:', error);

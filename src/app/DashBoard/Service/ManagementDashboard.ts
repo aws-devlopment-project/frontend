@@ -62,7 +62,7 @@ export class ManagementDashboardService {
         if (userQuestPrev) {
             userQuestPrev.prevQuestTotalList.forEach((num) => {
                 userProfile.totalQuests += 1;
-                userProfile.completedQuests += num.isSuccess ? 1 : 0;
+                userProfile.completedQuests += num.success ? 1 : 0;
             });
         }
         return userProfile;
@@ -274,15 +274,7 @@ export class ManagementDashboardService {
             const userId = user ? user.id : "";
             
             // 채널 탈퇴 API 호출
-            await firstValueFrom(
-                this.httpService.post('/api/user/leaveClub', {
-                    user: userId,
-                    group: groupId,
-                    clubList: [channelId]
-                }, new HttpHeaders({
-                    'Content-Type': 'application/json'
-                }))
-            );
+            await this.userService.leaveClub(userId, groupId, channelId);
         } catch (error) {
             console.error('채널 탈퇴 실패:', error);
             throw error;
