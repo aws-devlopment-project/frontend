@@ -34,6 +34,7 @@ export class ManagementDashboardService {
         private router: Router
     ) {}
 
+    serverUrl: string = "https://server.teamnameless.click"
     async getUserProfile() {
         let userProfile: UserProfile = {
             username: '',
@@ -167,7 +168,7 @@ export class ManagementDashboardService {
         };
 
         const response = await firstValueFrom(
-        this.httpService.post(environment.apiUrl + `/api/user/setUserAvatar`, payload, 
+        this.httpService.post(this.serverUrl + `/api/user/setUserAvatar`, payload, 
             new HttpHeaders({ 'Content-Type': 'application/json' })
         )
         );
@@ -233,7 +234,7 @@ export class ManagementDashboardService {
             const userId = user ? user.id : "";
 
             await firstValueFrom(
-                this.httpService.post(environment.apiUrl + `/api/user/resetUserAvatar`, 
+                this.httpService.post(this.serverUrl + `/api/user/resetUserAvatar`, 
                     { user: userId },
                     new HttpHeaders({ 'Content-Type': 'application/json' })
                 )
