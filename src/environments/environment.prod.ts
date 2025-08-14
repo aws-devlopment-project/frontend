@@ -13,7 +13,6 @@ export const environment = {
 
   globalGivingApiKey: '',
   globalGivingApiUrl: '',
-
   donation: {
     defaultLimit: 20,
     maxLimit: 50,
