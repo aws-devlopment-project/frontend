@@ -1,4 +1,4 @@
-// Chatbot.ts - 기존 파일에 최소한의 Q&A 기능 추가
+// Chatbot.ts - 퀘스트 완료 메시지 자동 추가 개선
 import { Component, OnInit, OnDestroy, signal, computed, effect, ViewChild, ElementRef, AfterViewChecked, ChangeDetectorRef, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -7,11 +7,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatInputModule } from '@angular/material/input';
 import { MatCardModule } from '@angular/material/card';
 import { MatBadgeModule } from '@angular/material/badge';
-import { MatTooltipModule } from '@angular/material/tooltip'; // 추가
-import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { Subject } from 'rxjs';
 
-import { ChatbotService, ChatbotMessage, UserActivityContext } from '../../Service/ChatbotService'; // 기존 경로 유지
+import { ChatbotService, ChatbotMessage, UserActivityContext } from '../../Service/ChatbotService';
 import { SharedStateService } from '../../Service/SharedService';
 import { LocalActivityService } from '../../../DashBoard/Service/LocalActivityService';
 
@@ -20,7 +19,6 @@ interface CacheEntry {
   timestamp: number;
 }
 
-// ChatbotMessage 인터페이스에 피드백 속성 추가
 interface EnhancedChatbotMessage extends ChatbotMessage {
   feedback?: 'helpful' | 'unhelpful' | null;
   showFeedback?: boolean;
@@ -39,7 +37,7 @@ interface EnhancedChatbotMessage extends ChatbotMessage {
     MatInputModule,
     MatCardModule,
     MatBadgeModule,
-    MatTooltipModule // 추가
+    MatTooltipModule
   ],
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -53,11 +51,15 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
   private destroy$ = new Subject<void>();
   private shouldScrollToBottom = false;
   
+  // 퀘스트 완료 추적을 위한 새로운 프로퍼티들
+  private lastProcessedActivityCount = 0;
+  private processedQuestCompletions = new Set<string>();
+  
   // 성능 최적화: 응답 캐시 및 디바운싱
   private responseCache = new Map<string, CacheEntry>();
   private readonly CACHE_DURATION = 5 * 60 * 1000; // 5분
-  private readonly MAX_MESSAGES = 50; // 메시지 제한
-  private readonly MAX_CACHE_SIZE = 100; // 캐시 크기 제한
+  private readonly MAX_MESSAGES = 50;
+  private readonly MAX_CACHE_SIZE = 100;
   
   // === Signals ===
   isOpen = signal<boolean>(false);
@@ -74,7 +76,7 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
   // 성능 최적화: 표시할 메시지만 computed로 계산
   readonly messages = computed(() => {
     const messages = this.allMessages();
-    return messages.slice(-this.MAX_MESSAGES); // 최근 메시지만 표시
+    return messages.slice(-this.MAX_MESSAGES);
   });
   
   // Computed signals
@@ -82,7 +84,7 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
   readonly isEmpty = computed(() => this.allMessages().length === 0);
   readonly canSend = computed(() => this.userInputValue().trim().length > 0 && !this.isTyping());
 
-  // Quick action buttons (Q&A 검색 추가)
+  // Quick action buttons
   readonly quickActions = signal<string[]>([
     '통계 보여줘',
     '오늘 퀘스트는?',
@@ -97,7 +99,7 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
     private cdr: ChangeDetectorRef
   ) {
     this.addWelcomeMessage();
-    this.monitorQuestCompletions();
+    this.setupQuestCompletionMonitoring(); // 개선된 퀘스트 모니터링
     this.initializeQAStats();
   }
 
@@ -121,16 +123,116 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
+  // === 개선된 퀘스트 완료 모니터링 ===
+  
+  private setupQuestCompletionMonitoring(): void {
+    // LocalActivityService의 activities를 모니터링
+    effect(() => {
+      const activities = this.activityService.activities();
+      this.processNewQuestCompletions(activities);
+    });
+
+    // SharedStateService의 상태 변화도 모니터링 (추가적인 안전장치)
+    effect(() => {
+      const initialized = this.sharedState.initialized();
+      const hasGroups = this.sharedState.hasJoinedGroups();
+      
+      if (initialized && hasGroups) {
+        this.checkForRecentQuestCompletions();
+      }
+    });
+  }
+
+  private processNewQuestCompletions(activities: any[]): void {
+    // 새로운 퀘스트 완료 활동만 처리
+    const newActivities = activities.slice(0, activities.length - this.lastProcessedActivityCount);
+    
+    newActivities.forEach(activity => {
+      if (activity.type === 'quest_complete' && !this.processedQuestCompletions.has(activity.id)) {
+        this.addQuestCompletionMessage(activity);
+        this.processedQuestCompletions.add(activity.id);
+        this.incrementNotificationCount();
+      }
+    });
+
+    this.lastProcessedActivityCount = activities.length;
+  }
+
+  private addQuestCompletionMessage(activity: any): void {
+    const questName = activity.context?.questName || '퀘스트';
+    const groupName = activity.context?.groupName || '그룹';
+    
+    const congratulationMessages = [
+      `🎉 축하합니다! "${questName}" 퀘스트를 완료하셨습니다!`,
+      `✨ 멋져요! "${questName}" 미션을 성공적으로 달성했습니다!`,
+      `🎯 훌륭합니다! "${questName}" 퀘스트 완료! 한 걸음 더 성장하셨네요!`,
+      `🏆 대단해요! "${questName}" 퀘스트를 완료하시며 목표에 한 발짝 더 가까워졌습니다!`
+    ];
+
+    const randomMessage = congratulationMessages[Math.floor(Math.random() * congratulationMessages.length)];
+    
+    let fullMessage = randomMessage;
+    
+    // 연속 완료 체크
+    const streak = this.activityService.getCurrentStreak();
+    if (streak >= 3) {
+      fullMessage += `\n\n🔥 현재 ${streak}일 연속 활동 중이시네요! 놀라운 꾸준함입니다!`;
+    }
+
+    // 그룹 정보 추가
+    if (groupName && groupName !== '그룹') {
+      fullMessage += `\n\n📍 완료된 그룹: ${groupName}`;
+    }
+
+    // 격려 메시지 추가
+    const encouragementMessages = [
+      '계속해서 멋진 성과를 이어가세요! 💪',
+      '다음 목표도 화이팅입니다! 🌟',
+      '이런 꾸준함이 큰 변화를 만들어냅니다! ✨',
+      '오늘도 한 걸음 성장하셨네요! 🚀'
+    ];
+
+    const randomEncouragement = encouragementMessages[Math.floor(Math.random() * encouragementMessages.length)];
+    fullMessage += `\n\n${randomEncouragement}`;
+
+    // 메시지 추가
+    setTimeout(() => {
+      this.addMessageWithFeedback(fullMessage, false, true);
+    }, 500); // 약간의 지연으로 자연스럽게 표시
+  }
+
+  private checkForRecentQuestCompletions(): void {
+    // 최근 5분 이내의 퀘스트 완료 활동 확인
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const recentCompletions = this.activityService.activities()
+      .filter(activity => 
+        activity.type === 'quest_complete' && 
+        activity.timestamp >= fiveMinutesAgo &&
+        !this.processedQuestCompletions.has(activity.id)
+      );
+
+    recentCompletions.forEach(activity => {
+      this.addQuestCompletionMessage(activity);
+      this.processedQuestCompletions.add(activity.id);
+      this.incrementNotificationCount();
+    });
+  }
+
+  private incrementNotificationCount(): void {
+    // 채팅창이 열려있지 않을 때만 알림 카운트 증가
+    if (!this.isOpen()) {
+      this.notificationCount.update(count => count + 1);
+    }
+  }
+
   // === Q&A 통계 관리 ===
   private initializeQAStats(): void {
-    // ChatbotService의 Q&A 통계 가져오기
     setTimeout(() => {
       const stats = this.chatbotService.getQAStats();
       this.qaStats.set(stats);
-    }, 1000); // 서비스 초기화 대기
+    }, 1000);
   }
 
-  // 템플릿에서 사용할 헬퍼 메서드 추가
   getCategoryCount(): number {
     const categories = this.qaStats()?.categories || {};
     return Object.keys(categories).length;
@@ -194,7 +296,7 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
       timestamp: new Date(),
       animated,
       feedback: null,
-      showFeedback: !isUser && text.length > 10, // 봇 메시지 중 충분히 긴 응답에만 피드백 표시
+      showFeedback: !isUser && text.length > 10,
       feedbackProvided: false
     };
 
@@ -244,16 +346,14 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
-  // 부정적 피드백 처리
   private handleNegativeFeedback(message: EnhancedChatbotMessage): void {
     setTimeout(() => {
-      const followUpMessage = `죄송합니다. 답변이 도움이 되지 않았나 보네요. 😔\n\n다른 방식으로 질문해주시거나, 더 구체적으로 말씀해 주시면 더 나은 답변을 드릴 수 있어요!\n\n💡 예: "그룹 가입 방법", "퀘스트 완료 안됨" 등`;
+      const followUpMessage = `죄송합니다. 답변이 도움이 되지 않았나 보네요. 😟\n\n다른 방식으로 질문해주시거나, 더 구체적으로 말씀해 주시면 더 나은 답변을 드릴 수 있어요!\n\n💡 예: "그룹 가입 방법", "퀘스트 완료 안됨" 등`;
       
       this.addMessage(followUpMessage, false, true);
     }, 1000);
   }
 
-  // 이전 사용자 메시지 찾기
   private findPreviousUserMessage(currentIndex: number): EnhancedChatbotMessage | null {
     const messages = this.allMessages();
     
@@ -336,7 +436,7 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.quickActions.set(baseActions);
   }
 
-  // === 빠른 액션 처리 (확장) ===
+  // === 빠른 액션 처리 ===
   onQuickAction(action: string): void {
     if (action === 'Q&A 검색') {
       this.addMessage('어떤 것을 검색하시겠어요? 키워드를 입력해주세요.', false, true);
@@ -360,7 +460,7 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
         isUser: false,
         timestamp: new Date(),
         animated: false,
-        showFeedback: false // 환영 메시지에는 피드백 버튼 표시 안함
+        showFeedback: false
       };
       
       this.allMessages.set([welcomeMessage]);
@@ -372,7 +472,7 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
     return this.addMessageWithFeedback(text, isUser, animated);
   }
 
-  // === 캐시 및 성능 관리 (기존 코드 유지) ===
+  // === 캐시 및 성능 관리 ===
   private generateCacheKey(input: string, context?: UserActivityContext): string {
     const contextHash = context ? this.hashContext(context) : '';
     return `${input.toLowerCase().trim()}-${contextHash}`;
@@ -386,18 +486,14 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
     };
     
     try {
-      // JSON.stringify 후 안전한 해시 생성
       const jsonString = JSON.stringify(relevantContext);
-      // btoa 대신 간단한 해시 함수 사용
       return this.simpleHash(jsonString);
     } catch (error) {
       console.warn('Context hashing failed, using fallback:', error);
-      // 실패 시 간단한 문자열 반환
       return 'default-context';
     }
   }
 
-  // 안전한 해시 함수 (btoa 대체)
   private simpleHash(str: string): string {
     let hash = 0;
     if (str.length === 0) return hash.toString();
@@ -405,10 +501,9 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
       hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // 32bit 정수로 변환
+      hash = hash & hash;
     }
     
-    // 음수를 양수로 변환하고 16진수로 표현 (8자리로 제한)
     return Math.abs(hash).toString(16).slice(0, 8);
   }
 
@@ -494,6 +589,7 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   // === 기존 메서드들 유지 ===
+  
   toggleChatbot(): void {
     if (this.isMinimized()) {
       this.maximize();
@@ -539,7 +635,6 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
-  // TrackBy 함수
   trackByMessageId(index: number, message: EnhancedChatbotMessage): string {
     return message.id;
   }
@@ -550,6 +645,7 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
       cacheSize: this.responseCache.size,
       messageCount: this.allMessages().length,
       displayedMessageCount: this.messages().length,
+      processedQuestCompletions: this.processedQuestCompletions.size,
       memoryUsage: 'memory' in performance ? 
         Math.round(((performance as any).memory?.usedJSHeapSize || 0) / 1048576) + 'MB' : 'N/A'
     };
@@ -590,34 +686,25 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
   resetChatbot(): void {
     this.allMessages.set([]);
     this.responseCache.clear();
+    this.processedQuestCompletions.clear();
+    this.lastProcessedActivityCount = 0;
     this.addWelcomeMessage();
   }
 
-  // === 기존 알림 관련 메서드들 (간소화) ===
-  private monitorQuestCompletions(): void {
-    // 기존 코드 유지 (간소화 버전)
-    effect(() => {
-      const activities = this.activityService.activities();
-      const questCompletions = activities.filter(activity => 
-        activity.type === 'quest_complete' && 
-        this.isRecentActivity(activity.timestamp)
-      );
-
-      if (questCompletions.length > 0) {
-        this.updateNotificationCount();
-      }
-    });
-  }
-
+  // === 기존 알림 관련 메서드들 ===
   private updateNotificationCount(): void {
     try {
+      // 최근 퀘스트 완료 활동 확인
       const activities = this.activityService.activities();
       const recentCompletions = activities.filter(activity => 
         activity.type === 'quest_complete' && 
-        this.isRecentActivity(activity.timestamp)
+        this.isRecentActivity(activity.timestamp) &&
+        !this.processedQuestCompletions.has(activity.id)
       ).length;
 
-      this.notificationCount.set(recentCompletions);
+      if (!this.isOpen()) {
+        this.notificationCount.set(recentCompletions);
+      }
     } catch (error) {
       console.error('Error updating notification count:', error);
     }
@@ -653,6 +740,12 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
     if (messages.length > this.MAX_MESSAGES) {
       const recentMessages = messages.slice(-this.MAX_MESSAGES);
       this.allMessages.set(recentMessages);
+    }
+
+    // 오래된 퀘스트 완료 추적 정보 정리
+    if (this.processedQuestCompletions.size > 100) {
+      this.processedQuestCompletions.clear();
+      this.lastProcessedActivityCount = this.activityService.activities().length;
     }
   }
 }
