@@ -196,20 +196,20 @@
       @if (quests().length > 0) {
         <div class="quest-grid">
           @for (quest of quests(); track quest.id) {
-            <div class="quest-card" 
-                 [attr.data-status]="quest.status"
-                 [class.selected]="isQuestSelected(quest.id)"
-                 [class.disabled]="!isQuestCompletable(quest)"
-                 [class.cache-completed]="isQuestCompletedInCache(quest.id)"
-                 (click)="onQuestClick(quest)">
-              
+            <div class="quest-card"
+                [attr.data-status]="quest.status"
+                [class.selected]="isQuestSelected(quest.id)"
+                [class.disabled]="!isQuestCompletable(quest)"
+                [class.cache-completed]="isQuestCompletedByQuestId(quest.id)"
+                (click)="onQuestClick(quest)">
+
               @if (isQuestSelected(quest.id)) {
                 <div class="selection-indicator">
                   <mat-icon>check_circle</mat-icon>
                 </div>
               }
               
-              @if (isQuestCompletedInCache(quest.id)) {
+              @if (isQuestCompletedByQuestId(quest.id)) {
                 <div class="completion-badge">
                   <mat-icon>verified</mat-icon>
                   <span>완료됨</span>

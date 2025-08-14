@@ -53,6 +53,14 @@ interface RecentActivity {
   };
 }
 
+interface QuestMapping {
+  questId: string;
+  questTitle: string;
+  groupName: string;
+  userQuestRecord: any; // UserQuestCur의 실제 레코드
+  groupQuestIndex: number; // Group.questList에서의 인덱스
+}
+
 @Component({
   selector: 'app-group-dashboard',
   templateUrl: './GroupDashboard.html',
@@ -181,6 +189,68 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
+  // 매핑 테이블 추가
+  private questMappingTable = signal<Map<string, QuestMapping>>(new Map());
+  
+  // === questId 기반 매핑 테이블 구축 ===
+  private buildQuestMappingTable(): Map<string, QuestMapping> {
+    const mappingTable = new Map<string, QuestMapping>();
+    
+    if (!this.userQuestCache || !this.groupCache) {
+      console.warn('⚠️ UserQuestCache 또는 GroupCache가 없어 매핑 테이블 구축 불가');
+      return mappingTable;
+    }
+
+    const groupName = this.shared.selectedGroup();
+    if (!groupName) {
+      console.warn('⚠️ 선택된 그룹이 없어 매핑 테이블 구축 불가');
+      return mappingTable;
+    }
+
+    // UserQuestCur에서 현재 그룹의 퀘스트들만 필터링
+    const currentGroupQuests = this.userQuestCache.curQuestTotalList.filter(
+      quest => quest.group === groupName
+    );
+
+    console.log('🔧 매핑 테이블 구축 시작:', {
+      groupName,
+      userQuestCount: currentGroupQuests.length,
+      groupQuestCount: this.groupCache.questList.length
+    });
+
+    currentGroupQuests.forEach(userQuestRecord => {
+      const questId = userQuestRecord.questId.toString();
+      const questTitle = userQuestRecord.quest;
+      
+      // Group.questList에서 해당 퀘스트의 인덱스 찾기
+      const groupQuestIndex = this.groupCache!.questList.indexOf(questTitle);
+      
+      if (groupQuestIndex === -1) {
+        console.warn('⚠️ 그룹 퀘스트 목록에서 찾을 수 없음:', questTitle);
+      }
+
+      const mapping: QuestMapping = {
+        questId,
+        questTitle,
+        groupName,
+        userQuestRecord,
+        groupQuestIndex
+      };
+
+      mappingTable.set(questId, mapping);
+      
+      console.log(`✅ 매핑 등록: questId=${questId}, title=${questTitle}, success=${userQuestRecord.success}`);
+    });
+
+    console.log('🔧 매핑 테이블 구축 완료:', {
+      totalMappings: mappingTable.size,
+      questIds: Array.from(mappingTable.keys())
+    });
+
+    return mappingTable;
+  }
+
+
   // === 초기화 메서드들 ===
   private async initializeComponent(): Promise<void> {
     await this.ensureGroupSelected();
@@ -248,39 +318,36 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
     this.updateStats();
   }
 
-  // === UserQuestCur 기반 퀘스트 처리 (핵심) ===
   private processQuestsFromUserQuestCur(): void {
     if (!this.userQuestCache || !this.groupCache) {
       this.quests.set([]);
+      this.questMappingTable.set(new Map());
       return;
     }
 
-    const groupName = this.shared.selectedGroup();
-    if (!groupName) return;
+    // 1. 매핑 테이블 구축
+    const mappingTable = this.buildQuestMappingTable();
+    this.questMappingTable.set(mappingTable);
 
-    // UserQuestCur에서 현재 그룹의 퀘스트들만 필터링
-    const currentGroupQuests = this.userQuestCache.curQuestTotalList.filter(
-      quest => quest.group === groupName
-    );
-
-    // UserQuestCur 기반으로 Quest 객체 생성 (questId 정확히 매핑)
-    const questsFromUserData = currentGroupQuests.map(questRecord => {
-      // 그룹 캐시에서 성공 횟수 정보 가져오기
-      const questIndex = this.groupCache!.questList.indexOf(questRecord.quest);
-      const successCount = questIndex !== -1 ? (this.groupCache!.questSuccessNum[questIndex] || 0) : 0;
-      const progress = this.calculateProgress(successCount, this.groupCache!.memberNum);
-
-      return {
-        id: questRecord.questId.toString(), // ✅ UserQuestCur의 실제 questId 사용
-        title: questRecord.quest,
-        description: questRecord.descriptions || `${questRecord.quest} 퀘스트를 완료하세요`,
-        icon: this.getQuestIcon(questRecord.quest),
-        progress: progress,
-        status: this.determineQuestStatus(questRecord.success, progress)
-      } as Quest;
+    // 2. 매핑 테이블 기반으로 Quest 객체들 생성
+    const quests: Quest[] = [];
+    
+    mappingTable.forEach((mapping, questId) => {
+      const quest = this.createQuestFromMapping(mapping);
+      quests.push(quest);
     });
 
-    this.quests.set(questsFromUserData);
+    // 3. 퀘스트 목록 설정
+    this.quests.set(quests);
+    
+    // 4. 완료 상태 동기화 (매핑 기반)
+    this.syncQuestStateFromMapping(mappingTable);
+    
+    console.log('✅ questId 기반 퀘스트 처리 완료:', {
+      questCount: quests.length,
+      mappingCount: mappingTable.size
+    });
+
     setTimeout(() => this.animateProgress(), 500);
   }
 
@@ -306,6 +373,80 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
       'c': '💧',
     };
     return iconMap[questTitle] || '⭐';
+  }
+
+  private createQuestFromMapping(mapping: QuestMapping): Quest {
+    const { questId, questTitle, userQuestRecord, groupQuestIndex } = mapping;
+    
+    // 그룹 진행률 계산
+    const successCount = groupQuestIndex !== -1 ? 
+      (this.groupCache!.questSuccessNum[groupQuestIndex] || 0) : 0;
+    const progress = this.calculateProgress(successCount, this.groupCache!.memberNum);
+    
+    // UserQuestCur의 success 상태가 우선
+    const isUserCompleted = userQuestRecord.success;
+    const status = this.determineQuestStatusFromMapping(isUserCompleted, progress);
+    
+    console.log(`🎯 Quest 생성: ${questTitle}`, {
+      questId,
+      isUserCompleted,
+      progress,
+      status,
+      successCount,
+      memberNum: this.groupCache!.memberNum
+    });
+
+    return {
+      id: questId, // ✅ UserQuestCur의 실제 questId 사용
+      title: questTitle,
+      description: userQuestRecord.descriptions || `${questTitle} 퀘스트를 완료하세요`,
+      icon: this.getQuestIcon(questTitle),
+      progress: progress,
+      status: status
+    };
+  }
+
+  private determineQuestStatusFromMapping(isUserCompleted: boolean, progress: number): Quest['status'] {
+    // UserQuestCur의 success 필드가 최우선
+    if (isUserCompleted) {
+      console.log('✅ UserQuestCur에서 완료됨');
+      return 'completed';
+    }
+    
+    // 그룹 진행률 기반 보조 판단
+    if (progress >= 100) return 'completed';
+    if (progress > 0) return 'in-progress';
+    return 'not-started';
+  }
+
+  private syncQuestStateFromMapping(mappingTable: Map<string, QuestMapping>): void {
+    const newCompletedTitles = new Set<string>();
+    const newCompletedIds = new Set<string>();
+
+    mappingTable.forEach((mapping, questId) => {
+      const { questTitle, userQuestRecord } = mapping;
+      
+      if (userQuestRecord.success) {
+        newCompletedTitles.add(questTitle);
+        newCompletedIds.add(questId);
+        
+        console.log(`✅ 완료 상태 동기화: questId=${questId}, title=${questTitle}`);
+      } else {
+        console.log(`❌ 미완료 상태: questId=${questId}, title=${questTitle}`);
+      }
+    });
+
+    this.questState.set({
+      completedQuestIds: newCompletedIds,
+      completedQuestTitles: newCompletedTitles,
+      lastSyncTime: Date.now()
+    });
+
+    console.log('🔄 매핑 기반 상태 동기화 완료:', {
+      completedIds: Array.from(newCompletedIds),
+      completedTitles: Array.from(newCompletedTitles),
+      totalMappings: mappingTable.size
+    });
   }
 
   // === UserQuestCur 기반 상태 관리 ===
@@ -336,46 +477,6 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
       completedTitles: Array.from(newCompletedTitles),
       completedIds: Array.from(newCompletedIds)
     });
-  }
-
-  // === UserQuestCur 기반 퀘스트 완료 상태 확인 ===
-  private isQuestCompletedInUserQuestCur(questTitle: string): boolean {
-    if (!this.userQuestCache) {
-      return this.questState().completedQuestTitles.has(questTitle);
-    }
-    
-    const groupName = this.shared.selectedGroup();
-    if (!groupName) {
-      return this.questState().completedQuestTitles.has(questTitle);
-    }
-
-    // UserQuestCur에서 직접 확인
-    const questRecord = this.userQuestCache.curQuestTotalList.find(
-      quest => quest.quest === questTitle && quest.group === groupName
-    );
-
-    const isCompleted = questRecord?.success || false;
-    
-    // 로컬 상태도 동기화
-    if (isCompleted && questRecord) {
-      const currentState = this.questState();
-      const newCompletedTitles = new Set(currentState.completedQuestTitles);
-      const newCompletedIds = new Set(currentState.completedQuestIds);
-      
-      newCompletedTitles.add(questTitle);
-      newCompletedIds.add(questRecord.questId.toString());
-      
-      this.questState.set({
-        ...currentState,
-        completedQuestTitles: newCompletedTitles,
-        completedQuestIds: newCompletedIds
-      });
-    }
-    return isCompleted;
-  }
-
-  public isQuestCompletable(quest: Quest): boolean {
-    return !this.isQuestCompletedInUserQuestCur(quest.title) && quest.status !== 'completed';
   }
 
   // === 퀘스트 완료 처리 (UserQuestCur 중심) ===
@@ -1366,5 +1467,64 @@ private async processQuestCompletion(quest: Quest): Promise<void> {
       console.error('자동 수정 중 오류:', error);
       return false;
     }
+  }
+
+
+  private getQuestMappingById(questId: string): QuestMapping | undefined {
+    return this.questMappingTable().get(questId);
+  }
+
+  private getQuestIdByTitle(questTitle: string): string | null {
+    const mappingTable = this.questMappingTable();
+    
+    for (const [questId, mapping] of mappingTable.entries()) {
+      if (mapping.questTitle === questTitle) {
+        return questId;
+      }
+    }
+    return null;
+  }
+
+  isQuestCompletedByQuestId(questId: string): boolean {
+    const mapping = this.getQuestMappingById(questId);
+    
+    if (!mapping) {
+      console.warn('⚠️ 매핑을 찾을 수 없음:', questId);
+      return false;
+    }
+    
+    const isCompleted = mapping.userQuestRecord.success;
+    
+    console.log(`🔍 questId ${questId} 완료 상태 확인:`, {
+      questTitle: mapping.questTitle,
+      isCompleted,
+      userQuestRecord: mapping.userQuestRecord
+    });
+    
+    return isCompleted;
+  }
+
+  private isQuestCompletedInUserQuestCur(questTitle: string): boolean {
+    const questId = this.getQuestIdByTitle(questTitle);
+    
+    if (!questId) {
+      console.warn('⚠️ questTitle로 questId를 찾을 수 없음:', questTitle);
+      return false;
+    }
+    
+    return this.isQuestCompletedByQuestId(questId);
+  }
+
+  public isQuestCompletable(quest: Quest): boolean {
+    const isCompleted = this.isQuestCompletedByQuestId(quest.id);
+    
+    console.log(`🎯 완료 가능 여부 확인: ${quest.title}`, {
+      questId: quest.id,
+      isCompleted,
+      questStatus: quest.status,
+      completable: !isCompleted && quest.status !== 'completed'
+    });
+    
+    return !isCompleted && quest.status !== 'completed';
   }
 }
