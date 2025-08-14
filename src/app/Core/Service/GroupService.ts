@@ -16,7 +16,7 @@ export class GroupService {
 
     constructor(private httpService: HttpService, private dataService: DataCacheService, private userService: UserService) {}
 
-    serverUrl: string = "https://stage.teamnameless.click"
+    serverUrl: string = "https://server.teamnameless.click"
 
     async checkQuestCreateTime(groupname: string) : Promise<boolean> {
         const group: Group | null = await this.dataService.getCache(groupname);
