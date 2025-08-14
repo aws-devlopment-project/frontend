@@ -801,7 +801,7 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
       console.log('✅ LoginService 로그아웃 완료');
       
       // 4. SharedState 초기화
-      this.shared.clearError();
+      this.shared.reset();
       console.log('✅ SharedState 초기화 완료');
       
       // 5. 캐시 정리
