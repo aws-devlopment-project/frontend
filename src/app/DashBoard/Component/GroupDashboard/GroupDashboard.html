@@ -1,24 +1,24 @@
-<div class="content">
-  <!-- 플로팅 피드백 UI (텍스트 입력으로 변경) -->
+<div class="dashboard-container">
+  <!-- 피드백 모달 -->
   @if (showFeedback()) {
-    <div class="floating-feedback-overlay">
-      <div class="floating-feedback-card">
-        <div class="feedback-header">
-          <div class="feedback-icon">🎉</div>
-          <div class="feedback-title">퀘스트 완료!</div>
-          <button class="feedback-close" (click)="closeFeedback()">
+    <div class="modal-overlay">
+      <div class="feedback-modal">
+        <div class="modal-header">
+          <div class="modal-icon">🎉</div>
+          <h3>퀘스트 완료!</h3>
+          <button class="close-btn" (click)="closeFeedback()">
             <mat-icon>close</mat-icon>
           </button>
         </div>
         
-        <div class="feedback-content">
-          <h3>{{ feedbackDataTitle() }}</h3>
+        <div class="modal-content">
+          <h4>{{ feedbackData()?.questTitle }}</h4>
           <p>축하합니다! 퀘스트를 성공적으로 완료하셨습니다.</p>
           <p class="feedback-question">이 퀘스트는 어떠셨나요?</p>
           
-          <!-- 좋아요/싫어요 선택 -->
-          <div class="like-dislike-section">
-            <div class="like-dislike-buttons">
+          <!-- 좋아요/싫어요 버튼 -->
+          <div class="like-section">
+            <div class="like-buttons">
               <button 
                 class="like-btn"
                 [class.selected]="feedbackLike() === true"
@@ -36,6 +36,7 @@
                 <span>아쉬워요</span>
               </button>
             </div>
+            
             @if (feedbackLike() !== null) {
               <div class="selection-feedback">
                 {{ feedbackLike() ? '👍 좋은 경험이셨군요!' : '👎 개선할 점을 알려주세요!' }}
@@ -43,53 +44,41 @@
             }
           </div>
           
-          <!-- 텍스트 피드백 입력 -->
-          <div class="feedback-input-section">
-            <mat-form-field appearance="outline" class="feedback-textarea">
-              <mat-label>
-                {{ feedbackLike() === true ? '어떤 점이 좋았는지 알려주세요' : 
-                   feedbackLike() === false ? '어떤 점이 아쉬웠는지 알려주세요' : 
-                   '퀘스트에 대한 소감을 알려주세요' }}
-              </mat-label>
+          <!-- 텍스트 입력 -->
+          <div class="feedback-input">
+            <mat-form-field appearance="outline">
+              <mat-label>소감을 알려주세요</mat-label>
               <textarea 
                 matInput 
-                rows="4"
+                rows="3"
                 maxlength="200"
                 [placeholder]="feedbackLike() === true ? 
-                  '예: 목표가 명확해서 실행하기 쉬웠어요. 성취감도 느낄 수 있었습니다!' :
-                  feedbackLike() === false ?
-                  '예: 목표가 너무 어려웠어요. 좀 더 단계적인 접근이 필요할 것 같습니다.' :
-                  '이 퀘스트를 완료하면서 느낀 점이나 개선 사항 등을 자유롭게 작성해주세요...'"
+                  '어떤 점이 좋았는지 알려주세요...' :
+                  '어떤 점이 아쉬웠는지 알려주세요...'"
                 [value]="feedbackText()"
                 (input)="onFeedbackTextChange($event)"
                 [disabled]="isSubmittingFeedback()">
               </textarea>
               <mat-hint>{{ feedbackTextLength() }}/200자</mat-hint>
-              @if (!isFeedbackValid() && (feedbackTextLength() > 0 || feedbackLike() !== null)) {
-                <mat-error>
-                  @if (feedbackLike() === null) {
-                    좋아요/싫어요를 선택해주세요
-                  } @else if (feedbackTextLength() < 5) {
-                    최소 5자 이상 입력해주세요
-                  }
-                </mat-error>
+              @if (!isFeedbackValid() && feedbackTextLength() > 0) {
+                <mat-error>최소 5자 이상 입력해주세요</mat-error>
               }
             </mat-form-field>
           </div>
           
-          <div class="feedback-actions">
+          <div class="modal-actions">
             <button 
-              class="btn btn-secondary feedback-btn" 
+              class="btn secondary" 
               (click)="closeFeedback()"
               [disabled]="isSubmittingFeedback()">
               건너뛰기
             </button>
             <button 
-              class="btn btn-primary feedback-btn" 
+              class="btn primary" 
               [disabled]="!isFeedbackValid() || isSubmittingFeedback()"
               (click)="submitFeedback()">
               @if (isSubmittingFeedback()) {
-                <div class="btn-spinner"></div>
+                <div class="spinner"></div>
                 전송 중...
               } @else {
                 <mat-icon>send</mat-icon>
@@ -102,10 +91,10 @@
     </div>
   }
 
-  <!-- 퀘스트 완료 확인 모달 -->
+  <!-- 확인 모달 -->
   @if (showConfirmModal()) {
-    <div class="confirm-modal-overlay">
-      <div class="confirm-modal-card">
+    <div class="modal-overlay">
+      <div class="confirm-modal">
         <div class="modal-header">
           <div class="modal-icon">✅</div>
           <h3>퀘스트 완료 확인</h3>
@@ -122,19 +111,13 @@
               </div>
             }
           </div>
-          
-          <div class="modal-summary">
-            <strong>총 {{ confirmModalData()?.questCount || 0 }}개의 퀘스트</strong>를 완료로 표시합니다.
-          </div>
         </div>
         
         <div class="modal-actions">
-          <button class="btn btn-secondary modal-btn" (click)="cancelQuestCompletion()">
-            <mat-icon>close</mat-icon>
+          <button class="btn secondary" (click)="cancelQuestCompletion()">
             취소
           </button>
-          <button class="btn btn-primary modal-btn" (click)="confirmQuestCompletion()">
-            <mat-icon>check</mat-icon>
+          <button class="btn primary" (click)="confirmQuestCompletion()">
             완료 처리
           </button>
         </div>
@@ -145,173 +128,40 @@
   <!-- 로딩 상태 -->
   @if (isLoading()) {
     <div class="loading-container">
-      <div class="loading-spinner">
-        <div class="spinner"></div>
-        <p>그룹 데이터를 불러오는 중...</p>
-      </div>
+      <div class="spinner"></div>
+      <p>그룹 데이터를 불러오는 중...</p>
     </div>
   }
   
   <!-- 에러 상태 -->
   @else if (error() !== null) {
     <div class="error-container">
-      <div class="error-card">
-        <div class="error-icon">⚠️</div>
-        <h3>데이터를 불러올 수 없습니다</h3>
-        <p>{{ error() }}</p>
-        <button class="btn btn-primary" (click)="retry()">
-          <mat-icon>refresh</mat-icon>
-          다시 시도
-        </button>
-      </div>
+      <div class="error-icon">⚠️</div>
+      <h3>데이터를 불러올 수 없습니다</h3>
+      <p>{{ error() }}</p>
+      <button class="btn primary" (click)="retry()">
+        <mat-icon>refresh</mat-icon>
+        다시 시도
+      </button>
     </div>
   }
   
-  <!-- 정상 대시보드 -->
+  <!-- 메인 대시보드 -->
   @else {
-    <!-- 페이지 헤더 -->
-    <div class="page-header">
+    <!-- 헤더 -->
+    <div class="dashboard-header">
       <div class="header-content">
-        <h1 class="page-title">{{ title() }}</h1>
-        <p class="page-description">오늘도 목표를 향해 한 걸음 더 나아가요! 💪</p>
+        <h1>{{ title() }}</h1>
+        <p>오늘도 목표를 향해 한 걸음 더 나아가요! 💪</p>
       </div>
-      <div class="header-stats">
-        <div class="quick-stat">
-          <span class="stat-number">{{ getTodayAchievementRate() }}%</span>
-          <span class="stat-label">오늘 달성률</span>
-        </div>
+      <div class="achievement-badge">
+        <span class="achievement-number">{{ achievementRate() }}%</span>
+        <span class="achievement-label">개인 달성률</span>
       </div>
     </div>
 
-    <!-- 일일 퀘스트 섹션 -->
-    <div class="section-card">
-      <div class="section-header">
-        <h2 class="section-title">
-          <mat-icon>assignment</mat-icon>
-          일일 퀘스트 진척사항
-        </h2>
-        <p class="section-subtitle">클릭하여 퀘스트를 선택하고 완료해보세요</p>
-      </div>
-      
-      @if (quests().length > 0) {
-        <div class="quest-grid">
-          @for (quest of quests(); track quest.id) {
-            <div [class]="getQuestCardClass(quest)"
-                 (click)="onQuestClick(quest)">
-              
-              <!-- 🎯 개인 완료 상태 표시 (카드 상단) -->
-              <div class="personal-status-header">
-                <div class="personal-status-indicator">
-                  <mat-icon [style.color]="getPersonalStatusColor(quest)">
-                    {{ getPersonalStatusIcon(quest) }}
-                  </mat-icon>
-                  <span class="personal-status-text">
-                    @if (isPersonallyCompleted(quest)) {
-                      내가 완료함
-                    } @else if (canSelectQuest(quest)) {
-                      완료 가능
-                    } @else {
-                      완료 불가
-                    }
-                  </span>
-                </div>
-                
-                <!-- 선택 표시 -->
-                @if (isQuestSelected(quest.id)) {
-                  <div class="selection-badge">
-                    <mat-icon>check_circle</mat-icon>
-                    <span>선택됨</span>
-                  </div>
-                }
-              </div>
-
-              <!-- 퀘스트 정보 -->
-              <div class="quest-header">
-                <div class="quest-icon">{{ quest.icon }}</div>
-                <div class="quest-info">
-                  <h3 class="quest-title">{{ quest.title }}</h3>
-                  <p class="quest-description">{{ quest.description }}</p>
-                </div>
-              </div>
-              
-              <!-- 🎯 그룹 진행률 섹션 (기존 방식 유지) -->
-              <div class="group-progress-section">
-                <div class="group-progress-header">
-                  <span class="group-progress-label">그룹 진행률</span>
-                  <span class="group-progress-text">{{ getGroupProgressText(quest) }}</span>
-                </div>
-                
-                <div class="group-progress-container">
-                  <div class="group-progress-bar">
-                    <div class="group-progress-fill" 
-                         [style.width.%]="quest.progress"
-                         [style.background-color]="getStatusColor(quest.status)">
-                    </div>
-                  </div>
-                  <div class="group-progress-percentage">{{ quest.progress }}%</div>
-                </div>
-                
-                <div class="group-status-text">{{ getGroupStatusText(quest) }}</div>
-              </div>
-
-              <!-- 🎯 액션 영역 -->
-              <div class="quest-actions">
-                @if (!isPersonallyCompleted(quest)) {
-                  <button class="quest-action-button"
-                          [disabled]="!canSelectQuest(quest)"
-                          [class.selected]="isQuestSelected(quest.id)">
-                    @if (canSelectQuest(quest)) {
-                      {{ isQuestSelected(quest.id) ? '선택 취소' : '완료하기' }}
-                    } @else {
-                      완료 불가
-                    }
-                  </button>
-                } @else {
-                  <div class="completed-indicator">
-                    <mat-icon>verified</mat-icon>
-                    <span>완료됨</span>
-                  </div>
-                }
-              </div>
-            </div>
-          }
-        </div>
-
-        <div class="action-section">
-          <button class="btn btn-primary" 
-                  [class.btn-active]="hasSelectedQuests()"
-                  [disabled]="!hasSelectedQuests()"
-                  (click)="onQuestAction()">
-            <mat-icon>check</mat-icon>
-            선택한 퀘스트 완료하기 ({{ selectedQuestIds().size }})
-          </button>
-          
-          @if (hasCompletedQuests()) {
-            <div class="completed-quests-info">
-              <mat-icon>info</mat-icon>
-              <span>일부 퀘스트가 이미 완료되었습니다</span>
-            </div>
-          }
-        </div>
-      } @else {
-        <div class="empty-state">
-          <div class="empty-icon">📝</div>
-          <h4>아직 퀘스트가 없습니다</h4>
-          <p>곧 새로운 퀘스트가 추가될 예정입니다!</p>
-        </div>
-      }
-    </div>
-
-    <!-- 통계 섹션 -->
-    <div class="section-card">
-      <div class="section-header">
-        <h2 class="section-title">
-          <mat-icon>trending_up</mat-icon>
-          그룹 현황
-        </h2>
-        <p class="section-subtitle">전체 현황을 한눈에 확인하세요</p>
-      </div>
-      
+    <!-- 통계 카드 -->
+    <div class="stats-section">
       <div class="stats-grid">
         @for (stat of stats(); track stat.id) {
           <div class="stat-card">
@@ -327,112 +177,86 @@
       </div>
     </div>
 
-    <!-- 향상된 최근 활동 섹션 -->
-    <div class="section-card">
+    <!-- 퀘스트 섹션 -->
+    <div class="quests-section">
       <div class="section-header">
-        <h2 class="section-title">
-          <mat-icon>timeline</mat-icon>
-          최근 그룹 활동
+        <h2>
+          <mat-icon>assignment</mat-icon>
+          일일 퀘스트
         </h2>
-        <p class="section-subtitle">실시간 활동 현황과 성과를 확인하세요</p>
-        <button class="refresh-btn" (click)="refreshData()" title="새로고침">
-          <mat-icon>refresh</mat-icon>
-        </button>
+        <p>클릭하여 퀘스트를 선택하고 완료해보세요</p>
       </div>
       
-      @if (recentActivities().length > 0) {
-        <div class="enhanced-activity-feed">
-          @for (activity of recentActivities(); track activity.id) {
-            <div class="enhanced-activity-item" [attr.data-type]="activity.type">
-              <div class="activity-avatar-enhanced">
-                <span class="avatar-emoji">{{ getActivityIcon(activity) }}</span>
-              </div>
+      @if (quests().length > 0) {
+        <div class="quest-grid">
+          @for (quest of quests(); track quest.id) {
+            <div 
+              class="{{ getQuestCardClass(quest) }}"
+              (click)="onQuestClick(quest)">
               
-              <div class="activity-content-enhanced">
-                <div class="activity-header">
-                  <div class="activity-title">{{ activity.title }}</div>
-                  <div class="activity-time">{{ getTimeAgo(activity.timestamp) }}</div>
+              <!-- 퀘스트 헤더 -->
+              <div class="quest-header">
+                <div class="quest-icon">{{ quest.icon }}</div>
+                <div class="quest-info">
+                  <h3>{{ quest.title }}</h3>
+                  <p>{{ quest.description }}</p>
                 </div>
-                
-                <div class="activity-description">{{ activity.description }}</div>
-                
-                @if (activity.user) {
-                  <div class="activity-user">
-                    <mat-icon>person</mat-icon>
-                    <span>{{ activity.user }}</span>
-                  </div>
-                }
-                
-                @if (activity.metadata) {
-                  <div class="activity-metadata">
-                    @if (activity.metadata.streakDays) {
-                      <div class="metadata-item streak">
-                        <mat-icon>local_fire_department</mat-icon>
-                        <span>{{ activity.metadata.streakDays }}일 연속</span>
-                      </div>
-                    }
-                    @if (activity.metadata.questTitle) {
-                      <div class="metadata-item quest">
-                        <mat-icon>task_alt</mat-icon>
-                        <span>{{ activity.metadata.questTitle }}</span>
-                      </div>
-                    }
-                    @if (activity.metadata.achievementLevel) {
-                      <div class="metadata-item achievement">
-                        <mat-icon>military_tech</mat-icon>
-                        <span>레벨 {{ activity.metadata.achievementLevel }}</span>
-                      </div>
-                    }
-                  </div>
-                }
+                <div class="quest-status">
+                  <mat-icon [style.color]="getPersonalStatusColor(quest)">
+                    {{ getPersonalStatusIcon(quest) }}
+                  </mat-icon>
+                </div>
               </div>
               
-              @if (activity.badge) {
-                <div class="activity-badge-enhanced" [class]="getActivityBadgeClass(activity.badge.type)">
-                  {{ activity.badge.text }}
+              <!-- 진행률 바 -->
+              <div class="progress-section">
+                <div class="progress-header">
+                  <span class="progress-label">그룹 진행률</span>
+                  <span class="progress-text">{{ getGroupProgressText(quest) }}</span>
+                </div>
+                <div class="progress-bar">
+                  <div 
+                    class="progress-fill" 
+                    [style.width.%]="quest.progress"
+                    [style.background-color]="getStatusColor(quest.status)">
+                  </div>
+                </div>
+                <div class="progress-percentage">{{ quest.progress }}%</div>
+              </div>
+
+              <!-- 선택 표시 -->
+              @if (isQuestSelected(quest.id)) {
+                <div class="selection-indicator">
+                  <mat-icon>check_circle</mat-icon>
+                </div>
+              }
+
+              <!-- 완료 표시 -->
+              @if (isPersonallyCompleted(quest)) {
+                <div class="completion-badge">
+                  <mat-icon>verified</mat-icon>
+                  <span>완료됨</span>
                 </div>
               }
             </div>
           }
         </div>
-        
-        <!-- 활동 요약 카드 -->
-        <div class="activity-summary-cards">
-          <div class="summary-card">
-            <div class="summary-icon">🎯</div>
-            <div class="summary-content">
-              <div class="summary-number">{{ recentQuestCompletions() }}</div>
-              <div class="summary-label">최근 완료한 퀘스트</div>
-            </div>
-          </div>
-          
-          <div class="summary-card">
-            <div class="summary-icon">🔥</div>
-            <div class="summary-content">
-              <div class="summary-number">{{ currentStreak() }}</div>
-              <div class="summary-label">현재 연속 기록</div>
-            </div>
-          </div>
-          
-          <div class="summary-card">
-            <div class="summary-icon">👥</div>
-            <div class="summary-content">
-              <div class="summary-number">{{ recentNewMembers() }}</div>
-              <div class="summary-label">새로운 멤버</div>
-            </div>
-          </div>
+
+        <!-- 액션 버튼 -->
+        <div class="action-section">
+          <button 
+            class="btn primary large"
+            [disabled]="!hasSelectedQuests()"
+            (click)="onQuestAction()">
+            <mat-icon>check</mat-icon>
+            선택한 퀘스트 완료하기 ({{ selectedQuestIds().size }})
+          </button>
         </div>
       } @else {
-        <div class="empty-activity-state">
-          <div class="empty-activity-icon">
-            <mat-icon>timeline</mat-icon>
-          </div>
-          <h4>최근 활동이 없습니다</h4>
-          <p>퀘스트를 완료하거나 새로운 활동을 시작해보세요!</p>
-          <button class="btn btn-primary" (click)="refreshData()">
-            <mat-icon>refresh</mat-icon>
-            새로고침
-          </button>
+        <div class="empty-state">
+          <div class="empty-icon">📝</div>
+          <h3>아직 퀘스트가 없습니다</h3>
+          <p>곧 새로운 퀘스트가 추가될 예정입니다!</p>
         </div>
       }
     </div>
