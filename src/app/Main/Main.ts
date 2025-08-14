@@ -1,7 +1,8 @@
-// Main.ts - 개선된 버전 (초기 사용자 지원)
-import { Component, OnInit, OnDestroy, effect, computed } from "@angular/core";
+// Main.ts - 실시간 동기화 연동 개선 (주요 부분만)
+import { Component, OnInit, OnDestroy, effect, computed, ViewChild } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { Subject } from "rxjs";
+import { takeUntil } from "rxjs/operators";
 import { MatIconModule } from "@angular/material/icon";
 import { SideBarComponent } from "../Core/Component/SideBar/SideBar";
 import { HeaderBarComponent } from "../Core/Component/HeaderBar/HeaderBar";
@@ -44,9 +45,10 @@ interface ChannelSelectEvent {
   standalone: true
 })
 export class MainComponent implements OnInit, OnDestroy {
+  @ViewChild('sidebarRef') sidebarComponent?: SideBarComponent;
+  @ViewChild('memberDashboardRef') memberDashboardComponent?: MemberOptionsComponent;
+  
   private destroy$ = new Subject<void>();
-
-  // Environment 객체를 템플릿에서 사용할 수 있도록 노출
   readonly environment = environment;
 
   // Computed signals for template usage
@@ -58,20 +60,18 @@ export class MainComponent implements OnInit, OnDestroy {
   readonly hasJoinedGroups = computed(() => this.sharedState.hasJoinedGroups());
 
   constructor(public sharedState: SharedStateService) {
-    // 초기화 상태 모니터링
+    // 기존 effect들 유지
     effect(() => {
       const initialized = this.sharedState.initialized();
       const hasData = this.sharedState.hasValidData();
       const hasGroups = this.sharedState.hasJoinedGroups();
       const error = this.sharedState.error();
 
-      // 초기화 완료 후 첫 방문자 처리
       if (initialized && hasData && !hasGroups && !error) {
         this.handleNewUser();
       }
     });
 
-    // 에러 상태 모니터링
     effect(() => {
       const error = this.sharedState.error();
       if (error) {
@@ -80,25 +80,33 @@ export class MainComponent implements OnInit, OnDestroy {
       }
     });
 
-    // 로딩 상태 모니터링
     effect(() => {
       const loading = this.sharedState.isLoading();
     });
 
-    // 그룹 참여 상태 변화 모니터링
     effect(() => {
       const hasGroups = this.sharedState.hasJoinedGroups();
       const availableGroups = this.sharedState.availableGroups();
 
-      // 새로 그룹에 참여했을 때 처리
       if (hasGroups && this.sharedState.activeTab() === 'home') {
         console.log('User now has groups - staying on current tab');
+      }
+    });
+
+    // === 새로 추가: 실시간 데이터 변화 감지 ===
+    effect(() => {
+      const userJoin = this.sharedState.userJoin();
+      const groupCount = userJoin?.joinList?.length || 0;
+      
+      // 그룹 수 변화 감지 및 UI 컴포넌트 동기화
+      if (userJoin) {
+        console.log('📊 Main: UserJoin 데이터 변화 감지, 그룹 수:', groupCount);
+        this.handleUserJoinDataChange(userJoin);
       }
     });
   }
 
   ngOnInit(): void {
-    // 컴포넌트가 완전히 초기화된 후 추가 설정
     setTimeout(() => {
       this.checkInitializationStatus();
     }, 0);
@@ -109,7 +117,323 @@ export class MainComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  // === 초기화 상태 확인 ===
+  // === 새로 추가: 실시간 동기화 처리 메서드들 ===
+
+  /**
+   * UserJoin 데이터 변화를 감지하고 하위 컴포넌트들을 동기화
+   */
+  private handleUserJoinDataChange(userJoin: any): void {
+    // SideBar 컴포넌트 동기화
+    if (this.sidebarComponent) {
+      console.log('🔄 SideBar 컴포넌트 데이터 동기화');
+      this.sidebarComponent.userJoin = userJoin;
+    }
+
+    // MemberDashboard 컴포넌트 동기화 (활성화된 경우)
+    if (this.memberDashboardComponent && this.sharedState.activeTab() === 'member') {
+      console.log('🔄 MemberDashboard 컴포넌트 데이터 동기화');
+      // 멤버 대시보드의 그룹 목록 새로고침 트리거
+      this.triggerMemberDashboardRefresh();
+    }
+  }
+
+  /**
+   * 멤버 대시보드의 데이터 새로고침을 트리거
+   */
+  private async triggerMemberDashboardRefresh(): Promise<void> {
+    try {
+      if (this.memberDashboardComponent) {
+        // 멤버 대시보드에서 그룹 목록 다시 로드
+        await this.memberDashboardComponent['loadJoinedGroups']();
+        console.log('✅ 멤버 대시보드 데이터 새로고침 완료');
+      }
+    } catch (error) {
+      console.error('❌ 멤버 대시보드 새로고침 실패:', error);
+    }
+  }
+
+  /**
+   * 탭 변경 시 필요한 경우 강제 동기화 실행
+   */
+  onNavigationChange(tab: string): void {
+    if (!this.sharedState.initialized()) {
+      console.warn('Cannot navigate - SharedState not initialized');
+      return;
+    }
+
+    try {
+      this.sharedState.setActiveTab(tab);
+      
+      // 특정 탭으로 이동할 때 데이터 일관성 확인
+      if (tab === 'group' || tab === 'member') {
+        this.ensureDataConsistencyForTab(tab);
+      }
+      
+      if (tab === 'group' && !this.sharedState.hasJoinedGroups()) {
+        console.log('User navigated to group tab but has no joined groups');
+      }
+      
+    } catch (error) {
+      console.error('Navigation failed:', error);
+    }
+  }
+
+  /**
+   * 특정 탭에 대한 데이터 일관성 보장
+   */
+  private async ensureDataConsistencyForTab(tab: string): Promise<void> {
+    try {
+      console.log(`🔍 ${tab} 탭 데이터 일관성 확인 중...`);
+      
+      const currentUserJoin = this.sharedState.userJoin();
+      
+      // 데이터가 없거나 오래된 것 같으면 새로고침
+      if (!currentUserJoin || currentUserJoin.joinList?.length === 0) {
+        console.log('📡 데이터 부족, 새로고침 실행');
+        await this.sharedState.refreshUserJoin();
+      }
+      
+      // 선택된 그룹/채널의 유효성 재검증
+      this.validateCurrentSelections();
+      
+    } catch (error) {
+      console.error('❌ 탭 데이터 일관성 확인 실패:', error);
+    }
+  }
+
+  /**
+   * 현재 선택된 그룹/채널이 여전히 유효한지 확인
+   */
+  private validateCurrentSelections(): void {
+    const selectedGroup = this.sharedState.selectedGroup();
+    const selectedChannel = this.sharedState.selectedChannel();
+    const availableGroups = this.sharedState.availableGroups();
+    
+    // 선택된 그룹이 더 이상 존재하지 않는 경우
+    if (selectedGroup && !availableGroups.some(g => g.groupname === selectedGroup)) {
+      console.log('⚠️ Main: 선택된 그룹이 더 이상 존재하지 않음, 선택 해제');
+      this.sharedState.setSelectedGroup(null);
+      this.sharedState.setSelectedChannel(null);
+    }
+    
+    // 선택된 채널이 더 이상 존재하지 않는 경우
+    if (selectedChannel && selectedGroup) {
+      const group = availableGroups.find(g => g.groupname === selectedGroup);
+      const hasChannel = group?.clubList?.some((club: any) => {
+        const clubName = typeof club === 'string' ? club : club.name;
+        return clubName === selectedChannel;
+      });
+      
+      if (!hasChannel) {
+        console.log('⚠️ Main: 선택된 채널이 더 이상 존재하지 않음, 선택 해제');
+        this.sharedState.setSelectedChannel(null);
+      }
+    }
+  }
+
+  // === 기존 메서드들 유지 ===
+  
+  onGroupSelect(groupId: string): void {
+    if (!this.sharedState.initialized()) {
+      console.warn('Cannot select group - SharedState not initialized');
+      return;
+    }
+
+    const availableGroups = this.sharedState.availableGroups();
+    const isValidGroup = availableGroups.some(group => group.groupname === groupId);
+    
+    if (!isValidGroup) {
+      console.warn('Invalid group selected:', groupId, 'Available:', availableGroups);
+      return;
+    }
+
+    try {
+      this.sharedState.setSelectedGroup(groupId);
+    } catch (error) {
+      console.error('Group selection failed:', error);
+    }
+  }
+
+  onChannelSelect(data: ChannelSelectEvent): void {
+    if (!this.sharedState.initialized()) {
+        console.warn('❌ SharedState가 초기화되지 않음 - 채널 선택 불가');
+        return;
+    }
+
+    if (!data.groupId || !data.channelId) {
+        console.error('❌ 필수 데이터 누락:', { groupId: data.groupId, channelId: data.channelId });
+        return;
+    }
+
+    const availableGroups = this.sharedState.availableGroups();
+    const isValidGroup = availableGroups.some(group => group.groupname === data.groupId);
+    
+    if (!isValidGroup) {
+        console.warn('❌ 유효하지 않은 그룹:', data.groupId);
+        return;
+    }
+
+    const groupChannels = this.sharedState.getGroupChannels(data.groupId);
+    const isValidChannel = groupChannels.includes(data.channelId);
+    
+    if (!isValidChannel) {
+        console.warn('❌ 유효하지 않은 채널:', data.channelId);
+        return;
+    }
+
+    try {
+        if (data.clubId && data.clubId !== -1) {
+            this.sharedState.setSelectedChannelByClubId(
+                data.clubId, 
+                data.channelName || data.channelId, 
+                data.groupId
+            );
+        } else {
+            this.sharedState.setSelectedChannel(
+                data.channelId, 
+                data.groupId, 
+                data.channelName
+            );
+        }
+
+        const currentChannel = this.sharedState.currentChannelWithId();
+
+        if (currentChannel.id === -1) {
+            console.error('❌ 채널 설정 실패 - clubId가 -1');
+        } else {
+            console.log('✅ 채널 선택 성공:', {
+                groupName: data.groupId,
+                channelName: data.channelId,
+                clubId: currentChannel.id
+            });
+        }
+
+    } catch (error) {
+        console.error('❌ 채널 선택 처리 중 오류:', error);
+    }
+  }
+
+  // === 기타 이벤트 핸들러들 ===
+  
+  onSearchQuery(query: string): void {
+    if (!query.trim()) {
+      return;
+    }
+    // 검색 로직 구현
+  }
+
+  onNotificationClick(): void {
+    console.log('Notification clicked');
+  }
+
+  onHelpClick(): void {
+    console.log('Help clicked');
+  }
+
+  onProfileClick(): void {
+    console.log('Profile clicked');
+  }
+
+  // === 액션 메서드들 ===
+  
+  async refreshData(): Promise<void> {
+    try {
+      this.sharedState.clearError();
+      
+      console.log('🔄 Main: 전체 데이터 새로고침 시작');
+      
+      // 강제 새로고침으로 최신 데이터 보장
+      await Promise.all([
+        this.sharedState.refreshUserStatus(),
+        this.sharedState.forceRefreshUserJoin()  // 개선된 메서드 사용
+      ]);
+      
+      // 하위 컴포넌트들도 새로고침
+      await this.refreshChildComponents();
+      
+      console.log('✅ Main: 전체 데이터 새로고침 완료');
+      
+    } catch (error) {
+      console.error('❌ Main: 데이터 새로고침 실패:', error);
+    }
+  }
+
+  /**
+   * 하위 컴포넌트들의 데이터 새로고침
+   */
+  private async refreshChildComponents(): Promise<void> {
+    try {
+      // SideBar 컴포넌트 새로고침
+      if (this.sidebarComponent) {
+        await this.sidebarComponent.forceRefreshSidebarData();
+      }
+      
+      // MemberDashboard 컴포넌트 새로고침 (활성화된 경우)
+      if (this.memberDashboardComponent && this.sharedState.activeTab() === 'member') {
+        await this.triggerMemberDashboardRefresh();
+      }
+      
+      console.log('✅ 하위 컴포넌트 새로고침 완료');
+      
+    } catch (error) {
+      console.error('❌ 하위 컴포넌트 새로고침 실패:', error);
+    }
+  }
+
+  clearError(): void {
+    this.sharedState.clearError();
+  }
+
+  navigateToGroupJoin(): void {
+    console.log('Navigating to group join page');
+  }
+
+  // === 템플릿 헬퍼 메서드들 ===
+  
+  getLoadingMessage(): string {
+    const loadingState = this.sharedState.loadingState();
+    
+    if (loadingState.user) return '사용자 정보를 불러오는 중...';
+    if (loadingState.userJoin) return '가입 목록을 불러오는 중...';
+    if (loadingState.groups) return '그룹 정보를 불러오는 중...';
+    if (loadingState.channels) return '채널 정보를 불러오는 중...';
+    
+    return '데이터를 불러오는 중...';
+  }
+
+  shouldShowContent(): boolean {
+    return this.sharedState.initialized() && 
+           this.sharedState.hasValidData() && 
+           !this.sharedState.error();
+  }
+
+  shouldShowError(): boolean {
+    const error = this.sharedState.error();
+    if (error && error.includes('가입 목록')) {
+      return false;
+    }
+    return error !== null;
+  }
+
+  shouldShowLoading(): boolean {
+    return this.sharedState.isLoading() || !this.sharedState.initialized();
+  }
+
+  shouldShowNewUserGuide(): boolean {
+    return this.shouldShowContent() && 
+           !this.sharedState.hasJoinedGroups() && 
+           this.sharedState.activeTab() === 'group';
+  }
+
+  getGroupSelectionMessage(): string {
+    if (!this.sharedState.hasJoinedGroups()) {
+      return '아직 참여한 그룹이 없습니다. 새로운 그룹에 참여해보세요!';
+    }
+    return '왼쪽 사이드바에서 참여하고 싶은 그룹을 선택해 보세요.';
+  }
+
+  // === 기존 초기화 및 에러 처리 메서드들 ===
+  
   private checkInitializationStatus(): void {
     if (!this.sharedState.initialized()) {
       console.log('SharedState not initialized, waiting...');
@@ -123,19 +447,11 @@ export class MainComponent implements OnInit, OnDestroy {
     }
   }
 
-  // === 새 사용자 처리 ===
   private handleNewUser(): void {
     console.log('Handling new user (no joined groups)');
-    
-    // 새 사용자에게 환영 메시지나 온보딩 가이드를 보여줄 수 있음
-    // 현재는 홈 탭에서 그룹 가입을 권유하는 UI를 표시
-    
-    // 필요시 자동으로 그룹 가입 페이지로 안내할 수도 있음
-    // this.suggestGroupJoin();
   }
 
   private suggestGroupJoin(): void {
-    // 예시: 3초 후 그룹 가입 페이지로 이동 제안
     setTimeout(() => {
       if (!this.sharedState.hasJoinedGroups()) {
         const shouldJoin = confirm(
@@ -149,11 +465,9 @@ export class MainComponent implements OnInit, OnDestroy {
     }, 3000);
   }
 
-  // === 에러 처리 ===
   private handleError(error: string): void {
     console.error('Handling error in MainComponent:', error);
     
-    // 필요에 따라 특정 에러에 대한 처리
     if (error.includes('사용자 정보')) {
       this.handleUserError();
     } else if (error.includes('가입 목록')) {
@@ -163,17 +477,13 @@ export class MainComponent implements OnInit, OnDestroy {
 
   private handleUserError(): void {
     console.log('Handling user error - may redirect to profile setup');
-    // 사용자 프로필 설정 페이지로 이동하거나 재시도 옵션 제공
   }
 
   private handleJoinListError(): void {
     console.log('Handling join list error - treating as new user');
-    // 가입 목록 로드 실패는 새 사용자로 처리
-    // 에러를 무시하고 빈 목록으로 계속 진행
     this.sharedState.clearError();
   }
 
-  // === 데이터 부족 처리 ===
   private handleMissingData(): void {
     if (!this.sharedState.currentUser()) {
       console.log('Missing user data');
@@ -199,213 +509,11 @@ export class MainComponent implements OnInit, OnDestroy {
       await this.sharedState.refreshUserJoin();
     } catch (error) {
       console.error('Failed to retry join list data load:', error);
-      // 가입 목록 로드 실패는 새 사용자로 처리
     }
   }
 
-  // === 이벤트 핸들러들 (개선됨) ===
-  onNavigationChange(tab: string): void {
-    if (!this.sharedState.initialized()) {
-      console.warn('Cannot navigate - SharedState not initialized');
-      return;
-    }
-
-    try {
-      this.sharedState.setActiveTab(tab);
-      
-      // 그룹 탭으로 이동했는데 참여한 그룹이 없는 경우 안내
-      if (tab === 'group' && !this.sharedState.hasJoinedGroups()) {
-        console.log('User navigated to group tab but has no joined groups');
-      }
-      
-    } catch (error) {
-      console.error('Navigation failed:', error);
-    }
-  }
-
-  onGroupSelect(groupId: string): void {
-    if (!this.sharedState.initialized()) {
-      console.warn('Cannot select group - SharedState not initialized');
-      return;
-    }
-
-    // 유효한 그룹인지 확인
-    const availableGroups = this.sharedState.availableGroups();
-    const isValidGroup = availableGroups.some(group => group.groupname === groupId);
-    
-    if (!isValidGroup) {
-      console.warn('Invalid group selected:', groupId, 'Available:', availableGroups);
-      return;
-    }
-
-    try {
-      this.sharedState.setSelectedGroup(groupId);
-    } catch (error) {
-      console.error('Group selection failed:', error);
-    }
-  }
-
-onChannelSelect(data: ChannelSelectEvent): void {
-    if (!this.sharedState.initialized()) {
-        console.warn('❌ SharedState가 초기화되지 않음 - 채널 선택 불가');
-        return;
-    }
-
-    // 1. 기본 유효성 검사
-    if (!data.groupId || !data.channelId) {
-        console.error('❌ 필수 데이터 누락:', { groupId: data.groupId, channelId: data.channelId });
-        return;
-    }
-
-    // 2. 그룹 유효성 확인
-    const availableGroups = this.sharedState.availableGroups();
-    const isValidGroup = availableGroups.some(group => group.groupname === data.groupId);
-    
-    if (!isValidGroup) {
-        console.warn('❌ 유효하지 않은 그룹:', data.groupId);
-        return;
-    }
-
-    // 3. 채널 유효성 확인
-    const groupChannels = this.sharedState.getGroupChannels(data.groupId);
-    const isValidChannel = groupChannels.includes(data.channelId);
-    
-    if (!isValidChannel) {
-        console.warn('❌ 유효하지 않은 채널:', data.channelId);
-        return;
-    }
-
-    try {
-        // 4. clubId가 있는 경우 우선 처리
-        if (data.clubId && data.clubId !== -1) {
-            // clubId를 사용한 직접 설정 (권장 방법)
-            this.sharedState.setSelectedChannelByClubId(
-                data.clubId, 
-                data.channelName || data.channelId, 
-                data.groupId
-            );
-        } else {
-            // 기존 방식으로 설정 (fallback)
-            this.sharedState.setSelectedChannel(
-                data.channelId, 
-                data.groupId, 
-                data.channelName
-            );
-        }
-
-        // 5. 설정 결과 확인
-        const currentChannel = this.sharedState.currentChannelWithId();
-
-        // 6. 성공적으로 설정되었는지 검증
-        if (currentChannel.id === -1) {
-            console.error('❌ 채널 설정 실패 - clubId가 -1');
-        } else {
-            console.log('✅ 채널 선택 성공:', {
-                groupName: data.groupId,
-                channelName: data.channelId,
-                clubId: currentChannel.id
-            });
-        }
-
-    } catch (error) {
-        console.error('❌ 채널 선택 처리 중 오류:', error);
-    }
-}
-
-  onSearchQuery(query: string): void {
-    if (!query.trim()) {
-      return;
-    }
-
-    // 검색 로직 구현 (SearchService 사용)
-    // 실제 검색 결과에 따라 네비게이션 수행
-  }
-
-  onNotificationClick(): void {
-    console.log('Notification clicked');
-    // 알림 패널 토글 또는 알림 페이지로 이동
-  }
-
-  onHelpClick(): void {
-    console.log('Help clicked');
-    // 도움말 모달 표시 또는 도움말 페이지로 이동
-  }
-
-  onProfileClick(): void {
-    console.log('Profile clicked');
-    // 프로필 모달 표시 또는 프로필 페이지로 이동
-  }
-
-  // === 액션 메서드들 ===
-  async refreshData(): Promise<void> {
-    try {
-      this.sharedState.clearError();
-      await Promise.all([
-        this.sharedState.refreshUserStatus(),
-        this.sharedState.refreshUserJoin()
-      ]);
-    } catch (error) {
-      console.error('Data refresh failed:', error);
-    }
-  }
-
-  clearError(): void {
-    this.sharedState.clearError();
-  }
-
-  navigateToGroupJoin(): void {
-    console.log('Navigating to group join page');
-    // RouterModule을 통해 그룹 가입 페이지로 이동
-    // 실제 라우팅 경로는 앱의 라우팅 설정에 따라 다름
-  }
-
-  // === 템플릿 헬퍼 메서드들 ===
-  getLoadingMessage(): string {
-    const loadingState = this.sharedState.loadingState();
-    
-    if (loadingState.user) return '사용자 정보를 불러오는 중...';
-    if (loadingState.userJoin) return '가입 목록을 불러오는 중...';
-    if (loadingState.groups) return '그룹 정보를 불러오는 중...';
-    if (loadingState.channels) return '채널 정보를 불러오는 중...';
-    
-    return '데이터를 불러오는 중...';
-  }
-
-  shouldShowContent(): boolean {
-    return this.sharedState.initialized() && 
-           this.sharedState.hasValidData() && 
-           !this.sharedState.error();
-  }
-
-  shouldShowError(): boolean {
-    const error = this.sharedState.error();
-    // 가입 목록 관련 에러는 새 사용자로 처리하므로 에러로 표시하지 않음
-    if (error && error.includes('가입 목록')) {
-      return false;
-    }
-    return error !== null;
-  }
-
-  shouldShowLoading(): boolean {
-    return this.sharedState.isLoading() || !this.sharedState.initialized();
-  }
-
-  // 새로 추가: 새 사용자 안내 메시지 표시 여부
-  shouldShowNewUserGuide(): boolean {
-    return this.shouldShowContent() && 
-           !this.sharedState.hasJoinedGroups() && 
-           this.sharedState.activeTab() === 'group';
-  }
-
-  // 새로 추가: 그룹 선택 안내 메시지 커스터마이징
-  getGroupSelectionMessage(): string {
-    if (!this.sharedState.hasJoinedGroups()) {
-      return '아직 참여한 그룹이 없습니다. 새로운 그룹에 참여해보세요!';
-    }
-    return '왼쪽 사이드바에서 참여하고 싶은 그룹을 선택해 보세요.';
-  }
-
-  // === 디버깅 메서드들 (개발용) ===
+  // === 디버깅 메서드들 ===
+  
   debugState(): void {
     console.log('=== DEBUG STATE ===');
     console.log('Initialized:', this.sharedState.initialized());
@@ -422,7 +530,31 @@ onChannelSelect(data: ChannelSelectEvent): void {
     console.log('=================');
   }
 
-  // 테스트용 메서드들 (개발 환경에서만 사용)
+  /**
+   * 전체 앱 상태 강제 재설정 (긴급 상황용)
+   */
+  async emergencyStateReset(): Promise<void> {
+    console.log('🚨 Main: 긴급 상태 재설정 실행');
+    
+    try {
+      // SharedStateService 긴급 리셋
+      await this.sharedState.safeForcedReinitialization();
+      
+      // 하위 컴포넌트들도 새로고침
+      await this.refreshChildComponents();
+      
+      console.log('✅ 긴급 상태 재설정 완료');
+      
+    } catch (error) {
+      console.error('❌ 긴급 상태 재설정 실패:', error);
+      
+      // 최후의 수단: 페이지 새로고침
+      if (confirm('앱 상태 복구에 실패했습니다. 페이지를 새로고침하시겠습니까?')) {
+        window.location.reload();
+      }
+    }
+  }
+
   simulateGroupLeave(): void {
     if (!environment.production && this.sharedState.hasJoinedGroups()) {
       const firstGroup = this.sharedState.availableGroups()[0];

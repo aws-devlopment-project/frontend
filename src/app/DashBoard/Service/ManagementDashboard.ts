@@ -1,3 +1,4 @@
+// ManagementDashboardService.ts - 실시간 동기화 개선
 import { Injectable } from "@angular/core";
 import { UserService } from "../../Core/Service/UserService";
 import { SharedStateService } from "../../Core/Service/SharedService";
@@ -34,6 +35,9 @@ export class ManagementDashboardService {
     ) {}
 
     serverUrl: string = "https://server.teamnameless.click"
+
+    // === 기존 메서드들 유지 ===
+    
     async getUserProfile() {
         let userProfile: UserProfile = {
             username: '',
@@ -51,7 +55,6 @@ export class ManagementDashboardService {
         if (user) {
             userProfile.username = user.name;
             userProfile.email = user.id;
-            // 아바타가 있으면 사용, 없으면 기본 이미지
             userProfile.avatar = user.avatar || '/assets/images/default-avatar.png';
             userProfile.joinDate = user.joinDate ? new Date(user.joinDate) : new Date();
         } else {
@@ -74,13 +77,11 @@ export class ManagementDashboardService {
             const user = this.shared.currentUser();
             const userId = user ? user.id : "";
 
-            // 1. Amplify custom:username 속성 업데이트
-            console.log('🔄 Amplify custom:username 업데이트 시작...');
+            console.log('📝 Amplify custom:username 업데이트 시작...');
             await this.loginService.updateCustomUsername(username);
             console.log('✅ Amplify custom:username 업데이트 완료');
 
-            // 2. 백엔드 API 호출 (기존 로직)
-            console.log('🔄 백엔드 username 업데이트 시작...');
+            console.log('📝 백엔드 username 업데이트 시작...');
             if (user) {
                 await this.userService.setUsername(user.id, username);
             } else {
@@ -88,7 +89,6 @@ export class ManagementDashboardService {
             }
             console.log('✅ 백엔드 username 업데이트 완료');
 
-            // 3. 로컬 상태 업데이트
             if (user) {
                 user.name = username;
                 this.shared.setCurrentUser(user);
@@ -100,7 +100,6 @@ export class ManagementDashboardService {
         } catch (error) {
             console.error('❌ 사용자명 업데이트 실패:', error);
             
-            // 에러 타입별 처리
             if (error && typeof error === 'object' && 'name' in error) {
                 switch (error.name) {
                     case 'NotAuthorizedException':
@@ -120,77 +119,66 @@ export class ManagementDashboardService {
         }
     }
 
-    // 이미지 리사이징 기능 추가
     private async resizeImage(file: File, maxWidth: number = 200, maxHeight: number = 200): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        const img = new Image();
-        
-        img.onload = () => {
-        // 비율 계산
-        const ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
-        canvas.width = img.width * ratio;
-        canvas.height = img.height * ratio;
-        
-        // 이미지 그리기
-        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-        
-        // base64로 변환
-        const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        resolve(resizedDataUrl);
-        };
-        
-        img.onerror = () => reject(new Error('이미지 로드 실패'));
-        img.src = URL.createObjectURL(file);
-    });
+        return new Promise((resolve, reject) => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            img.onload = () => {
+                const ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
+                canvas.width = img.width * ratio;
+                canvas.height = img.height * ratio;
+                
+                ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+                
+                const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                resolve(resizedDataUrl);
+            };
+            
+            img.onerror = () => reject(new Error('이미지 로드 실패'));
+            img.src = URL.createObjectURL(file);
+        });
     }
 
-    // setAvatarImage 메서드에서 리사이징 사용
     async setAvatarImage(file: File): Promise<{ success: boolean; error?: string }> {
-    try {
-        const user = this.shared.currentUser();
-        const userId = user ? user.id : "";
+        try {
+            const user = this.shared.currentUser();
+            const userId = user ? user.id : "";
 
-        // 파일 유효성 검사
-        const validation = this.validateImageFile(file);
-        if (!validation.isValid) {
-        return { success: false, error: validation.error };
+            const validation = this.validateImageFile(file);
+            if (!validation.isValid) {
+                return { success: false, error: validation.error };
+            }
+
+            const resizedBase64 = await this.resizeImage(file);
+            
+            const payload = {
+                user: userId,
+                avatar: resizedBase64.split(',')[1]
+            };
+
+            const response = await firstValueFrom(
+                this.httpService.post(this.serverUrl + `/api/user/setUserAvatar`, payload, 
+                    new HttpHeaders({ 'Content-Type': 'application/json' })
+                )
+            );
+
+            if (user) {
+                user.avatar = resizedBase64;
+                await this.shared.setCurrentUser(user);
+            }
+            
+            return { success: true };
+        } catch (error) {
+            console.error('아바타 업로드 실패:', error);
+            return { 
+                success: false, 
+                error: '아바타 업로드에 실패했습니다. 다시 시도해 주세요.' 
+            };
         }
-
-        // 이미지 리사이징
-        const resizedBase64 = await this.resizeImage(file);
-        
-        const payload = {
-        user: userId,
-        avatar: resizedBase64.split(',')[1] // base64 헤더 제거
-        };
-
-        const response = await firstValueFrom(
-        this.httpService.post(this.serverUrl + `/api/user/setUserAvatar`, payload, 
-            new HttpHeaders({ 'Content-Type': 'application/json' })
-        )
-        );
-
-        // 로컬 상태 업데이트
-        if (user) {
-        user.avatar = resizedBase64;
-        await this.shared.setCurrentUser(user);
-        }
-        
-        return { success: true };
-    } catch (error) {
-        console.error('아바타 업로드 실패:', error);
-        return { 
-        success: false, 
-        error: '아바타 업로드에 실패했습니다. 다시 시도해 주세요.' 
-        };
-    }
     }
 
-    /**
-     * 파일을 base64로 변환
-     */
     private fileToBase64(file: File): Promise<string> {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -200,12 +188,9 @@ export class ManagementDashboardService {
         });
     }
 
-    /**
-     * 이미지 파일 유효성 검사
-     */
     validateImageFile(file: File): { isValid: boolean; error?: string } {
         const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-        const maxSize = 5 * 1024 * 1024; // 5MB
+        const maxSize = 5 * 1024 * 1024;
 
         if (!allowedTypes.includes(file.type)) {
             return {
@@ -224,9 +209,6 @@ export class ManagementDashboardService {
         return { isValid: true };
     }
 
-    /**
-     * 아바타 리셋
-     */
     async resetAvatar(): Promise<{ success: boolean; error?: string }> {
         try {
             const user = this.shared.currentUser();
@@ -239,7 +221,6 @@ export class ManagementDashboardService {
                 )
             );
 
-            // 로컬 상태 업데이트
             if (user) {
                 user.avatar = '/assets/images/default-avatar.png';
                 this.shared.setCurrentUser(user);
@@ -260,28 +241,186 @@ export class ManagementDashboardService {
         return group;
     }
 
-    async leaveGroup(groupId: string): Promise<void> {
-        const user = this.shared.currentUser();
-        if (user) {
-            await this.userService.leaveGroup(user.id, groupId);
-        } else {
-            await this.userService.leaveGroup("", groupId);
-        }
-    }
+    // === 개선된 그룹/채널 탈퇴 메서드들 ===
 
-    async leaveChannel(groupId: string, channelId: string): Promise<void> {
+    /**
+     * 그룹 탈퇴 (실시간 동기화 포함)
+     */
+    async leaveGroup(groupId: string): Promise<void> {
+        console.log('🚪 그룹 탈퇴 서비스 시작:', groupId);
+        
         try {
             const user = this.shared.currentUser();
             const userId = user ? user.id : "";
             
-            // 채널 탈퇴 API 호출
-            await this.userService.leaveClub(userId, groupId, channelId);
+            // 1. 실제 API 호출
+            await this.userService.leaveGroup(userId, groupId);
+            console.log('✅ 그룹 탈퇴 API 성공');
+            
+            // 2. 즉시 SharedStateService에서 그룹 제거
+            this.shared.removeGroupImmediately(groupId);
+            console.log('⚡ SharedState에서 그룹 즉시 제거 완료');
+            
+            // 3. 캐시 무효화
+            this.invalidateRelevantCaches();
+            
+            console.log('✅ 그룹 탈퇴 서비스 완료');
+            
         } catch (error) {
-            console.error('채널 탈퇴 실패:', error);
+            console.error('❌ 그룹 탈퇴 서비스 실패:', error);
             throw error;
         }
     }
 
+    /**
+     * 채널 탈퇴 (실시간 동기화 포함)
+     */
+    async leaveChannel(groupId: string, channelId: string): Promise<void> {
+        console.log('🚪 채널 탈퇴 서비스 시작:', { groupId, channelId });
+        
+        try {
+            const user = this.shared.currentUser();
+            const userId = user ? user.id : "";
+            
+            // 1. 실제 API 호출
+            await this.userService.leaveClub(userId, groupId, channelId);
+            console.log('✅ 채널 탈퇴 API 성공');
+            
+            // 2. 즉시 SharedStateService에서 채널 제거
+            this.shared.removeChannelImmediately(groupId, channelId);
+            console.log('⚡ SharedState에서 채널 즉시 제거 완료');
+            
+            // 3. 캐시 무효화
+            this.invalidateRelevantCaches();
+            
+            console.log('✅ 채널 탈퇴 서비스 완료');
+            
+        } catch (error) {
+            console.error('❌ 채널 탈퇴 서비스 실패:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 관련 캐시들을 무효화하여 최신 데이터 보장
+     */
+    private invalidateRelevantCaches(): void {
+        console.log('🗑️ 관련 캐시 무효화 시작...');
+        
+        try {
+            // UserJoin 캐시 삭제
+            this.cacheService.removeCache('userJoin');
+            
+            // UserStatus 캐시도 삭제 (그룹 관련 정보가 있을 수 있음)
+            this.cacheService.removeCache('userStatus');
+            
+            // 기타 그룹 관련 캐시들 삭제
+            this.cacheService.removeCache('groupList');
+            this.cacheService.removeCache('clubList');
+            
+            console.log('✅ 캐시 무효화 완료');
+            
+        } catch (error) {
+            console.error('❌ 캐시 무효화 실패:', error);
+        }
+    }
+
+    /**
+     * 전체 데이터 재동기화 (문제 발생 시 사용)
+     */
+    async forceSyncAfterGroupChanges(): Promise<void> {
+        console.log('🔄 그룹 변경 후 강제 동기화 시작...');
+        
+        try {
+            // 1. 모든 관련 캐시 무효화
+            this.invalidateRelevantCaches();
+            
+            // 2. SharedStateService 강제 새로고침
+            await this.shared.forceRefreshUserJoin();
+            
+            console.log('✅ 강제 동기화 완료');
+            
+        } catch (error) {
+            console.error('❌ 강제 동기화 실패:', error);
+            
+            // 최후의 수단: 전체 앱 상태 재초기화
+            try {
+                console.log('🚨 최후의 수단: 전체 상태 재초기화');
+                await this.shared.safeForcedReinitialization();
+            } catch (resetError) {
+                console.error('❌ 전체 상태 재초기화도 실패:', resetError);
+            }
+        }
+    }
+
+    /**
+     * 데이터 일관성 검증 (선택사항 - 디버깅용)
+     */
+    async validateDataConsistency(): Promise<{
+        isConsistent: boolean;
+        issues: string[];
+        recommendations: string[];
+    }> {
+        const issues: string[] = [];
+        const recommendations: string[] = [];
+        
+        try {
+            // 1. SharedState vs UserService 데이터 비교
+            const sharedUserJoin = this.shared.userJoin();
+            const serviceUserJoin = await this.userService.getUserJoin();
+            
+            if (!sharedUserJoin && serviceUserJoin) {
+                issues.push('SharedState에 UserJoin 데이터가 없음');
+                recommendations.push('SharedState 강제 새로고침 실행');
+            }
+            
+            if (sharedUserJoin && serviceUserJoin) {
+                const sharedGroupCount = sharedUserJoin.joinList?.length || 0;
+                const serviceGroupCount = serviceUserJoin.joinList?.length || 0;
+                
+                if (sharedGroupCount !== serviceGroupCount) {
+                    issues.push(`그룹 수 불일치 (SharedState: ${sharedGroupCount}, Service: ${serviceGroupCount})`);
+                    recommendations.push('데이터 동기화 실행');
+                }
+            }
+            
+            // 2. 현재 선택 상태 유효성 검증
+            const selectedGroup = this.shared.selectedGroup();
+            const selectedChannel = this.shared.selectedChannel();
+            
+            if (selectedGroup && sharedUserJoin) {
+                const groupExists = sharedUserJoin.joinList?.some(g => g.groupname === selectedGroup);
+                if (!groupExists) {
+                    issues.push(`선택된 그룹이 가입 목록에 없음: ${selectedGroup}`);
+                    recommendations.push('선택 상태 초기화');
+                }
+            }
+            
+            if (selectedChannel && selectedGroup && sharedUserJoin) {
+                const group = sharedUserJoin.joinList?.find(g => g.groupname === selectedGroup);
+                const channelExists = group?.clubList?.some(c => 
+                    (typeof c === 'string' ? c : c.name) === selectedChannel
+                );
+                if (!channelExists) {
+                    issues.push(`선택된 채널이 그룹에 없음: ${selectedChannel}`);
+                    recommendations.push('채널 선택 초기화');
+                }
+            }
+            
+        } catch (error) {
+            issues.push(`일관성 검증 중 오류: ${error}`);
+            recommendations.push('전체 상태 재초기화');
+        }
+        
+        return {
+            isConsistent: issues.length === 0,
+            issues,
+            recommendations
+        };
+    }
+
+    // === 기존 계정 탈퇴 메서드 ===
+    
     async departUser(username: string = ""): Promise<void> {
         const user = this.shared.currentUser();
         if (user) {

@@ -789,23 +789,73 @@ export class SharedStateService {
 
   // === 기존 메서드들 ===
   async refreshUserJoin(): Promise<void> {
+    console.log('🔄 표준 사용자 가입 목록 새로고침');
+    
     this.setLoadingState('userJoin', true);
     try {
+      // 캐시 무효화
       this.userService['cacheService']?.removeCache('userJoin');
       
       const joinList = await this.loadUserJoin();
       if (joinList) {
         this._userJoin.set(joinList);
         this.validateCurrentSelections();
+        console.log('✅ 표준 새로고침 완료');
       } else {
-        // API에서 빈 결과가 왔을 때 빈 목록으로 설정
         this._userJoin.set({ id: '', joinList: [] });
       }
     } catch (error) {
-      console.error('Error refreshing user join list:', error);
+      console.error('❌ 표준 새로고침 실패:', error);
       this.setError('가입 목록 새로고침에 실패했습니다.');
     } finally {
       this.setLoadingState('userJoin', false);
+    }
+  }
+
+  emergencyReset(): void {
+    console.log('🚨 긴급 상태 리셋 실행');
+    
+    // 선택 상태 모두 초기화
+    this._selectedGroup.set(null);
+    this._selectedChannel.set(null);
+    this._selectedChannelInfo.set(null);
+    this._expandedSections.set([]);
+    
+    // 사이드바 상태 초기화
+    this._sidebarExpanded.set(false);
+    
+    // 에러 상태 클리어
+    this.setError(null);
+    
+    console.log('✅ 긴급 상태 리셋 완료');
+  }
+
+  async safeForcedReinitialization(): Promise<void> {
+    console.log('🔄 전체 애플리케이션 강제 재초기화 시작...');
+    
+    try {
+      // 1. 모든 상태 초기화
+      this.emergencyReset();
+      
+      // 2. 초기화 플래그 리셋
+      this._initialized.set(false);
+      
+      // 3. 모든 캐시 클리어
+      if (this.userService['cacheService']) {
+        this.userService['cacheService'].removeCache('userStatus');
+        this.userService['cacheService'].removeCache('userJoin');
+        console.log('🗑️ 모든 캐시 클리어 완료');
+      }
+      
+      // 4. 데이터 재로드
+      await this.initializeUserData();
+      
+      console.log('✅ 전체 애플리케이션 강제 재초기화 완료');
+      
+    } catch (error) {
+      console.error('❌ 강제 재초기화 실패:', error);
+      this.setError('애플리케이션 재초기화에 실패했습니다.');
+      throw error;
     }
   }
 
@@ -981,5 +1031,169 @@ export class SharedStateService {
   private getGroupIdByName(groupName: string): number {
       const group = this._groupList().find(g => g.name === groupName);
       return group?.id || -1;
+  }
+
+  async forceRefreshUserJoin(): Promise<void> {
+    console.log('🔄 강제 사용자 가입 목록 새로고침 시작...');
+    
+    this.setLoadingState('userJoin', true);
+    this.setError(null);
+    
+    try {
+      // 1. 캐시 완전 삭제
+      if (this.userService['cacheService']) {
+        this.userService['cacheService'].removeCache('userJoin');
+        console.log('🗑️ UserJoin 캐시 삭제 완료');
+      }
+      
+      // 2. 새로운 데이터 로드
+      const freshJoinList = await this.loadUserJoin();
+      
+      if (freshJoinList) {
+        // 3. 기존 상태와 비교하여 변경사항 로깅
+        const previousGroupCount = this.userJoin()?.joinList?.length || 0;
+        const newGroupCount = freshJoinList.joinList?.length || 0;
+        
+        console.log('📊 그룹 수 변화:', {
+          이전: previousGroupCount,
+          현재: newGroupCount,
+          차이: newGroupCount - previousGroupCount
+        });
+        
+        // 4. 새로운 데이터 설정
+        this._userJoin.set(freshJoinList);
+        
+        // 5. 현재 선택 상태 유효성 검증 및 정리
+        this.validateAndCleanupSelections();
+        
+        console.log('✅ 사용자 가입 목록 강제 새로고침 완료');
+      } else {
+        console.warn('⚠️ 새로고침 결과가 null - 빈 목록으로 설정');
+        this._userJoin.set({ id: '', joinList: [] });
+      }
+      
+    } catch (error) {
+      console.error('❌ 강제 새로고침 실패:', error);
+      this.setError('데이터 새로고침에 실패했습니다.');
+      throw error;
+    } finally {
+      this.setLoadingState('userJoin', false);
+    }
+  }
+
+  private validateAndCleanupSelections(): void {
+    const currentGroup = this.selectedGroup();
+    const currentChannel = this.selectedChannel();
+    const availableGroups = this.availableGroups();
+    
+    let needsCleanup = false;
+    
+    // 현재 선택된 그룹이 가입 목록에 없는 경우
+    if (currentGroup && !availableGroups.some(group => group.groupname === currentGroup)) {
+      console.log('🧹 유효하지 않은 그룹 선택 정리:', currentGroup);
+      this._selectedGroup.set(null);
+      this._selectedChannel.set(null);
+      this._selectedChannelInfo.set(null);
+      needsCleanup = true;
+    }
+    
+    // 현재 선택된 채널이 해당 그룹에 없는 경우
+    if (currentChannel && currentGroup && !needsCleanup) {
+      const group = availableGroups.find(g => g.groupname === currentGroup);
+      const hasChannel = group?.clubList.some(club => {
+        if (typeof club === 'string') {
+          return club === currentChannel;
+        } else if (club && typeof club === 'object' && club.name) {
+          return club.name === currentChannel;
+        }
+        return false;
+      });
+      
+      if (!hasChannel) {
+        console.log('🧹 유효하지 않은 채널 선택 정리:', currentChannel);
+        this._selectedChannel.set(null);
+        this._selectedChannelInfo.set(null);
+        needsCleanup = true;
+      }
+    }
+    
+    // 확장된 섹션 목록도 정리
+    if (needsCleanup) {
+      const validGroupNames = availableGroups.map(group => group.groupname);
+      const currentExpanded = this.expandedSections();
+      const validExpanded = currentExpanded.filter(sectionId => validGroupNames.includes(sectionId));
+      
+      if (validExpanded.length !== currentExpanded.length) {
+        console.log('🧹 유효하지 않은 확장 섹션 정리');
+        this._expandedSections.set(validExpanded);
+      }
+    }
+    
+    if (needsCleanup) {
+      console.log('✅ 선택 상태 정리 완료');
+    }
+  }
+
+  removeGroupImmediately(groupName: string): void {
+    console.log('⚡ 즉시 그룹 제거:', groupName);
+    
+    const currentJoinList = this._userJoin();
+    if (!currentJoinList) return;
+
+    // 그룹 목록에서 제거
+    const updatedJoinList = {
+      ...currentJoinList,
+      joinList: currentJoinList.joinList.filter(group => group.groupname !== groupName)
+    };
+    
+    this._userJoin.set(updatedJoinList);
+    
+    // 해당 그룹이 현재 선택되어 있다면 선택 해제
+    if (this.selectedGroup() === groupName) {
+      this._selectedGroup.set(null);
+      this._selectedChannel.set(null);
+      this._selectedChannelInfo.set(null);
+    }
+    
+    // 확장된 섹션에서도 제거
+    this._expandedSections.update(sections => 
+      sections.filter(sectionId => sectionId !== groupName)
+    );
+    
+    console.log('✅ 즉시 그룹 제거 완료');
+  }
+
+  removeChannelImmediately(groupName: string, channelName: string): void {
+    console.log('⚡ 즉시 채널 제거:', { groupName, channelName });
+    
+    const currentJoinList = this._userJoin();
+    if (!currentJoinList) return;
+
+    // 해당 그룹에서 채널 제거
+    const updatedJoinList = {
+      ...currentJoinList,
+      joinList: currentJoinList.joinList.map(group => {
+        if (group.groupname === groupName) {
+          return {
+            ...group,
+            clubList: group.clubList.filter(club => {
+              const clubName = typeof club === 'string' ? club : club.name;
+              return clubName !== channelName;
+            })
+          };
+        }
+        return group;
+      })
+    };
+    
+    this._userJoin.set(updatedJoinList);
+    
+    // 해당 채널이 현재 선택되어 있다면 선택 해제
+    if (this.selectedChannel() === channelName && this.selectedGroup() === groupName) {
+      this._selectedChannel.set(null);
+      this._selectedChannelInfo.set(null);
+    }
+    
+    console.log('✅ 즉시 채널 제거 완료');
   }
 }
