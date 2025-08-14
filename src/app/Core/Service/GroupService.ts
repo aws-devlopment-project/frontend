@@ -7,6 +7,7 @@ import { firstValueFrom } from 'rxjs';
 import { createGroup, createGroupList } from "../Models/group";
 import { UserQuestCur } from "../Models/user";
 import { UserService } from "./UserService";
+import { environment } from "../../../environments/environtment";
 
 @Injectable({
     providedIn: 'root'
@@ -32,7 +33,7 @@ export class GroupService {
         if (group) {
             return group;
         }
-        const url = `/api/group/getGroupInfo?name=${groupname}`;
+        const url = environment.apiUrl + `/api/group/getGroupInfo?name=${groupname}`;
         const headers: HttpHeaders = new HttpHeaders({
             'Content-Type': 'application/json'
         });
@@ -51,7 +52,7 @@ export class GroupService {
     }
 
     async getGroupList(): Promise<Group[]> {
-        const url = '/api/group/getGroupList';
+        const url = environment.apiUrl + '/api/group/getGroupList';
         const headers: HttpHeaders = new HttpHeaders({
             'Content-Type': 'application/json'
         });
@@ -79,7 +80,7 @@ export class GroupService {
         user: string, 
         questList: {club: string, quest: string, feedback: string}[],
         ): Promise<boolean> {
-        const url = '/api/group/questSuccess';
+        const url = environment.apiUrl + '/api/group/questSuccess';
         const headers = new HttpHeaders({
             'Content-Type': 'application/json'
         });

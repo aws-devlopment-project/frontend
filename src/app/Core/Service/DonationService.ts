@@ -94,7 +94,7 @@ export interface DonationRecord {
 })
 export class DonationService {
   private readonly globalGivingApiKey = environment.globalGivingApiKey || 'YOUR_API_KEY';
-  private readonly globalGivingBaseUrl = 'https://api.globalgiving.org/api/public/projectservice';
+  private readonly globalGivingBaseUrl = environment.globalGivingApiUrl || 'https://api.globalgiving.org/api/public/projectservice';
   private readonly defaultProjectLimit = 20;
   private readonly apiTimeout = 10000; // 10초 타임아웃
 

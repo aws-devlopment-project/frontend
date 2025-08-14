@@ -8,6 +8,7 @@ import { firstValueFrom } from 'rxjs';
 import { HttpService } from "../../Core/Service/HttpService";
 import { DataCacheService } from "../../Core/Service/DataCacheService";
 import { Router } from "@angular/router";
+import { environment } from "../../../environments/environment.prod";
 
 interface UserProfile {
   username: string;
@@ -166,7 +167,7 @@ export class ManagementDashboardService {
         };
 
         const response = await firstValueFrom(
-        this.httpService.post(`/api/user/setUserAvatar`, payload, 
+        this.httpService.post(environment.apiUrl + `/api/user/setUserAvatar`, payload, 
             new HttpHeaders({ 'Content-Type': 'application/json' })
         )
         );
@@ -232,7 +233,7 @@ export class ManagementDashboardService {
             const userId = user ? user.id : "";
 
             await firstValueFrom(
-                this.httpService.post(`/api/user/resetUserAvatar`, 
+                this.httpService.post(environment.apiUrl + `/api/user/resetUserAvatar`, 
                     { user: userId },
                     new HttpHeaders({ 'Content-Type': 'application/json' })
                 )
