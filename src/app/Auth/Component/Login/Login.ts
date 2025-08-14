@@ -356,24 +356,6 @@ export class LoginComponent implements OnInit {
     private async handleAuthCallback(): Promise<void> {
         // 로컬에서 사용 시 try 내부 코드에서 주석 처리된 코드를 활성화 해주시고 기존에 활성화된 코드는 주석 처리해주세요
         try {
-            // const user: UserCredentials = {
-            //     id: "",
-            //     name: "",
-            //     idToken: "",
-            // };
-
-            // const userStatus: UserStatus = {
-            //     id: ",
-            //     name: "",
-            //     status: 'online',
-            //     joinDate: new Date(),
-            //     lastSeen: new Date()
-            // };
-
-            // this.cacheService.setCache('user', user);
-            // this.cacheService.setCache('userStatus', userStatus);
-            
-            // await this.router.navigate(['/board']);
             const isAuthenticated = await this.auth.checkAuthState();
             
             if (isAuthenticated) {
