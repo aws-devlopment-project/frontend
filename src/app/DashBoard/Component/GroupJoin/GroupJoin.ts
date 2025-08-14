@@ -6,7 +6,6 @@ import { Router } from "@angular/router";
 import { SharedStateService } from "../../../Core/Service/SharedService";
 import { GroupService } from "../../../Core/Service/GroupService";
 import { UserService } from "../../../Core/Service/UserService";
-import { matchingGroup } from "../../../../environments/environtment";
 import { Group } from "../../../Core/Models/group";
 
 interface GroupInfo {
@@ -106,7 +105,6 @@ export class GroupJoinComponent implements OnInit {
     try {
       // 그룹별 모임 데이터
       let groupInfo = await this.groupService.getGroupInfo(groupId);
-      let exampleGroupInfo = matchingGroup.filter((group) => group.name === groupId);
       let clubData: ClubInfo[] = [];
       
       if (groupInfo && groupInfo.clubList) {
@@ -125,22 +123,12 @@ export class GroupJoinComponent implements OnInit {
         clubData = groupInfo.clubList.map((club, index) => ({
           id: club.name, // 실제 클럽 이름을 ID로 사용
           name: club.name,
-          icon: club.icon ? club.icon : exampleGroupInfo[0]?.emoji || '🏠',
-          description: club.description ? club.description : exampleGroupInfo[0]?.description || '',
+          icon: club.icon ? club.icon : '🏠',
+          description: club.description ? club.description : '',
           members: club.memberNum || 0,
           activity: '활발'
         }));
-      } else if (exampleGroupInfo[0]?.clubList?.length) {
-        clubData = exampleGroupInfo[0].clubList.map((club, index) => ({
-          id: club.name,
-          name: club.name,
-          icon: exampleGroupInfo[0].emoji,
-          description: club.description || exampleGroupInfo[0].description,
-          members: club.members ?? 0,
-          activity: '활발'
-        }));
       }
-
       this.availableChannels.set(clubData);
     } catch (error) {
       console.error('Error loading channels for group:', groupId, error);
