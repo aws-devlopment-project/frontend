@@ -146,8 +146,7 @@ export class LoginService {
     async getCurrentUserInfo(): Promise<any> {
         try {
             const session = await fetchAuthSession();
-            
-            console.log(session);
+
             if (!session.tokens?.accessToken) {
                 await this.signOutUser();
                 throw new Error('유효하지 않은 세션입니다.');
@@ -545,7 +544,6 @@ export class LoginService {
                 }
             });
 
-            console.log('Custom username updated successfully');
             return true;
         } catch (e) {
             console.error('Error updating custom username: ', e);
