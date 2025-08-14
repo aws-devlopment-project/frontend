@@ -34,7 +34,7 @@ export class ManagementDashboardService {
         private router: Router
     ) {}
 
-    serverUrl: string = "https://server.teamnameless.click"
+    serverUrl: string = "https://stage.teamnameless.click"
     async getUserProfile() {
         let userProfile: UserProfile = {
             username: '',
