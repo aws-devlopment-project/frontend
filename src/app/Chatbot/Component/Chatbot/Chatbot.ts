@@ -1,4 +1,4 @@
-// Chatbot.ts - 퀘스트 완료 메시지 자동 추가 개선
+// Chatbot.ts 업데이트 - 동적 응답 기능 통합
 import { Component, OnInit, OnDestroy, signal, computed, effect, ViewChild, ElementRef, AfterViewChecked, ChangeDetectorRef, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -11,18 +11,16 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { Subject } from 'rxjs';
 
 import { ChatbotService, ChatbotMessage, UserActivityContext } from '../../Service/ChatbotService';
-import { SharedStateService } from '../../Service/SharedService';
+import { SharedStateService } from '../../../Core/Service/SharedService';
 import { LocalActivityService } from '../../../DashBoard/Service/LocalActivityService';
-
-interface CacheEntry {
-  response: string;
-  timestamp: number;
-}
 
 interface EnhancedChatbotMessage extends ChatbotMessage {
   feedback?: 'helpful' | 'unhelpful' | null;
   showFeedback?: boolean;
   feedbackProvided?: boolean;
+  responseType?: 'static' | 'dynamic' | 'hybrid';
+  dataSource?: 'realtime' | 'cached' | 'static';
+  confidence?: number;
 }
 
 @Component({
@@ -51,15 +49,18 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
   private destroy$ = new Subject<void>();
   private shouldScrollToBottom = false;
   
+  // 동적 응답 관련 상태
+  private lastUserContext: UserActivityContext | null = null;
+  private contextUpdateTimer: any;
+  
   // 퀘스트 완료 추적을 위한 새로운 프로퍼티들
   private lastProcessedActivityCount = 0;
   private processedQuestCompletions = new Set<string>();
   
   // 성능 최적화: 응답 캐시 및 디바운싱
-  private responseCache = new Map<string, CacheEntry>();
+  private responseCache = new Map<string, { response: string; timestamp: number }>();
   private readonly CACHE_DURATION = 5 * 60 * 1000; // 5분
   private readonly MAX_MESSAGES = 50;
-  private readonly MAX_CACHE_SIZE = 100;
   
   // === Signals ===
   isOpen = signal<boolean>(false);
@@ -69,9 +70,11 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
   userInputValue = signal<string>('');
   notificationCount = signal<number>(0);
   
-  // 새로 추가: Q&A 통계
+  // 새로 추가: Q&A 통계 및 동적 응답 상태
   qaStats = signal<any>({});
   showQAStats = signal<boolean>(false);
+  lastResponseType = signal<'static' | 'dynamic' | 'hybrid'>('static');
+  responseConfidence = signal<number>(0);
   
   // 성능 최적화: 표시할 메시지만 computed로 계산
   readonly messages = computed(() => {
@@ -84,13 +87,11 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
   readonly isEmpty = computed(() => this.allMessages().length === 0);
   readonly canSend = computed(() => this.userInputValue().trim().length > 0 && !this.isTyping());
 
-  // Quick action buttons
-  readonly quickActions = signal<string[]>([
-    '통계 보여줘',
-    '오늘 퀘스트는?',
-    '연속 기록은?',
-    '도움말'
-  ]);
+  // 동적 Quick action buttons - 사용자 상황에 따라 변경
+  readonly quickActions = computed(() => {
+    const userContext = this.createUserContext();
+    return this.chatbotService.generateContextualSuggestions(userContext);
+  });
 
   constructor(
     private chatbotService: ChatbotService,
@@ -99,21 +100,24 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
     private cdr: ChangeDetectorRef
   ) {
     this.addWelcomeMessage();
-    this.setupQuestCompletionMonitoring(); // 개선된 퀘스트 모니터링
+    this.setupQuestCompletionMonitoring();
     this.initializeQAStats();
+    this.setupContextMonitoring(); // 새로 추가: 컨텍스트 모니터링
   }
 
   ngOnInit(): void {
     this.loadStoredNotifications();
-    this.cleanupCache();
     this.schedulePerformanceCheck();
-    this.updateQuickActions();
+    this.startContextUpdateTimer();
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
     this.responseCache.clear();
+    if (this.contextUpdateTimer) {
+      clearInterval(this.contextUpdateTimer);
+    }
   }
 
   ngAfterViewChecked(): void {
@@ -121,6 +125,64 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
       this.scrollToBottom();
       this.shouldScrollToBottom = false;
     }
+  }
+
+  // === 새로 추가: 컨텍스트 모니터링 설정 ===
+  
+  private setupContextMonitoring(): void {
+    // SharedState 변화 감지
+    effect(() => {
+      const activeTab = this.sharedState.activeTab();
+      const selectedGroup = this.sharedState.selectedGroup();
+      const selectedChannel = this.sharedState.selectedChannel();
+      const hasJoinedGroups = this.sharedState.hasJoinedGroups();
+      
+      // 중요한 상태 변화가 있으면 컨텍스트 업데이트
+      const newContext = this.createUserContext();
+      if (this.hasContextChanged(newContext)) {
+        this.lastUserContext = newContext;
+        this.updateQuickActionsForContext(newContext);
+      }
+    });
+  }
+
+  private hasContextChanged(newContext: UserActivityContext): boolean {
+    if (!this.lastUserContext) return true;
+    
+    return (
+      this.lastUserContext.activeTab !== newContext.activeTab ||
+      this.lastUserContext.selectedGroup !== newContext.selectedGroup ||
+      this.lastUserContext.selectedChannel !== newContext.selectedChannel ||
+      this.lastUserContext.hasJoinedGroups !== newContext.hasJoinedGroups
+    );
+  }
+
+  private updateQuickActionsForContext(context: UserActivityContext): void {
+    // 컨텍스트 기반으로 Quick Actions 동적 업데이트
+    const suggestions = this.chatbotService.generateContextualSuggestions(context);
+    
+    // 상황별 특별 메시지 추가
+    if (context.activeTab === 'group' && !context.selectedGroup) {
+      this.addContextualHint('👋 그룹을 선택하시면 해당 그룹의 퀘스트와 진행상황을 확인해드릴 수 있어요!');
+    }
+  }
+
+  private addContextualHint(message: string): void {
+    if (this.isOpen() && this.allMessages().length > 0) {
+      setTimeout(() => {
+        this.addMessageWithFeedback(message, false, true, 'dynamic');
+      }, 1000);
+    }
+  }
+
+  private startContextUpdateTimer(): void {
+    // 5초마다 컨텍스트 업데이트 확인
+    this.contextUpdateTimer = setInterval(() => {
+      const newContext = this.createUserContext();
+      if (this.hasContextChanged(newContext)) {
+        this.lastUserContext = newContext;
+      }
+    }, 5000);
   }
 
   // === 개선된 퀘스트 완료 모니터링 ===
@@ -181,7 +243,7 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
 
     // 그룹 정보 추가
     if (groupName && groupName !== '그룹') {
-      fullMessage += `\n\n📍 완료된 그룹: ${groupName}`;
+      fullMessage += `\n\n📁 완료된 그룹: ${groupName}`;
     }
 
     // 격려 메시지 추가
@@ -197,7 +259,7 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
 
     // 메시지 추가
     setTimeout(() => {
-      this.addMessageWithFeedback(fullMessage, false, true);
+      this.addMessageWithFeedback(fullMessage, false, true, 'dynamic');
     }, 500); // 약간의 지연으로 자연스럽게 표시
   }
 
@@ -218,31 +280,7 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
     });
   }
 
-  private incrementNotificationCount(): void {
-    // 채팅창이 열려있지 않을 때만 알림 카운트 증가
-    if (!this.isOpen()) {
-      this.notificationCount.update(count => count + 1);
-    }
-  }
-
-  // === Q&A 통계 관리 ===
-  private initializeQAStats(): void {
-    setTimeout(() => {
-      const stats = this.chatbotService.getQAStats();
-      this.qaStats.set(stats);
-    }, 1000);
-  }
-
-  getCategoryCount(): number {
-    const categories = this.qaStats()?.categories || {};
-    return Object.keys(categories).length;
-  }
-
-  toggleQAStats(): void {
-    this.showQAStats.update(show => !show);
-  }
-
-  // === 개선된 메시지 전송 ===
+  // === 개선된 메시지 전송 (동적 응답 통합) ===
   async sendMessage(messageText?: string): Promise<void> {
     const inputText = messageText || this.userInputValue().trim();
     
@@ -253,42 +291,91 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
     const startTime = performance.now();
 
     // 사용자 메시지 추가
-    this.addMessageWithFeedback(inputText, true, false);
+    this.addMessageWithFeedback(inputText, true, false, 'static');
     this.userInputValue.set('');
 
     try {
-      // 캐시 확인
-      const userContext = this.createOptimizedUserContext();
-      const cacheKey = this.generateCacheKey(inputText, userContext);
-      const cachedResponse = this.getCachedResponse(cacheKey);
-      
-      if (cachedResponse) {
-        await this.simulateTypingDelay(500);
-        this.addMessageWithFeedback(cachedResponse, false, true);
-        return;
-      }
-
       this.isTyping.set(true);
-      await this.simulateTypingDelay(800);
       
-      // 개선된 응답 생성 (Q&A 통합)
+      // 현재 사용자 컨텍스트 생성
+      const userContext = this.createUserContext();
+      
+      // 타이핑 시뮬레이션 (동적 응답은 좀 더 오래 걸릴 수 있음)
+      const isLikelyDynamicQuery = this.isDynamicQuery(inputText);
+      const typingDelay = isLikelyDynamicQuery ? 1200 : 800;
+      
+      await this.simulateTypingDelay(typingDelay);
+      
+      // 개선된 응답 생성 (Q&A + 동적 데이터 통합)
       const response = await this.chatbotService.generateResponseWithActivity(inputText, userContext);
       
-      // 응답 캐시 저장
-      this.setCachedResponse(cacheKey, response);
+      // 응답 타입 및 신뢰도 추적
+      this.trackResponseMetrics(inputText, response, userContext);
       
-      this.addMessageWithFeedback(response, false, true);
+      this.addMessageWithFeedback(response, false, true, 'hybrid');
+      
+      // 성능 측정
+      const processingTime = performance.now() - startTime;
+      if (processingTime > 3000) {
+        console.warn('Slow response detected:', processingTime + 'ms');
+      }
       
     } catch (error) {
       console.error('Error generating enhanced chatbot response:', error);
-      this.addMessage('죄송해요, 일시적인 오류가 발생했습니다. 다시 시도해 주세요.', false, true);
+      this.addMessageWithFeedback(
+        '죄송해요, 일시적인 오류가 발생했습니다. 다시 시도해 주세요.', 
+        false, 
+        true, 
+        'static'
+      );
     } finally {
       this.isTyping.set(false);
     }
   }
 
-  // === 피드백 기능이 있는 메시지 추가 ===
-  private addMessageWithFeedback(text: string, isUser: boolean, animated: boolean = true): EnhancedChatbotMessage {
+  // === 동적 쿼리 감지 ===
+  private isDynamicQuery(query: string): boolean {
+    const dynamicKeywords = [
+      '오늘', '현재', '진행', '통계', '연속', '그룹', '퀘스트', '활동', '최근'
+    ];
+    
+    return dynamicKeywords.some(keyword => query.includes(keyword));
+  }
+
+  // === 응답 메트릭 추적 ===
+  private trackResponseMetrics(query: string, response: string, context: UserActivityContext): void {
+    // 응답 타입 감지
+    let responseType: 'static' | 'dynamic' | 'hybrid' = 'static';
+    
+    if (response.includes('📅') || response.includes('📊') || response.includes('🔥')) {
+      responseType = response.includes('💡') ? 'hybrid' : 'dynamic';
+    }
+    
+    this.lastResponseType.set(responseType);
+    
+    // 신뢰도 추정 (응답 길이, 구체적 데이터 포함 여부 등 기반)
+    let confidence = 0.5;
+    
+    if (responseType === 'dynamic') {
+      // 숫자가 포함된 구체적 응답
+      if (/\d+/.test(response)) confidence += 0.3;
+      // 현재 상태 반영
+      if (context.selectedGroup && response.includes(context.selectedGroup)) confidence += 0.2;
+    }
+    
+    if (response.length > 100) confidence += 0.1;
+    if (response.includes('죄송')) confidence -= 0.2;
+    
+    this.responseConfidence.set(Math.min(Math.max(confidence, 0), 1));
+  }
+
+  // === 향상된 메시지 추가 메서드 ===
+  private addMessageWithFeedback(
+    text: string, 
+    isUser: boolean, 
+    animated: boolean = true,
+    responseType: 'static' | 'dynamic' | 'hybrid' = 'static'
+  ): EnhancedChatbotMessage {
     const newMessage: EnhancedChatbotMessage = {
       id: this.generateMessageId(),
       text,
@@ -297,7 +384,10 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
       animated,
       feedback: null,
       showFeedback: !isUser && text.length > 10,
-      feedbackProvided: false
+      feedbackProvided: false,
+      responseType,
+      dataSource: responseType === 'dynamic' ? 'realtime' : 'static',
+      confidence: this.responseConfidence()
     };
 
     const currentMessages = this.allMessages();
@@ -314,233 +404,8 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
     return newMessage;
   }
 
-  // === 피드백 처리 ===
-  onMessageFeedback(messageId: string, feedback: 'helpful' | 'unhelpful'): void {
-    const messages = this.allMessages();
-    const messageIndex = messages.findIndex(m => m.id === messageId);
-    
-    if (messageIndex === -1) return;
-
-    const updatedMessages = [...messages];
-    const message = { ...updatedMessages[messageIndex] };
-    
-    message.feedback = feedback;
-    message.feedbackProvided = true;
-    updatedMessages[messageIndex] = message;
-    
-    this.allMessages.set(updatedMessages);
-
-    // 피드백이 부정적인 경우 개선 제안
-    if (feedback === 'unhelpful') {
-      this.handleNegativeFeedback(message);
-    }
-
-    // 학습 데이터 수집
-    const userMessage = this.findPreviousUserMessage(messageIndex);
-    if (userMessage) {
-      this.chatbotService.learnFromInteraction(
-        userMessage.text, 
-        message.text, 
-        feedback
-      );
-    }
-  }
-
-  private handleNegativeFeedback(message: EnhancedChatbotMessage): void {
-    setTimeout(() => {
-      const followUpMessage = `죄송합니다. 답변이 도움이 되지 않았나 보네요. 😟\n\n다른 방식으로 질문해주시거나, 더 구체적으로 말씀해 주시면 더 나은 답변을 드릴 수 있어요!\n\n💡 예: "그룹 가입 방법", "퀘스트 완료 안됨" 등`;
-      
-      this.addMessage(followUpMessage, false, true);
-    }, 1000);
-  }
-
-  private findPreviousUserMessage(currentIndex: number): EnhancedChatbotMessage | null {
-    const messages = this.allMessages();
-    
-    for (let i = currentIndex - 1; i >= 0; i--) {
-      if (messages[i].isUser) {
-        return messages[i];
-      }
-    }
-    return null;
-  }
-
-  // === Q&A 검색 기능 ===
-  searchQA(query: string): void {
-    if (!query.trim()) return;
-    
-    const results = this.chatbotService.searchKnowledge(query);
-    
-    if (results.length > 0) {
-      const resultText = `🔍 "${query}"에 대한 검색 결과:\n\n` +
-        results.slice(0, 3).map((result, index) => 
-          `${index + 1}. ${result.item.question}\n   ${result.item.answer.substring(0, 100)}${result.item.answer.length > 100 ? '...' : ''}\n`
-        ).join('\n');
-      
-      this.addMessage(resultText, false, true);
-    } else {
-      this.addMessage(`"${query}"에 대한 검색 결과가 없습니다. 다른 키워드로 검색해보세요.`, false, true);
-    }
-  }
-
-  // === Q&A 파일 업로드 ===
-  async uploadQAFile(event: Event): Promise<void> {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    
-    if (!file || !file.name.endsWith('.txt')) {
-      this.addMessage('올바른 텍스트 파일(.txt)을 선택해주세요.', false, true);
-      return;
-    }
-
-    try {
-      const content = await file.text();
-      await this.chatbotService.uploadQAFile(content);
-      
-      const stats = this.chatbotService.getQAStats();
-      this.qaStats.set(stats);
-      
-      this.addMessage(
-        `✅ Q&A 파일이 성공적으로 업로드되었습니다!\n\n` +
-        `📊 통계:\n` +
-        `• 총 Q&A: ${stats.totalItems}개\n` +
-        `• 카테고리: ${Object.keys(stats.categories).length}개\n` +
-        `• 키워드 인덱스: ${stats.keywordIndexSize}개`,
-        false,
-        true
-      );
-
-      this.updateQuickActions();
-    } catch (error) {
-      console.error('Failed to upload Q&A file:', error);
-      this.addMessage('Q&A 파일 업로드 중 오류가 발생했습니다.', false, true);
-    }
-  }
-
-  // === 빠른 액션 업데이트 ===
-  updateQuickActions(): void {
-    const qaStats = this.qaStats();
-    const hasQA = qaStats.totalItems > 0;
-    
-    const baseActions = [
-      '통계 보여줘',
-      '오늘 퀘스트는?',
-      '연속 기록은?',
-      '도움말'
-    ];
-    
-    if (hasQA) {
-      baseActions.push('Q&A 검색');
-    }
-    
-    this.quickActions.set(baseActions);
-  }
-
-  // === 빠른 액션 처리 ===
-  onQuickAction(action: string): void {
-    if (action === 'Q&A 검색') {
-      this.addMessage('어떤 것을 검색하시겠어요? 키워드를 입력해주세요.', false, true);
-      setTimeout(() => this.focusInput(), 300);
-    } else {
-      this.sendMessage(action);
-    }
-  }
-
-  // === 환영 메시지 개선 ===
-  private addWelcomeMessage(): void {
-    setTimeout(() => {
-      const qaStats = this.qaStats();
-      const welcomeText = qaStats.totalItems > 0 
-        ? `안녕하세요! 🤖\n\n${qaStats.totalItems}개의 Q&A 데이터로 더욱 똑똑해진 AI 어시스턴트입니다! 무엇을 도와드릴까요? 😊`
-        : '안녕하세요! 무엇을 도와드릴까요? 😊';
-      
-      const welcomeMessage: EnhancedChatbotMessage = {
-        id: this.generateMessageId(),
-        text: welcomeText,
-        isUser: false,
-        timestamp: new Date(),
-        animated: false,
-        showFeedback: false
-      };
-      
-      this.allMessages.set([welcomeMessage]);
-    }, 1000);
-  }
-
-  // === 기존 메서드들과의 호환성 ===
-  private addMessage(text: string, isUser: boolean, animated: boolean = true): EnhancedChatbotMessage {
-    return this.addMessageWithFeedback(text, isUser, animated);
-  }
-
-  // === 캐시 및 성능 관리 ===
-  private generateCacheKey(input: string, context?: UserActivityContext): string {
-    const contextHash = context ? this.hashContext(context) : '';
-    return `${input.toLowerCase().trim()}-${contextHash}`;
-  }
-
-  private hashContext(context: UserActivityContext): string {
-    const relevantContext = {
-      group: context.selectedGroup,
-      channel: context.selectedChannel,
-      hasGroups: context.hasJoinedGroups
-    };
-    
-    try {
-      const jsonString = JSON.stringify(relevantContext);
-      return this.simpleHash(jsonString);
-    } catch (error) {
-      console.warn('Context hashing failed, using fallback:', error);
-      return 'default-context';
-    }
-  }
-
-  private simpleHash(str: string): string {
-    let hash = 0;
-    if (str.length === 0) return hash.toString();
-    
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash;
-    }
-    
-    return Math.abs(hash).toString(16).slice(0, 8);
-  }
-
-  private getCachedResponse(key: string): string | null {
-    const entry = this.responseCache.get(key);
-    if (!entry) return null;
-
-    if (Date.now() - entry.timestamp > this.CACHE_DURATION) {
-      this.responseCache.delete(key);
-      return null;
-    }
-
-    return entry.response;
-  }
-
-  private setCachedResponse(key: string, response: string): void {
-    if (this.responseCache.size >= this.MAX_CACHE_SIZE) {
-      const oldestKey = this.responseCache.keys().next().value;
-      if (oldestKey) this.responseCache.delete(oldestKey);
-    }
-
-    this.responseCache.set(key, {
-      response,
-      timestamp: Date.now()
-    });
-  }
-
-  private cleanupCache(): void {
-    const now = Date.now();
-    for (const [key, entry] of this.responseCache.entries()) {
-      if (now - entry.timestamp > this.CACHE_DURATION) {
-        this.responseCache.delete(key);
-      }
-    }
-  }
-
-  private createOptimizedUserContext(): UserActivityContext {
+  // === 사용자 컨텍스트 생성 ===
+  private createUserContext(): UserActivityContext {
     const currentUser = this.sharedState.currentUser();
     const recentActivities = this.activityService.activities()
       .filter(activity => this.isRecentActivity(activity.timestamp))
@@ -561,9 +426,229 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
     const now = new Date();
     const activityTime = new Date(timestamp);
     const timeDiff = now.getTime() - activityTime.getTime();
-    return timeDiff < 5 * 60 * 1000;
+    return timeDiff < 5 * 60 * 1000; // 5분 이내
   }
 
+  // === 피드백 처리 강화 ===
+  onMessageFeedback(messageId: string, feedback: 'helpful' | 'unhelpful'): void {
+    const messages = this.allMessages();
+    const messageIndex = messages.findIndex(m => m.id === messageId);
+    
+    if (messageIndex === -1) return;
+
+    const updatedMessages = [...messages];
+    const message = { ...updatedMessages[messageIndex] };
+    
+    message.feedback = feedback;
+    message.feedbackProvided = true;
+    updatedMessages[messageIndex] = message;
+    
+    this.allMessages.set(updatedMessages);
+
+    // 피드백이 부정적인 경우 개선 제안
+    if (feedback === 'unhelpful') {
+      this.handleNegativeFeedback(message);
+    }
+
+    // 학습 데이터 수집 (사용자 컨텍스트 포함)
+    const userMessage = this.findPreviousUserMessage(messageIndex);
+    if (userMessage) {
+      const context = this.createUserContext();
+      this.chatbotService.learnFromInteraction(
+        userMessage.text, 
+        message.text, 
+        feedback,
+        context
+      );
+    }
+
+    // 동적 응답에 대한 피드백인 경우 특별 처리
+    if (message.responseType === 'dynamic' && feedback === 'helpful') {
+      this.addContextualHint('✨ 실시간 정보가 도움이 되셨군요! 더 궁금한 것이 있으면 언제든 말씀해주세요.');
+    }
+  }
+
+  private handleNegativeFeedback(message: EnhancedChatbotMessage): void {
+    setTimeout(() => {
+      let followUpMessage = `죄송합니다. 답변이 도움이 되지 않았나 보네요. 😟\n\n`;
+      
+      // 응답 타입에 따른 맞춤형 개선 제안
+      if (message.responseType === 'dynamic') {
+        followUpMessage += `실시간 정보를 가져오는 중 문제가 있었을 수 있어요. 다시 한 번 시도해보시거나, 더 구체적으로 질문해주세요.\n\n`;
+        followUpMessage += `💡 예: "오늘 운동 그룹 퀘스트", "이번 주 완료율" 등`;
+      } else {
+        followUpMessage += `다른 방식으로 질문해주시거나, 더 구체적으로 말씀해 주시면 더 나은 답변을 드릴 수 있어요!\n\n`;
+        followUpMessage += `💡 예: "그룹 가입 방법", "퀘스트 완료 안됨" 등`;
+      }
+      
+      this.addMessageWithFeedback(followUpMessage, false, true, 'static');
+    }, 1000);
+  }
+
+  private findPreviousUserMessage(currentIndex: number): EnhancedChatbotMessage | null {
+    const messages = this.allMessages();
+    
+    for (let i = currentIndex - 1; i >= 0; i--) {
+      if (messages[i].isUser) {
+        return messages[i];
+      }
+    }
+    return null;
+  }
+
+  // === Q&A 통계 관리 개선 ===
+  private initializeQAStats(): void {
+    setTimeout(() => {
+      const stats = this.chatbotService.getQAStats();
+      this.qaStats.set(stats);
+    }, 1000);
+  }
+
+  getCategoryCount(): number {
+    const categories = this.qaStats()?.categories || {};
+    return Object.keys(categories).length;
+  }
+
+  toggleQAStats(): void {
+    this.showQAStats.update(show => !show);
+    
+    if (this.showQAStats()) {
+      // 통계 패널이 열릴 때 최신 데이터 업데이트
+      const updatedStats = this.chatbotService.getQAStats();
+      this.qaStats.set(updatedStats);
+    }
+  }
+
+  getPerformanceStats(): any {
+    const baseStats = this.chatbotService.getPerformanceMetrics();
+    const responsiveStats = {
+      lastResponseType: this.lastResponseType(),
+      responseConfidence: this.responseConfidence(),
+      contextUpdates: this.lastUserContext ? 1 : 0
+    };
+    
+    return {
+      ...baseStats,
+      responsive: responsiveStats
+    };
+  }
+
+  // === 빠른 액션 처리 개선 ===
+  onQuickAction(action: string): void {
+    // 특별한 액션들 처리
+    if (action === 'Q&A 검색') {
+      this.addMessageWithFeedback('어떤 것을 검색하시겠어요? 키워드를 입력해주세요.', false, true, 'static');
+      setTimeout(() => this.focusInput(), 300);
+      return;
+    }
+    
+    if (action === '도움말') {
+      const helpMessage = this.chatbotService.generateTimeBasedGreeting() + '\n\n' + 
+        '다음과 같은 도움을 받을 수 있어요:\n\n' +
+        '📊 "통계 보여줘" - 현재 진행상황\n' +
+        '🎯 "오늘 퀘스트" - 오늘의 할일\n' +
+        '🔥 "연속 기록" - 활동 스트릭\n' +
+        '👥 "그룹 정보" - 참여 그룹 현황\n' +
+        '📱 "최근 활동" - 최근 활동 내역';
+      
+      this.addMessageWithFeedback(helpMessage, false, true, 'static');
+      return;
+    }
+
+    // 일반적인 액션은 메시지로 전송
+    this.sendMessage(action);
+  }
+
+  // === Q&A 파일 업로드 개선 ===
+  async uploadQAFile(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    
+    if (!file || !file.name.endsWith('.txt')) {
+      this.addMessageWithFeedback('올바른 텍스트 파일(.txt)을 선택해주세요.', false, true, 'static');
+      return;
+    }
+
+    try {
+      const content = await file.text();
+      await this.chatbotService.uploadQAFile(content);
+      
+      const stats = this.chatbotService.getQAStats();
+      this.qaStats.set(stats);
+      
+      this.addMessageWithFeedback(
+        `✅ Q&A 파일이 성공적으로 업로드되었습니다!\n\n` +
+        `📊 통계:\n` +
+        `• 총 Q&A: ${stats.totalItems}개\n` +
+        `• 카테고리: ${Object.keys(stats.categories).length}개\n` +
+        `• 키워드 인덱스: ${stats.keywordIndexSize}개\n\n` +
+        `이제 더 정확한 답변을 드릴 수 있어요! 🎉`,
+        false,
+        true,
+        'static'
+      );
+
+      // Quick Actions 업데이트
+      this.updateQuickActionsForContext(this.createUserContext());
+    } catch (error) {
+      console.error('Failed to upload Q&A file:', error);
+      this.addMessageWithFeedback('Q&A 파일 업로드 중 오류가 발생했습니다.', false, true, 'static');
+    }
+  }
+
+  // === 환영 메시지 개선 ===
+  private addWelcomeMessage(): void {
+    setTimeout(() => {
+      const userContext = this.createUserContext();
+      const greeting = this.chatbotService.generateTimeBasedGreeting();
+      
+      let welcomeText = `${greeting}\n\n`;
+      
+      // 사용자 상황에 맞는 환영 메시지
+      if (!userContext.hasJoinedGroups) {
+        welcomeText += `아직 그룹에 참여하지 않으셨군요! 그룹에 가입해서 다른 사람들과 함께 목표를 달성해보세요. 🎯\n\n`;
+        welcomeText += `"그룹 참여 방법"이라고 물어보시면 자세히 알려드릴게요!`;
+      } else if (userContext.selectedGroup) {
+        welcomeText += `현재 ${userContext.selectedGroup} 그룹에서 활동 중이시네요! 👥\n\n`;
+        welcomeText += `"오늘 퀘스트" 또는 "진행 상황"을 물어보시면 현재 상태를 확인해드릴게요!`;
+      } else {
+        welcomeText += `여러 그룹에 참여하고 계시는군요! 멋져요! 🌟\n\n`;
+        welcomeText += `"통계 보여줘"라고 하시면 전체 진행상황을 확인할 수 있어요!`;
+      }
+      
+      const qaStats = this.qaStats();
+      if (qaStats.totalItems > 0) {
+        welcomeText += `\n\n💡 ${qaStats.totalItems}개의 Q&A 데이터로 더욱 똑똑해진 AI 어시스턴트입니다!`;
+      }
+      
+      const welcomeMessage: EnhancedChatbotMessage = {
+        id: this.generateMessageId(),
+        text: welcomeText,
+        isUser: false,
+        timestamp: new Date(),
+        animated: false,
+        showFeedback: false,
+        responseType: 'hybrid'
+      };
+      
+      this.allMessages.set([welcomeMessage]);
+    }, 1000);
+  }
+
+  // === 기존 메서드들과의 호환성 ===
+  private addMessage(text: string, isUser: boolean, animated: boolean = true): EnhancedChatbotMessage {
+    return this.addMessageWithFeedback(text, isUser, animated, 'static');
+  }
+
+  // === 긴급 상황 처리 ===
+  private handleEmergencyQuery(query: string): void {
+    const emergencyResponse = this.chatbotService.handleEmergencyQuery(query);
+    if (emergencyResponse) {
+      this.addMessageWithFeedback(emergencyResponse, false, true, 'static');
+    }
+  }
+
+  // === 유틸리티 메서드들 ===
   private async simulateTypingDelay(baseDelay: number): Promise<void> {
     const randomDelay = baseDelay + (Math.random() * 200 - 100);
     await new Promise(resolve => setTimeout(resolve, Math.max(100, randomDelay)));
@@ -588,6 +673,13 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
+  private incrementNotificationCount(): void {
+    // 채팅창이 열려있지 않을 때만 알림 카운트 증가
+    if (!this.isOpen()) {
+      this.notificationCount.update(count => count + 1);
+    }
+  }
+
   // === 기존 메서드들 유지 ===
   
   toggleChatbot(): void {
@@ -598,7 +690,6 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
         const newState = !current;
         if (newState) {
           this.clearNotifications();
-          this.updateQuickActions();
           setTimeout(() => {
             this.focusInput();
           }, 300);
@@ -617,7 +708,6 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.isMinimized.set(false);
     this.isOpen.set(true);
     this.clearNotifications();
-    this.updateQuickActions();
     setTimeout(() => {
       this.focusInput();
     }, 300);
@@ -640,47 +730,9 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   // === 성능 및 관리 메서드들 ===
-  getPerformanceStats(): any {
-    const baseStats = {
-      cacheSize: this.responseCache.size,
-      messageCount: this.allMessages().length,
-      displayedMessageCount: this.messages().length,
-      processedQuestCompletions: this.processedQuestCompletions.size,
-      memoryUsage: 'memory' in performance ? 
-        Math.round(((performance as any).memory?.usedJSHeapSize || 0) / 1048576) + 'MB' : 'N/A'
-    };
-
-    const qaStats = this.qaStats();
-    return {
-      ...baseStats,
-      qaKnowledgeBase: qaStats,
-      responseQuality: this.calculateResponseQuality(),
-      feedbackRate: this.calculateFeedbackRate()
-    };
-  }
-
-  private calculateResponseQuality(): number {
-    const messages = this.allMessages();
-    const botMessages = messages.filter(m => !m.isUser && m.feedbackProvided);
-    
-    if (botMessages.length === 0) return 0;
-    
-    const positiveCount = botMessages.filter(m => m.feedback === 'helpful').length;
-    return Math.round((positiveCount / botMessages.length) * 100);
-  }
-
-  private calculateFeedbackRate(): number {
-    const messages = this.allMessages();
-    const botMessages = messages.filter(m => !m.isUser && m.showFeedback);
-    
-    if (botMessages.length === 0) return 0;
-    
-    const feedbackCount = botMessages.filter(m => m.feedbackProvided).length;
-    return Math.round((feedbackCount / botMessages.length) * 100);
-  }
-
   clearCache(): void {
     this.responseCache.clear();
+    this.chatbotService.clearCache();
   }
 
   resetChatbot(): void {
@@ -688,30 +740,15 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.responseCache.clear();
     this.processedQuestCompletions.clear();
     this.lastProcessedActivityCount = 0;
+    this.lastUserContext = null;
+    this.chatbotService.clearCache();
     this.addWelcomeMessage();
   }
 
   // === 기존 알림 관련 메서드들 ===
-  private updateNotificationCount(): void {
-    try {
-      // 최근 퀘스트 완료 활동 확인
-      const activities = this.activityService.activities();
-      const recentCompletions = activities.filter(activity => 
-        activity.type === 'quest_complete' && 
-        this.isRecentActivity(activity.timestamp) &&
-        !this.processedQuestCompletions.has(activity.id)
-      ).length;
-
-      if (!this.isOpen()) {
-        this.notificationCount.set(recentCompletions);
-      }
-    } catch (error) {
-      console.error('Error updating notification count:', error);
-    }
-  }
-
   private loadStoredNotifications(): void {
-    this.updateNotificationCount();
+    // 실제 저장된 알림이 있으면 로드
+    // 현재는 퀘스트 완료 기반으로만 알림 생성
   }
 
   private clearNotifications(): void {
@@ -721,10 +758,11 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
   private schedulePerformanceCheck(): void {
     setInterval(() => {
       this.performPerformanceCheck();
-    }, 5 * 60 * 1000);
+    }, 5 * 60 * 1000); // 5분마다
   }
 
   private performPerformanceCheck(): void {
+    // 메모리 사용량 체크
     if ('memory' in performance) {
       const memory = (performance as any).memory;
       const usedMB = Math.round(memory.usedJSHeapSize / 1048576);
@@ -732,7 +770,9 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
         this.performCleanup();
       }
     }
-    this.cleanupCache();
+    
+    // 캐시 정리
+    this.cleanupOldCache();
   }
 
   private performCleanup(): void {
@@ -746,6 +786,15 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
     if (this.processedQuestCompletions.size > 100) {
       this.processedQuestCompletions.clear();
       this.lastProcessedActivityCount = this.activityService.activities().length;
+    }
+  }
+
+  private cleanupOldCache(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.responseCache.entries()) {
+      if (now - entry.timestamp > this.CACHE_DURATION) {
+        this.responseCache.delete(key);
+      }
     }
   }
 }

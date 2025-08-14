@@ -11,9 +11,9 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { Subject, takeUntil } from 'rxjs';
-import { DonationService, DonationItem } from '../../Service/DonationService';
-import { DonationPointsService } from '../../Service/DontaionPointService';
-import { SharedStateService } from '../../Service/SharedService';
+import { DonationService, DonationItem } from '../../../Donation/Service/DonationService';
+import { DonationPointsService } from '../../../Donation/Service/DontaionPointService';
+import { SharedStateService } from '../../../Core/Service/SharedService';
 import { LocalActivityService } from '../../../DashBoard/Service/LocalActivityService';
 import { environment } from '../../../../environments/environtment';
 

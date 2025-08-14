@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpErrorResponse } from '@angular/common/http';
-import { DataCacheService } from './DataCacheService';
+import { DataCacheService } from '../../Core/Service/DataCacheService';
 import { Observable, of, firstValueFrom, throwError } from 'rxjs';
 import { catchError, tap, map, timeout, retry } from 'rxjs/operators';
 import { environment } from '../../../environments/environtment';

@@ -7,6 +7,7 @@ import { RouterLink } from "@angular/router";
 import { ManagementDashboardService } from "../../Service/ManagementDashboard";
 import { LoginService } from "../../../Auth/Service/LoginService";
 import { UserJoin } from "../../../Core/Models/user";
+import { SharedStateService } from "../../../Core/Service/SharedService";
 
 interface UserProfile {
   username: string;
@@ -102,6 +103,9 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
   avatarPreviewUrl = signal<string | null>(null);
   selectedAvatarFile = signal<File | null>(null);
 
+  showLogoutConfirm = signal<boolean>(false);
+  logoutLoading = signal<boolean>(false);
+
   // 메뉴 구성
   menuItems = [
     { id: 'profile', label: '프로필 관리', icon: 'person', description: '개인 정보 및 프로필 설정' },
@@ -112,7 +116,8 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
 
   constructor(
     private managementDashboardService: ManagementDashboardService,
-    private loginService: LoginService
+    private loginService: LoginService,
+    private shared: SharedStateService
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -122,6 +127,9 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.showLogoutConfirm()) {
+      this.showLogoutConfirm.set(false);
+    }
     this.cleanupResources();
   }
 
@@ -762,5 +770,137 @@ export class MemberOptionsComponent implements OnInit, OnDestroy {
 
   openHelpCenter(): void {
     window.open('https://help.example.com', '_blank');
+  }
+
+  logout(): void {
+    // 확인 모달 표시
+    this.showLogoutConfirm.set(true);
+  }
+
+  cancelLogout(): void {
+    this.showLogoutConfirm.set(false);
+  }
+
+  async confirmLogout(): Promise<void> {
+    this.logoutLoading.set(true);
+    
+    try {
+      console.log('🚪 로그아웃 프로세스 시작...');
+      
+      // 1. 현재 사용자 정보 가져오기
+      const currentUser = this.shared.currentUser();
+      if (currentUser) {
+        console.log('👤 로그아웃 사용자:', currentUser.name);
+      }
+      
+      // 2. 로컬 리소스 정리
+      this.cleanupLocalResources();
+      
+      // 3. LoginService를 통한 로그아웃
+      await this.loginService.signOutUser();
+      console.log('✅ LoginService 로그아웃 완료');
+      
+      // 4. SharedState 초기화
+      this.shared.clearError();
+      console.log('✅ SharedState 초기화 완료');
+      
+      // 5. 캐시 정리
+      this.clearAllCaches();
+      console.log('✅ 캐시 정리 완료');
+      
+      // 6. 성공 메시지 표시
+      this.showMessage('로그아웃되었습니다. 이용해 주셔서 감사합니다.', 'success');
+      
+      // 7. 로그인 페이지로 리다이렉트 (LoginService에서 처리됨)
+      console.log('🎉 로그아웃 프로세스 완료');
+      
+    } catch (error) {
+      console.error('❌ 로그아웃 실패:', error);
+      
+      // 에러가 발생해도 강제로 로그아웃 처리
+      try {
+        this.forceLogout();
+      } catch (forceError) {
+        console.error('❌ 강제 로그아웃도 실패:', forceError);
+        // 최후의 수단: 페이지 새로고침
+        window.location.reload();
+      }
+      
+    } finally {
+      this.logoutLoading.set(false);
+      this.showLogoutConfirm.set(false);
+    }
+  }
+
+    private cleanupLocalResources(): void {
+    try {
+      // 아바타 미리보기 URL 정리
+      if (this.avatarPreviewUrl()) {
+        URL.revokeObjectURL(this.avatarPreviewUrl()!);
+        this.avatarPreviewUrl.set(null);
+      }
+      
+      // 선택된 파일 정리
+      this.selectedAvatarFile.set(null);
+      
+      // 에러 메시지 초기화
+      this.clearAllMessages();
+      
+      console.log('🧹 로컬 리소스 정리 완료');
+      
+    } catch (error) {
+      console.error('❌ 로컬 리소스 정리 실패:', error);
+    }
+  }
+
+  /**
+   * 모든 캐시 정리
+   */
+  private clearAllCaches(): void {
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      console.log('💾 캐시 정리 완료');
+      
+    } catch (error) {
+      console.error('❌ 캐시 정리 실패:', error);
+    }
+  }
+
+  /**
+   * 모든 메시지 상태 초기화
+   */
+  private clearAllMessages(): void {
+    this.clearMessages();
+    this.clearUsernameMessages();
+    this.clearPasswordMessages();
+    this.uploadError.set(null);
+    this.uploadSuccess.set(false);
+  }
+
+  /**
+   * 강제 로그아웃 (에러 발생 시 사용)
+   */
+  private forceLogout(): void {
+    console.log('🚨 강제 로그아웃 실행...');
+    
+    try {
+      // 로컬 스토리지 완전 정리
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // 페이지 리로드로 모든 상태 초기화
+      window.location.href = '/login';
+      
+    } catch (error) {
+      console.error('❌ 강제 로그아웃 실패:', error);
+      // 최후의 수단
+      window.location.reload();
+    }
+  }
+
+  canLogout(): boolean {
+    return !this.isLoading();
   }
 }

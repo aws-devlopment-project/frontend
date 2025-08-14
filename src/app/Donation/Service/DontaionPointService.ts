@@ -1,6 +1,6 @@
 import { Injectable, computed, signal } from '@angular/core';
-import { SharedStateService } from './SharedService';
-import { UserService } from './UserService';
+import { SharedStateService } from '../../Core/Service/SharedService';
+import { UserService } from '../../Core/Service/UserService';
 import { LocalActivityService } from '../../DashBoard/Service/LocalActivityService';
 
 @Injectable({
@@ -31,7 +31,7 @@ export class DonationPointsService {
       }
     } catch (error) {
       console.error('Failed to initialize points:', error);
-      this._userPoints.set(50000); // 기본값
+      this._userPoints.set(0); // 기본값
     }
   }
 
@@ -39,21 +39,11 @@ export class DonationPointsService {
     try {
       // 활동 기반 포인트 계산
       const activityStats = this.activityService.getActivityStats();
-      let points = activityStats.totalPoints;
       
-      // 퀘스트 완료 보너스
-      const questStats = await this.activityService.getQuestBasedStats();
-      points += questStats.completedQuests * 100;
-      
-      // 그룹 참여 보너스
-      const groupStats = await this.activityService.getGroupParticipationStats();
-      points += groupStats.totalGroups * 500;
-      points += groupStats.totalClubs * 200;
-      
-      return Math.max(points, 10000); // 최소 1만 포인트 보장
+      return activityStats.totalPoints;
     } catch (error) {
       console.error('Error calculating points:', error);
-      return 50000; // 기본값
+      return 0; // 기본값
     }
   }
 

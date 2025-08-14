@@ -5,9 +5,9 @@
       <div class="user-summary">
         <div class="user-avatar-image">
           <img [src]="getCurrentAvatarUrl()" 
-               (error)="onAvatarImageError($event)"
-               alt="사용자 아바타"
-               class="avatar-image">
+              (error)="onAvatarImageError($event)"
+              alt="사용자 아바타"
+              class="avatar-image">
         </div>
         <div class="user-info">
           <h3>{{ userProfile().username }}</h3>
@@ -19,6 +19,21 @@
               <span>{{ authProvider() === 'google' ? 'Google' : 'OAuth' }} 계정</span>
             </div>
           }
+        </div>
+        
+        <!-- 로그아웃 버튼 추가 -->
+        <div class="user-actions">
+          <button class="btn btn-logout" 
+                  (click)="logout()"
+                  [disabled]="isLoading()">
+            @if (isLoading()) {
+              <div class="btn-spinner"></div>
+              로그아웃 중...
+            } @else {
+              <mat-icon>logout</mat-icon>
+              로그아웃
+            }
+          </button>
         </div>
       </div>
       
