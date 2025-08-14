@@ -10,10 +10,8 @@ export const environment = {
   cognitoDomain: '',
   redirectSignIn: '',
   redirectSignOut: '',
-
   globalGivingApiKey: '',
   globalGivingApiUrl: '',
-
   donation: {
     defaultLimit: 20,
     maxLimit: 50,

@@ -39,7 +39,7 @@ frontend:
             environment: 'production',
             logLevel: 'error',
             globalGivingApiKey: '${DONATION_KEY}',
-            globalGivingApiUrl: '${DONATION_URL}'
+            globalGivingApiUrl: '${DONATION_URL}',
             donation: {
               defaultLimit: 20,
               maxLimit: 50,
@@ -97,7 +97,7 @@ frontend:
             environment: 'development',
             logLevel: 'debug',
             globalGivingApiKey: '${DONATION_KEY}',
-            globalGivingApiUrl: '${DONATION_URL}'
+            globalGivingApiUrl: '${DONATION_URL}',
             donation: {
               defaultLimit: 20,
               maxLimit: 50,
