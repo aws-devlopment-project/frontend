@@ -78,8 +78,6 @@ export class HttpService {
       const headers = customHeaders ? 
         customHeaders.set('Authorization', authHeaders.get('Authorization') || '') : 
         authHeaders;
-
-      console.error("api get: " + url);
       return this.http.get<{error: {result: string }, data: T}>(url, { headers }).pipe(
         map(response => {
           if (response.error && response.error.result === 'failure')
@@ -117,8 +115,6 @@ export class HttpService {
       const headers = customHeaders ? 
         customHeaders.set('Authorization', authHeaders.get('Authorization') || '') : 
         authHeaders;
-
-      console.error("api post: ", url);
       return this.http.post<T>(url, body, { headers }).pipe(
         catchError(error => this.handleError(error, url))
       );

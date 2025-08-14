@@ -20,6 +20,20 @@ frontend:
             export APP_REGION="${APP_REGION:-ap-northeast-2}"
           fi
         - |
+          if [ -z "$DONATION_KEY" ] || [ -z "$DONATION_URL" ]; then
+            echo "Warning: Donation environment variables are not set - using placeholder values"
+            echo "Please update these after getting the Amplify domain"
+            export DONATION_KEY="${DONATION_KEY:-placeholder}"
+            export DONATION_URL="${DONATION_URL:-placeholder}"
+          fi
+        - |
+          if [ -z "$API_URL" ] || [ -z "$WS_URL" ]; then
+            echo "Warning: API and WebSocket URLs are not set - using placeholder values"
+            echo "Please update these after getting the Amplify domain"
+            export API_URL="${API_URL:-https://server.teamnameless.click}"
+            export WS_URL="${WS_URL:-https://server.teamnameless.click}"
+          fi
+        - |
           cat <<EOF > src/environments/environment.prod.ts
           export const environment = {
             production: true,
@@ -35,8 +49,8 @@ frontend:
             cognitoDomain: '${COGNITO_DOMAIN:-}',
             redirectSignIn: '${REDIRECT_SIGN_IN:-}',
             redirectSignOut: '${REDIRECT_SIGN_OUT:-}',
-            apiUrl: '${API_URL:-}',
-            webSocketUrl: '${WS_URL:-}',
+            apiUrl: '${API_URL:-https://server.teamnameless.click}',
+            webSocketUrl: '${WS_URL:-https://server.teamnameless.click}',
             environment: 'production',
             logLevel: 'error',
             globalGivingApiKey: '${DONATION_KEY}',
