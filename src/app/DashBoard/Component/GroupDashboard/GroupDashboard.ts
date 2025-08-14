@@ -53,6 +53,20 @@ interface RecentActivity {
   };
 }
 
+interface EnhancedQuest extends Quest {
+  // 개인 상태
+  isPersonallyCompleted: boolean;
+  isSelectable: boolean;
+  personalCompletionDate: Date | null;
+  
+  // 그룹 통계
+  groupCompletions: number;
+  totalMembers: number;
+  
+  // 추가 정보
+  clubName: string;
+}
+
 @Component({
   selector: 'app-group-dashboard',
   templateUrl: './GroupDashboard.html',
@@ -248,7 +262,6 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
     this.updateStats();
   }
 
-  // === UserQuestCur 기반 퀘스트 처리 (핵심) ===
   private processQuestsFromUserQuestCur(): void {
     if (!this.userQuestCache || !this.groupCache) {
       this.quests.set([]);
@@ -258,30 +271,100 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
     const groupName = this.shared.selectedGroup();
     if (!groupName) return;
 
-    // UserQuestCur에서 현재 그룹의 퀘스트들만 필터링
     const currentGroupQuests = this.userQuestCache.curQuestTotalList.filter(
       quest => quest.group === groupName
     );
 
-    // UserQuestCur 기반으로 Quest 객체 생성 (questId 정확히 매핑)
+    console.log('📋 퀘스트 처리 (개인 상태 + 그룹 진행률 분리):', {
+      groupName,
+      userQuestCount: currentGroupQuests.length
+    });
+
     const questsFromUserData = currentGroupQuests.map(questRecord => {
-      // 그룹 캐시에서 성공 횟수 정보 가져오기
+      // 🎯 그룹 진행률 계산 (기존 방식 유지)
+      let groupProgress = 0;
+      let groupCompletions = 0;
       const questIndex = this.groupCache!.questList.indexOf(questRecord.quest);
-      const successCount = questIndex !== -1 ? (this.groupCache!.questSuccessNum[questIndex] || 0) : 0;
-      const progress = this.calculateProgress(successCount, this.groupCache!.memberNum);
+      
+      if (questIndex !== -1) {
+        groupCompletions = this.groupCache!.questSuccessNum[questIndex] || 0;
+        groupProgress = this.calculateProgress(groupCompletions, this.groupCache!.memberNum);
+      }
+
+      // 🎯 개인 완료 상태 (CSS 스타일링용)
+      const isPersonallyCompleted = questRecord.success;
+      const isSelectable = !isPersonallyCompleted; // 완료하지 않은 퀘스트만 선택 가능
 
       return {
-        id: questRecord.questId.toString(), // ✅ UserQuestCur의 실제 questId 사용
+        id: questRecord.questId.toString(),
         title: questRecord.quest,
         description: questRecord.descriptions || `${questRecord.quest} 퀘스트를 완료하세요`,
         icon: this.getQuestIcon(questRecord.quest),
-        progress: progress,
-        status: this.determineQuestStatus(questRecord.success, progress)
-      } as Quest;
+        
+        // 🎯 그룹 진행률 (게이지와 % 표시용)
+        progress: groupProgress,
+        groupCompletions: groupCompletions,
+        totalMembers: this.groupCache!.memberNum,
+        
+        // 🎯 개인 완료 상태 (CSS 클래스 적용용)
+        isPersonallyCompleted: isPersonallyCompleted,
+        isSelectable: isSelectable,
+        
+        // UI 표시용 상태 (그룹 진행률 기반)
+        status: this.determineGroupStatus(groupProgress),
+        
+        // 추가 정보
+        personalCompletionDate: isPersonallyCompleted ? new Date() : null,
+        clubName: questRecord.club
+      } as EnhancedQuest;
     });
 
     this.quests.set(questsFromUserData);
+    this.syncQuestStateFromUserQuestCur();
     setTimeout(() => this.animateProgress(), 500);
+    
+    console.log('✅ 처리 완료:', questsFromUserData.map(q => ({
+      title: q.title,
+      personalCompleted: q.isPersonallyCompleted,
+      groupProgress: q.progress,
+      selectable: q.isSelectable
+    })));
+  }
+
+  private determineGroupStatus(groupProgress: number): Quest['status'] {
+    if (groupProgress >= 100) return 'completed';
+    if (groupProgress > 0) return 'in-progress';
+    return 'not-started';
+  }
+
+  public getQuestCardClass(quest: Quest): string {
+    const enhancedQuest = quest as EnhancedQuest;
+    const classes = ['quest-card'];
+    
+    // 🎯 개인 완료 상태 기반 클래스
+    if (enhancedQuest.isPersonallyCompleted) {
+      classes.push('personally-completed');
+    } else if (enhancedQuest.isSelectable) {
+      classes.push('selectable');
+    } else {
+      classes.push('not-selectable');
+    }
+    
+    // 그룹 진행률 기반 클래스 (보조)
+    if (enhancedQuest.progress >= 80) {
+      classes.push('group-high-progress');
+    } else if (enhancedQuest.progress >= 30) {
+      classes.push('group-medium-progress');
+    } else {
+      classes.push('group-low-progress');
+    }
+    
+    // 선택 상태
+    if (this.isQuestSelected(enhancedQuest.id)) {
+      classes.push('selected');
+    }
+    
+    return classes.join(' ');
   }
 
   private calculateProgress(successCount: number, memberCount: number): number {
@@ -348,46 +431,47 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
       return this.questState().completedQuestIds.has(questId);
     }
 
-    // ✅ questId로 직접 찾기 (기존은 questTitle로 찾았음)
+    // ✅ questRecord.success만 확인 (그룹 진행률 무시)
     const questRecord = this.userQuestCache.curQuestTotalList.find(
       quest => quest.questId.toString() === questId && quest.group === groupName
     );
 
     const isCompleted = questRecord?.success || false;
     
-    // 로컬 상태도 동기화
-    if (isCompleted && questRecord) {
-      const currentState = this.questState();
-      const newCompletedTitles = new Set(currentState.completedQuestTitles);
-      const newCompletedIds = new Set(currentState.completedQuestIds);
-      
-      newCompletedTitles.add(questRecord.quest);
-      newCompletedIds.add(questRecord.questId.toString());
-      
-      this.questState.set({
-        ...currentState,
-        completedQuestTitles: newCompletedTitles,
-        completedQuestIds: newCompletedIds
-      });
-    }
+    console.log(`🔍 questId ${questId} 개인 완료 상태:`, {
+      found: !!questRecord,
+      questTitle: questRecord?.quest,
+      personalSuccess: questRecord?.success,
+      result: isCompleted
+    });
     
     return isCompleted;
   }
 
   public isQuestCompletable(quest: Quest): boolean {
-    return !this.isQuestCompletedByQuestId(quest.id) && quest.status !== 'completed';
+    return !this.isQuestCompletedByQuestId(quest.id);
   }
 
   // === 퀘스트 완료 처리 (UserQuestCur 중심) ===
   async onQuestAction(): Promise<void> {
     const selectedIds = Array.from(this.selectedQuestIds());
     const selectedQuests = this.quests()
-      .filter(quest => selectedIds.includes(quest.id) && this.isQuestCompletable(quest));
+      .filter(quest => selectedIds.includes(quest.id))
+      .filter(quest => this.canSelectQuest(quest));
     
     if (selectedQuests.length === 0) {
-      this.showErrorToast('완료할 퀘스트를 선택해주세요.');
+      this.showErrorToast('완료할 수 있는 퀘스트를 선택해주세요.');
       return;
     }
+
+    console.log('완료 처리할 퀘스트:', selectedQuests.map(q => {
+      const enhanced = q as EnhancedQuest;
+      return {
+        id: q.id,
+        title: q.title,
+        isPersonallyCompleted: enhanced.isPersonallyCompleted
+      };
+    }));
 
     this.showConfirmationModal(selectedQuests);
   }
@@ -445,6 +529,70 @@ private async processQuestCompletion(quest: Quest): Promise<void> {
 
     // UserQuestCur 캐시 갱신 및 상태 동기화
     await this.refreshUserQuestData();
+  }
+
+  getEnhancedStats(): {
+    personal: {
+      completedCount: number;
+      totalCount: number;
+      completionRate: number;
+      selectableCount: number;
+    };
+    group: {
+      averageProgress: number;
+      totalCompletions: number;
+      totalPossible: number;
+      mostActiveQuest: string;
+    };
+  } {
+    const quests = this.quests().map(q => q as EnhancedQuest);
+    
+    // 개인 통계
+    const personalCompleted = quests.filter(q => q.isPersonallyCompleted).length;
+    const personalTotal = quests.length;
+    const personalRate = personalTotal > 0 ? Math.round((personalCompleted / personalTotal) * 100) : 0;
+    const selectableCount = quests.filter(q => q.isSelectable).length;
+    
+    // 그룹 통계
+    const totalCompletions = quests.reduce((sum, q) => sum + q.groupCompletions, 0);
+    const totalPossible = quests.reduce((sum, q) => sum + q.totalMembers, 0);
+    const averageProgress = quests.length > 0 ? 
+      Math.round(quests.reduce((sum, q) => sum + q.progress, 0) / quests.length) : 0;
+    
+    const mostActiveQuest = quests
+      .sort((a, b) => b.progress - a.progress)[0]?.title || 'None';
+    
+    return {
+      personal: {
+        completedCount: personalCompleted,
+        totalCount: personalTotal,
+        completionRate: personalRate,
+        selectableCount
+      },
+      group: {
+        averageProgress,
+        totalCompletions,
+        totalPossible,
+        mostActiveQuest
+      }
+    };
+  }
+
+  private updateStats(): void {
+    const stats = this.getEnhancedStats();
+    
+    this.stats.update(currentStats => currentStats.map(stat => {
+      switch (stat.label) {
+        case '전체 멤버':
+          return { ...stat, value: this.groupCache?.memberNum || 0 };
+        case '퀘스트 달성률':
+          return { ...stat, value: stats.personal.completionRate }; // 개인 달성률
+        case '소모임 수':
+          return { ...stat, value: this.groupCache?.clubList?.length || 0 };
+        default:
+          return stat;
+      }
+    }));
   }
 
   private rollbackQuestUI(questId: string): void {
@@ -624,7 +772,15 @@ private async processQuestCompletion(quest: Quest): Promise<void> {
 
   // === UI 이벤트 핸들러 ===
   onQuestClick(quest: Quest): void {
-    if (!this.isQuestCompletable(quest)) return;
+    const enhancedQuest = quest as EnhancedQuest;
+    
+    if (!this.canSelectQuest(quest)) {
+      console.log(`퀘스트 "${quest.title}" 선택 불가:`, {
+        isPersonallyCompleted: enhancedQuest.isPersonallyCompleted,
+        isSelectable: enhancedQuest.isSelectable
+      });
+      return;
+    }
     
     this.selectedQuestIds.update(selected => {
       const newSelected = new Set(selected);
@@ -712,29 +868,18 @@ private async processQuestCompletion(quest: Quest): Promise<void> {
     }, 1000);
   }
 
-  // === 통계 및 상태 관리 ===
-  private updateStats(): void {
-    if (!this.groupCache) return;
-
-    const totalQuests = this.quests().length;
-    const completedQuests = this.quests().filter(q => 
-      q.status === 'completed' || this.isQuestCompletedByQuestId(q.id)
-    ).length;
+  applyRecommendedSettings(): void {
+    console.log('🎯 권장 설정 적용: 개인 완료 상태 중심 처리');
     
-    const achievementRate = totalQuests > 0 ? Math.round((completedQuests / totalQuests) * 100) : 0;
+    // 개인 완료 상태 중심으로 처리
+    this.processQuestsFromUserQuestCur();
     
-    this.stats.update(currentStats => currentStats.map(stat => {
-      switch (stat.label) {
-        case '전체 멤버':
-          return { ...stat, value: this.groupCache!.memberNum };
-        case '퀘스트 달성률':
-          return { ...stat, value: achievementRate };
-        case '소모임 수':
-          return { ...stat, value: this.groupCache!.clubList?.length || 0 };
-        default:
-          return stat;
-      }
-    }));
+    console.log('✅ 권장 설정 적용 완료');
+    console.log('📊 현재 퀘스트 상태:', this.quests().map(q => ({
+      title: q.title,
+      status: q.status,
+      progress: q.progress
+    })));
   }
 
   // === 상태 확인 메서드들 ===
@@ -1389,7 +1534,44 @@ private async processQuestCompletion(quest: Quest): Promise<void> {
   }
 
   public canSelectQuest(quest: Quest): boolean {
-    return this.isQuestCompletable(quest);
+    const enhancedQuest = quest as EnhancedQuest;
+    return enhancedQuest.isSelectable && !enhancedQuest.isPersonallyCompleted;
+  }
+
+  public isPersonallyCompleted(quest: Quest): boolean {
+    const enhancedQuest = quest as EnhancedQuest;
+    return enhancedQuest.isPersonallyCompleted;
+  }
+
+  public getGroupProgressText(quest: Quest): string {
+    const enhancedQuest = quest as EnhancedQuest;
+    return `${enhancedQuest.groupCompletions}명 / ${enhancedQuest.totalMembers}명 완료`;
+  }
+
+  public getGroupStatusText(quest: Quest): string {
+    const enhancedQuest = quest as EnhancedQuest;
+    const progress = enhancedQuest.progress;
+    
+    if (progress >= 100) return '그룹 목표 달성!';
+    if (progress >= 80) return '거의 완료';
+    if (progress >= 50) return '절반 이상 진행';
+    if (progress >= 20) return '진행 중';
+    if (progress > 0) return '시작됨';
+    return '아직 시작 안 함';
+  }
+
+  public getPersonalStatusIcon(quest: Quest): string {
+    const enhancedQuest = quest as EnhancedQuest;
+    if (enhancedQuest.isPersonallyCompleted) return 'check_circle';
+    if (enhancedQuest.isSelectable) return 'radio_button_unchecked';
+    return 'block';
+  }
+
+  public getPersonalStatusColor(quest: Quest): string {
+    const enhancedQuest = quest as EnhancedQuest;
+    if (enhancedQuest.isPersonallyCompleted) return '#48bb78'; // 초록
+    if (enhancedQuest.isSelectable) return '#3182ce'; // 파랑
+    return '#a0aec0'; // 회색
   }
 
   public getQuestStatusClass(quest: Quest): string {

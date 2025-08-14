@@ -196,86 +196,83 @@
       @if (quests().length > 0) {
         <div class="quest-grid">
           @for (quest of quests(); track quest.id) {
-            <div class="quest-card" 
-                 [attr.data-status]="quest.status"
-                 [class]="getQuestStatusClass(quest)"
-                 [class.selected]="isQuestSelected(quest.id)"
-                 [class.completed]="isQuestCompletedForTemplate(quest)"
-                 [class.selectable]="canSelectQuest(quest)"
-                 (click)="canSelectQuest(quest) ? onQuestClick(quest) : null">
+            <div [class]="getQuestCardClass(quest)"
+                 (click)="onQuestClick(quest)">
               
-              <!-- 선택 표시 -->
-              @if (isQuestSelected(quest.id)) {
-                <div class="selection-indicator">
-                  <mat-icon>check_circle</mat-icon>
+              <!-- 🎯 개인 완료 상태 표시 (카드 상단) -->
+              <div class="personal-status-header">
+                <div class="personal-status-indicator">
+                  <mat-icon [style.color]="getPersonalStatusColor(quest)">
+                    {{ getPersonalStatusIcon(quest) }}
+                  </mat-icon>
+                  <span class="personal-status-text">
+                    @if (isPersonallyCompleted(quest)) {
+                      내가 완료함
+                    } @else if (canSelectQuest(quest)) {
+                      완료 가능
+                    } @else {
+                      완료 불가
+                    }
+                  </span>
                 </div>
-              }
-              
-              <!-- 완료 배지 -->
-              @if (isQuestCompletedForTemplate(quest)) {
-                <div class="completion-badge">
-                  <mat-icon>verified</mat-icon>
-                  <span>완료됨</span>
-                </div>
-              }
-              
+                
+                <!-- 선택 표시 -->
+                @if (isQuestSelected(quest.id)) {
+                  <div class="selection-badge">
+                    <mat-icon>check_circle</mat-icon>
+                    <span>선택됨</span>
+                  </div>
+                }
+              </div>
+
+              <!-- 퀘스트 정보 -->
               <div class="quest-header">
                 <div class="quest-icon">{{ quest.icon }}</div>
                 <div class="quest-info">
                   <h3 class="quest-title">{{ quest.title }}</h3>
                   <p class="quest-description">{{ quest.description }}</p>
                 </div>
+              </div>
+              
+              <!-- 🎯 그룹 진행률 섹션 (기존 방식 유지) -->
+              <div class="group-progress-section">
+                <div class="group-progress-header">
+                  <span class="group-progress-label">그룹 진행률</span>
+                  <span class="group-progress-text">{{ getGroupProgressText(quest) }}</span>
+                </div>
                 
-                <!-- 상태 아이콘 -->
-                <div class="quest-status-icons">
-                  @if (isQuestCompletedForTemplate(quest)) {
-                    <mat-icon class="status-icon completed">check_circle</mat-icon>
-                  } @else if (isQuestSelected(quest.id)) {
-                    <mat-icon class="status-icon selected">radio_button_checked</mat-icon>
-                  } @else if (canSelectQuest(quest)) {
-                    <mat-icon class="status-icon available">radio_button_unchecked</mat-icon>
-                  } @else {
-                    <mat-icon class="status-icon disabled">block</mat-icon>
-                  }
-                </div>
-              </div>
-              
-              <div class="quest-progress-container">
-                <div class="quest-progress">
-                  <div 
-                    class="quest-progress-bar" 
-                    [attr.data-progress]="quest.progress"
-                    [style.width.%]="isQuestCompletedForTemplate(quest) ? 100 : quest.progress"
-                    [style.background-color]="getStatusColor(quest.status)">
+                <div class="group-progress-container">
+                  <div class="group-progress-bar">
+                    <div class="group-progress-fill" 
+                         [style.width.%]="quest.progress"
+                         [style.background-color]="getStatusColor(quest.status)">
+                    </div>
                   </div>
+                  <div class="group-progress-percentage">{{ quest.progress }}%</div>
                 </div>
-                <div class="quest-status">
-                  <span 
-                    class="status-badge"
-                    [style.color]="getStatusColor(quest.status)">
-                    {{ isQuestCompletedForTemplate(quest) ? '완료됨' : getStatusText(quest.status) }}
-                  </span>
-                  <span class="progress-text">
-                    {{ isQuestCompletedForTemplate(quest) ? '100' : quest.progress }}% 완료
-                  </span>
-                </div>
+                
+                <div class="group-status-text">{{ getGroupStatusText(quest) }}</div>
               </div>
-              
-              <!-- 액션 버튼 (완료되지 않은 퀘스트만) -->
-              @if (!isQuestCompletedForTemplate(quest)) {
-                <div class="quest-actions">
-                  <button class="action-button"
+
+              <!-- 🎯 액션 영역 -->
+              <div class="quest-actions">
+                @if (!isPersonallyCompleted(quest)) {
+                  <button class="quest-action-button"
                           [disabled]="!canSelectQuest(quest)"
-                          [class.selected]="isQuestSelected(quest.id)"
-                          (click)="onQuestClick(quest); $event.stopPropagation()">
+                          [class.selected]="isQuestSelected(quest.id)">
                     @if (canSelectQuest(quest)) {
-                      {{ isQuestSelected(quest.id) ? '선택됨' : '선택하기' }}
+                      {{ isQuestSelected(quest.id) ? '선택 취소' : '완료하기' }}
                     } @else {
-                      선택 불가
+                      완료 불가
                     }
                   </button>
-                </div>
-              }
+                } @else {
+                  <div class="completed-indicator">
+                    <mat-icon>verified</mat-icon>
+                    <span>완료됨</span>
+                  </div>
+                }
+              </div>
             </div>
           }
         </div>
