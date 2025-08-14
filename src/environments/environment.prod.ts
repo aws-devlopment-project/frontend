@@ -3,25 +3,24 @@ export const environment = {
   userPoolId: '',
   userPoolClientId: '',
   identityPoolId: '',
-  region: 'ap-northeast-2',
+  region: '',
   googleClientId: '',
-  apiUrl: 'http://localhost:3000',
-  webSocketUrl: 'http://localhost:9001',
+  apiUrl: '',
+  webSocketUrl: '',
   cognitoDomain: '',
   redirectSignIn: '',
   redirectSignOut: '',
 
-  globalGivingApiKey: '178b5732-efbc-44e9-9113-7eaafcf08357',
-  globalGivingApiUrl: 'https://api.globalgiving.org/api/public/projectservice',
+  globalGivingApiKey: '',
+  globalGivingApiUrl: '',
 
   donation: {
-    defaultLimit: 20,           // 기본 프로젝트 조회 개수
-    maxLimit: 50,              // 최대 프로젝트 조회 개수
-    cacheTimeout: 300,         // 캐시 유효 시간 (초)
-    minDonationAmount: 1000,   // 최소 기부 금액 (포인트)
-    maxDonationAmount: 100000, // 최대 기부 금액 (포인트)
-    
-    // 카테고리 매핑
+    defaultLimit: 20,
+    maxLimit: 50,
+    cacheTimeout: 300,
+    minDonationAmount: 1000,
+    maxDonationAmount: 100000,
+
     categoryMapping: {
       'education': '교육지원',
       'health': '의료지원',
@@ -48,8 +47,7 @@ export const environment = {
       'human-rights',
       'economic-development'
     ],
-    
-    // 지원 가능한 국가 코드 (ISO 3166)
+
     supportedCountries: [
       'US', 'KR', 'JP', 'CN', 'IN', 'TH', 'VN', 'PH', 'ID', 'MY',
       'SG', 'BD', 'NP', 'LK', 'MM', 'KH', 'LA', 'BT', 'MV', 'BN'

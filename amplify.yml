@@ -37,7 +37,44 @@ frontend:
             redirectSignOut: '${REDIRECT_SIGN_OUT:-}',
             apiUrl: '$API_URL',
             environment: 'production',
-            logLevel: 'error'
+            logLevel: 'error',
+            globalGivingApiKey: '${DONATION_KEY}',
+            globalGivingApiUrl: '${DONATION_URL}'
+            donation: {
+              defaultLimit: 20,
+              maxLimit: 50,
+              cacheTimeout: 300,
+              minDonationAmount: 1000,
+              maxDonationAmount: 100000,
+              categoryMapping: {
+                'education': '교육지원',
+                'health': '의료지원',
+                'water': '국제개발',
+                'animals': '동물보호',
+                'disaster': '재해구호',
+                'elderly': '노인복지',
+                'disability': '장애인복지',
+                'environment': '환경보호',
+                'default': '기타'
+              },
+              supportedThemes: [
+                'education',
+                'health',
+                'water',
+                'animals',
+                'disaster',
+                'elderly',
+                'disability',
+                'environment',
+                'agriculture',
+                'human-rights',
+                'economic-development'
+              ],
+              supportedCountries: [
+                'US', 'KR', 'JP', 'CN', 'IN', 'TH', 'VN', 'PH', 'ID', 'MY',
+                'SG', 'BD', 'NP', 'LK', 'MM', 'KH', 'LA', 'BT', 'MV', 'BN'
+              ]
+            }
           };
           EOF
         - |
@@ -58,7 +95,44 @@ frontend:
             redirectSignOut: '$GOOGLE_REDIRECT_SIGNOUT',
             apiUrl: '$API_URL_DEV',
             environment: 'development',
-            logLevel: 'debug'
+            logLevel: 'debug',
+            globalGivingApiKey: '${DONATION_KEY}',
+            globalGivingApiUrl: '${DONATION_URL}'
+            donation: {
+              defaultLimit: 20,
+              maxLimit: 50,
+              cacheTimeout: 300,
+              minDonationAmount: 1000,
+              maxDonationAmount: 100000,
+              categoryMapping: {
+                'education': '교육지원',
+                'health': '의료지원',
+                'water': '국제개발',
+                'animals': '동물보호',
+                'disaster': '재해구호',
+                'elderly': '노인복지',
+                'disability': '장애인복지',
+                'environment': '환경보호',
+                'default': '기타'
+              },
+              supportedThemes: [
+                'education',
+                'health',
+                'water',
+                'animals',
+                'disaster',
+                'elderly',
+                'disability',
+                'environment',
+                'agriculture',
+                'human-rights',
+                'economic-development'
+              ],
+              supportedCountries: [
+                'US', 'KR', 'JP', 'CN', 'IN', 'TH', 'VN', 'PH', 'ID', 'MY',
+                'SG', 'BD', 'NP', 'LK', 'MM', 'KH', 'LA', 'BT', 'MV', 'BN'
+              ]
+            }
           };
           EOF
         - |
@@ -90,7 +164,6 @@ frontend:
               ]
             },
             aws_cognito_verification_mechanisms: ['EMAIL'],
-            // Custom attributes 설정 추가
             aws_cognito_user_attributes: [
               'email',
               'name',
@@ -116,7 +189,6 @@ frontend:
                   email: true,
                   phone: false
                 },
-                // 사용자 속성 설정 추가
                 userAttributes: {
                   email: {
                     required: true

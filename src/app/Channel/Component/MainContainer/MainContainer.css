@@ -1,4 +1,4 @@
-/* 간결한 MainContainer.css - 백엔드 예시에 맞춘 스타일 */
+/* 개선된 MainContainer.css - 새로운 UI 요소 스타일 추가 */
 
 .chat-container {
   display: flex;
@@ -120,7 +120,7 @@
   height: 14px;
 }
 
-/* 채팅 액션 버튼들 */
+/* 🔥 채팅 액션 버튼들 - 강화 */
 .chat-actions {
   display: flex;
   gap: 8px;
@@ -140,6 +140,7 @@
   color: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.2);
+  position: relative;
 }
 
 .header-btn:hover:not(:disabled) {
@@ -164,6 +165,110 @@
 .reconnect-btn:hover:not(:disabled) {
   background: rgba(239, 68, 68, 0.3) !important;
   box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3) !important;
+}
+
+.rejoin-btn {
+  background: rgba(245, 158, 11, 0.2) !important;
+  color: #fbbf24 !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+.rejoin-btn:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.3) !important;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3) !important;
+}
+
+.debug-btn {
+  background: rgba(139, 92, 246, 0.2) !important;
+  color: #a78bfa !important;
+  border-color: rgba(139, 92, 246, 0.3) !important;
+}
+
+.debug-btn:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.3) !important;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3) !important;
+}
+
+/* 🔥 연결 문제 알림 배너 */
+.connection-issue-banner {
+  background: linear-gradient(90deg, #fef3c7, #fde68a);
+  border-bottom: 2px solid #f59e0b;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  animation: slideDown 0.3s ease-out;
+}
+
+.issue-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.warning-icon {
+  color: #f59e0b;
+  font-size: 24px !important;
+  animation: pulse 2s infinite;
+}
+
+.issue-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.issue-text strong {
+  color: #92400e;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.issue-text span {
+  color: #a16207;
+  font-size: 12px;
+}
+
+.issue-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.fix-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(245, 158, 11, 0.2);
+  color: #92400e;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 600;
+}
+
+.fix-btn:hover {
+  background: rgba(245, 158, 11, 0.3);
+  transform: translateY(-1px);
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 
 /* === 메시지 영역 === */
@@ -221,6 +326,54 @@
   color: #718096;
   margin-bottom: 32px;
   line-height: 1.6;
+}
+
+/* 🔥 채팅방 정보 표시 */
+.room-info {
+  margin-top: 24px;
+  padding: 20px;
+  background: rgba(49, 130, 206, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(49, 130, 206, 0.1);
+}
+
+.room-info h6 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #3182ce;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(49, 130, 206, 0.1);
+}
+
+.info-item:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  font-size: 12px;
+  color: #718096;
+  font-weight: 600;
+}
+
+.info-value {
+  font-size: 12px;
+  color: #2d3748;
+  font-weight: 700;
 }
 
 .connection-waiting {
@@ -586,6 +739,176 @@
   50% { opacity: 0.6; }
 }
 
+/* 🔥 빠른 액션 버튼들 */
+.quick-actions {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.quick-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #3182ce, #2b6cb0);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(49, 130, 206, 0.2);
+}
+
+.quick-action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(49, 130, 206, 0.3);
+}
+
+.quick-action-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #718096;
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* 🔥 개발자 도구 패널 */
+.dev-tools {
+  background: #2d3748;
+  color: #e2e8f0;
+  border-top: 1px solid #4a5568;
+  transition: all 0.3s ease;
+}
+
+.dev-tools.collapsed {
+  height: auto;
+}
+
+.dev-tools-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  cursor: pointer;
+  background: #374151;
+  border-bottom: 1px solid #4b5563;
+  transition: background 0.2s ease;
+}
+
+.dev-tools-header:hover {
+  background: #4b5563;
+}
+
+.dev-tools-header mat-icon {
+  font-size: 18px !important;
+  color: #9ca3af;
+}
+
+.dev-tools-header span {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f3f4f6;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dev-tools-content {
+  padding: 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dev-tool-section h6 {
+  font-size: 12px;
+  font-weight: 700;
+  color: #9ca3af;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.status-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 12px;
+}
+
+.status-item span:first-child {
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.status-item span:last-child {
+  color: #f3f4f6;
+  font-weight: 600;
+}
+
+.status-connected {
+  color: #10b981 !important;
+}
+
+.status-connecting,
+.status-reconnecting {
+  color: #f59e0b !important;
+}
+
+.status-disconnected {
+  color: #ef4444 !important;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dev-btn {
+  background: #4b5563;
+  color: #f3f4f6;
+  border: 1px solid #6b7280;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.dev-btn:hover:not(:disabled) {
+  background: #6b7280;
+  transform: translateY(-1px);
+}
+
+.dev-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dev-btn.warning {
+  background: #dc2626;
+  border-color: #ef4444;
+}
+
+.dev-btn.warning:hover:not(:disabled) {
+  background: #ef4444;
+}
+
 /* === 스크롤바 스타일링 === */
 .chat-messages::-webkit-scrollbar {
   width: 8px;
@@ -617,6 +940,10 @@
 
   .connection-status {
     font-size: 10px;
+  }
+
+  .chat-actions {
+    gap: 6px;
   }
 
   .chat-messages {
@@ -656,6 +983,40 @@
   .send-btn {
     width: 32px;
     height: 32px;
+  }
+
+  .connection-issue-banner {
+    padding: 10px 16px;
+  }
+
+  .issue-content {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+  }
+
+  .issue-actions {
+    justify-content: center;
+  }
+
+  .dev-tools-content {
+    padding: 12px 16px;
+  }
+
+  .action-buttons {
+    justify-content: center;
+  }
+
+  .status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-actions {
+    flex-direction: column;
   }
 }
 
@@ -723,6 +1084,23 @@
   .message-input {
     font-size: 13px;
     padding: 6px;
+  }
+
+  .room-info {
+    padding: 16px;
+  }
+
+  .fix-btn {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .dev-tools-header {
+    padding: 10px 12px;
+  }
+
+  .dev-tools-content {
+    padding: 10px 12px;
   }
 }
 
