@@ -196,20 +196,23 @@
       @if (quests().length > 0) {
         <div class="quest-grid">
           @for (quest of quests(); track quest.id) {
-            <div class="quest-card"
-                [attr.data-status]="quest.status"
-                [class.selected]="isQuestSelected(quest.id)"
-                [class.disabled]="!isQuestCompletable(quest)"
-                [class.cache-completed]="isQuestCompletedByQuestId(quest.id)"
-                (click)="onQuestClick(quest)">
-
+            <div class="quest-card" 
+                 [attr.data-status]="quest.status"
+                 [class]="getQuestStatusClass(quest)"
+                 [class.selected]="isQuestSelected(quest.id)"
+                 [class.completed]="isQuestCompletedForTemplate(quest)"
+                 [class.selectable]="canSelectQuest(quest)"
+                 (click)="canSelectQuest(quest) ? onQuestClick(quest) : null">
+              
+              <!-- 선택 표시 -->
               @if (isQuestSelected(quest.id)) {
                 <div class="selection-indicator">
                   <mat-icon>check_circle</mat-icon>
                 </div>
               }
               
-              @if (isQuestCompletedByQuestId(quest.id)) {
+              <!-- 완료 배지 -->
+              @if (isQuestCompletedForTemplate(quest)) {
                 <div class="completion-badge">
                   <mat-icon>verified</mat-icon>
                   <span>완료됨</span>
@@ -222,6 +225,19 @@
                   <h3 class="quest-title">{{ quest.title }}</h3>
                   <p class="quest-description">{{ quest.description }}</p>
                 </div>
+                
+                <!-- 상태 아이콘 -->
+                <div class="quest-status-icons">
+                  @if (isQuestCompletedForTemplate(quest)) {
+                    <mat-icon class="status-icon completed">check_circle</mat-icon>
+                  } @else if (isQuestSelected(quest.id)) {
+                    <mat-icon class="status-icon selected">radio_button_checked</mat-icon>
+                  } @else if (canSelectQuest(quest)) {
+                    <mat-icon class="status-icon available">radio_button_unchecked</mat-icon>
+                  } @else {
+                    <mat-icon class="status-icon disabled">block</mat-icon>
+                  }
+                </div>
               </div>
               
               <div class="quest-progress-container">
@@ -229,6 +245,7 @@
                   <div 
                     class="quest-progress-bar" 
                     [attr.data-progress]="quest.progress"
+                    [style.width.%]="isQuestCompletedForTemplate(quest) ? 100 : quest.progress"
                     [style.background-color]="getStatusColor(quest.status)">
                   </div>
                 </div>
@@ -236,11 +253,29 @@
                   <span 
                     class="status-badge"
                     [style.color]="getStatusColor(quest.status)">
-                    {{ getStatusText(quest.status) }}
+                    {{ isQuestCompletedForTemplate(quest) ? '완료됨' : getStatusText(quest.status) }}
                   </span>
-                  <span class="progress-text">{{ quest.progress }}% 완료</span>
+                  <span class="progress-text">
+                    {{ isQuestCompletedForTemplate(quest) ? '100' : quest.progress }}% 완료
+                  </span>
                 </div>
               </div>
+              
+              <!-- 액션 버튼 (완료되지 않은 퀘스트만) -->
+              @if (!isQuestCompletedForTemplate(quest)) {
+                <div class="quest-actions">
+                  <button class="action-button"
+                          [disabled]="!canSelectQuest(quest)"
+                          [class.selected]="isQuestSelected(quest.id)"
+                          (click)="onQuestClick(quest); $event.stopPropagation()">
+                    @if (canSelectQuest(quest)) {
+                      {{ isQuestSelected(quest.id) ? '선택됨' : '선택하기' }}
+                    } @else {
+                      선택 불가
+                    }
+                  </button>
+                </div>
+              }
             </div>
           }
         </div>
