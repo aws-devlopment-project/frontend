@@ -14,8 +14,8 @@ import { ActivityDashboardComponent } from "../DashBoard/Component/ActivityDashb
 import { SharedStateService } from "../Core/Service/SharedService";
 import { environment } from "../../environments/environtment";
 import { RouterModule } from "@angular/router";
-import { ChatbotComponent } from "../Core/Component/Chatbot/Chatbot";
-import { DonationPageComponent } from "../Core/Component/Donation/Donation";
+import { ChatbotComponent } from "../Chatbot/Component/Chatbot/Chatbot";
+import { DonationPageComponent } from "../Donation/Component/Donation/Donation";
 
 interface ChannelSelectEvent {
     groupId: string;

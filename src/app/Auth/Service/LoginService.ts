@@ -331,7 +331,7 @@ export class LoginService {
             await signOut({global: true});
             // 로컬 저장소 정리
             this.clearLocalData();
-            this.router.navigate(['/board']);
+            this.router.navigate(['/login']);
             return { success: true };
         } catch (error: any) {
             console.error('로그아웃 오류:', error);
