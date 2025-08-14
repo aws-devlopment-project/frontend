@@ -1379,3 +1379,594 @@
     padding: 20px;
   }
 }
+
+.quest-card.personally-completed {
+  background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%) !important;
+  border: 2px solid #48bb78 !important;
+  cursor: default;
+  pointer-events: none;
+}
+
+.quest-card.personally-completed::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #48bb78, #38a169);
+}
+
+/* 선택 가능한 퀘스트 */
+.quest-card.selectable {
+  cursor: pointer;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  background: white;
+  color: #4a5568;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.quest-action-button:hover:not(:disabled) {
+  border-color: #3182ce;
+  background: rgba(49, 130, 206, 0.05);
+  color: #3182ce;
+  transform: translateY(-1px);
+}
+
+.quest-action-button.selected {
+  border-color: #3182ce;
+  background: linear-gradient(135deg, #3182ce, #2b6cb0);
+  color: white;
+  box-shadow: 0 4px 12px rgba(49, 130, 206, 0.3);
+}
+
+.quest-action-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #f7fafc;
+  color: #a0aec0;
+  border-color: #e2e8f0;
+}
+
+.completed-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #48bb78, #38a169);
+  color: white;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.completed-indicator mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+
+/* === 그룹 진행률 기반 보조 스타일 === */
+.quest-card.group-high-progress .group-progress-fill {
+  background: linear-gradient(90deg, #48bb78, #38a169);
+  box-shadow: 0 2px 8px rgba(72, 187, 120, 0.3);
+}
+
+.quest-card.group-medium-progress .group-progress-fill {
+  background: linear-gradient(90deg, #ed8936, #dd6b20);
+  box-shadow: 0 2px 8px rgba(237, 137, 54, 0.3);
+}
+
+.quest-card.group-low-progress .group-progress-fill {
+  background: linear-gradient(90deg, #a0aec0, #718096);
+}
+
+/* === 호버 효과 비활성화 (완료된 퀘스트) === */
+.quest-card.personally-completed:hover {
+  transform: none !important;
+  box-shadow: 0 4px 12px rgba(72, 187, 120, 0.2) !important;
+  border-color: #48bb78 !important;
+}
+
+.quest-card.not-selectable:hover {
+  transform: none !important;
+  box-shadow: none !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* === 반응형 개선 === */
+@media (max-width: 768px) {
+  .personal-status-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .group-progress-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .group-progress-container {
+    gap: 8px;
+  }
+  
+  .quest-header {
+    gap: 12px;
+  }
+  
+  .quest-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .quest-card {
+    padding: 16px;
+  }
+  
+  .group-progress-section {
+    padding: 12px;
+  }
+  
+  .personal-status-text {
+    font-size: 11px;
+  }
+  
+  .group-progress-label,
+  .group-progress-text {
+    font-size: 11px;
+  }
+}
+
+.quest-card.selectable:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(49, 130, 206, 0.2);
+  border-color: #3182ce;
+}
+
+.quest-card.selectable::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #3182ce, #2b6cb0);
+}
+
+/* 선택 불가능한 퀘스트 */
+.quest-card.not-selectable {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+  border-color: #e2e8f0;
+}
+
+/* 선택된 퀘스트 */
+.quest-card.selected {
+  border-color: #3182ce !important;
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%) !important;
+  box-shadow: 0 8px 24px rgba(49, 130, 206, 0.3);
+  transform: translateY(-2px);
+}
+
+.quest-card.selected::before {
+  height: 6px !important;
+  background: linear-gradient(90deg, #3182ce, #1e40af) !important;
+}
+
+/* === 🎯 개인 상태 표시 헤더 === */
+.personal-status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.personal-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.personal-status-indicator mat-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}
+
+.personal-status-text {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.selection-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #3182ce, #2b6cb0);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.selection-badge mat-icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+}
+
+/* === 🎯 그룹 진행률 섹션 === */
+.group-progress-section {
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.group-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.group-progress-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4a5568;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.group-progress-text {
+  font-size: 12px;
+  color: #718096;
+}
+
+.group-progress-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.group-progress-bar {
+  flex: 1;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.group-progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.8s ease-out;
+  background: linear-gradient(90deg, #48bb78, #38a169);
+}
+
+.group-progress-percentage {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2d3748;
+  min-width: 40px;
+  text-align: right;
+}
+
+.group-status-text {
+  font-size: 11px;
+  color: #718096;
+  text-align: center;
+  font-style: italic;
+}
+
+/* === 🎯 액션 영역 === */
+.quest-actions {
+  margin-top: 16px;
+}
+
+.quest-action-button {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e2e8f0;
+  
+
+.quest-completed {
+  background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%) !important;
+  border: 2px solid #48bb78 !important;
+  opacity: 0.85;
+  cursor: default;
+  pointer-events: none;
+}
+
+.quest-completed::before {
+  background: linear-gradient(90deg, #48bb78, #38a169) !important;
+  height: 6px !important;
+}
+
+.quest-completed .quest-icon {
+  background: linear-gradient(135deg, #48bb78, #38a169) !important;
+  box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4) !important;
+}
+
+.quest-selected {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%) !important;
+  border: 2px solid #3182ce !important;
+  box-shadow: 0 8px 24px rgba(49, 130, 206, 0.3) !important;
+  transform: translateY(-2px);
+}
+
+.quest-selected::before {
+  background: linear-gradient(90deg, #3182ce, #1e40af) !important;
+  height: 6px !important;
+}
+
+.quest-disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%) !important;
+  border: 2px solid #e2e8f0 !important;
+}
+
+.quest-disabled::before {
+  background: linear-gradient(90deg, #a0aec0, #718096) !important;
+}
+
+.quest-available {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.quest-available:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(49, 130, 206, 0.2);
+  border-color: #3182ce;
+}
+
+/* === 상태 아이콘 스타일 === */
+
+.quest-status-icons {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.status-icon {
+  font-size: 24px !important;
+  width: 24px !important;
+  height: 24px !important;
+}
+
+.status-icon.completed {
+  color: #48bb78;
+  animation: completionPulse 0.6s ease-out;
+}
+
+.status-icon.selected {
+  color: #3182ce;
+  animation: selectionBounce 0.3s ease-out;
+}
+
+.status-icon.available {
+  color: #a0aec0;
+  transition: color 0.2s ease;
+}
+
+.quest-card:hover .status-icon.available {
+  color: #3182ce;
+}
+
+.status-icon.disabled {
+  color: #e2e8f0;
+}
+
+/* === 액션 버튼 스타일 === */
+
+.quest-actions {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.action-button {
+  width: 100%;
+  padding: 10px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  background: white;
+  color: #4a5568;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+.action-button:hover:not(:disabled) {
+  border-color: #3182ce;
+  background: rgba(49, 130, 206, 0.05);
+  color: #3182ce;
+  transform: translateY(-1px);
+}
+
+.action-button.selected {
+  border-color: #3182ce;
+  background: linear-gradient(135deg, #3182ce, #2b6cb0);
+  color: white;
+  box-shadow: 0 4px 12px rgba(49, 130, 206, 0.3);
+}
+
+.action-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #f7fafc;
+  color: #a0aec0;
+  border-color: #e2e8f0;
+}
+
+/* === 디버깅 섹션 스타일 === */
+
+.debug-section {
+  margin-top: 24px;
+  padding: 16px;
+  background: #f7fafc;
+  border-radius: 8px;
+  border-left: 4px solid #4299e1;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+}
+
+.debug-section h4 {
+  color: #2d3748;
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.debug-section .btn {
+  font-size: 12px;
+  padding: 6px 12px;
+  min-width: auto;
+}
+
+/* === 애니메이션 개선 === */
+
+@keyframes completionPulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes selectionBounce {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* === 상태별 진행률 바 색상 === */
+
+.quest-completed .quest-progress-bar {
+  background: linear-gradient(90deg, #48bb78, #38a169) !important;
+  width: 100% !important;
+}
+
+.quest-selected .quest-progress-bar {
+  background: linear-gradient(90deg, #3182ce, #2b6cb0) !important;
+  box-shadow: 0 2px 8px rgba(49, 130, 206, 0.3);
+}
+
+.quest-disabled .quest-progress-bar {
+  background: linear-gradient(90deg, #a0aec0, #718096) !important;
+}
+
+/* === 상태 텍스트 스타일 === */
+
+.quest-completed .status-badge {
+  color: #48bb78 !important;
+  font-weight: 700;
+}
+
+.quest-completed .progress-text {
+  color: #38a169 !important;
+  font-weight: 600;
+}
+
+.quest-selected .status-badge {
+  color: #3182ce !important;
+  font-weight: 700;
+}
+
+.quest-disabled .status-badge {
+  color: #a0aec0 !important;
+}
+
+.quest-disabled .progress-text {
+  color: #a0aec0 !important;
+}
+
+/* === 호버 효과 비활성화 (완료된 퀘스트) === */
+
+.quest-completed:hover {
+  transform: none !important;
+  box-shadow: 0 4px 12px rgba(72, 187, 120, 0.2) !important;
+  border-color: #48bb78 !important;
+}
+
+.quest-disabled:hover {
+  transform: none !important;
+  box-shadow: none !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* === 반응형 개선 === */
+
+@media (max-width: 768px) {
+  .quest-status-icons {
+    margin-top: 8px;
+    margin-left: 0;
+  }
+  
+  .quest-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .debug-section {
+    padding: 12px;
+  }
+  
+  .debug-section .btn {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .status-icon {
+    font-size: 20px !important;
+    width: 20px !important;
+    height: 20px !important;
+  }
+  
+  .action-button {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  
+  .debug-section {
+    font-size: 11px;
+  }
+}
