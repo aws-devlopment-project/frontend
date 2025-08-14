@@ -34,7 +34,7 @@ export class StompWebSocketService {
   constructor() {}
   
   // STOMP 연결
-  connect(userEmail: string, username: string, serverUrl: string = `${environment.webSocketUrl}`): void {
+  connect(userEmail: string, username: string, serverUrl: string = "https://server.teamnameless.click"): void {
     console.log('🔌 STOMP 연결 시작:', { userEmail, username, serverUrl });
     
     if (this.stompClient?.connected) {

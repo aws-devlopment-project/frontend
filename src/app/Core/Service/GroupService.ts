@@ -16,6 +16,8 @@ export class GroupService {
 
     constructor(private httpService: HttpService, private dataService: DataCacheService, private userService: UserService) {}
 
+    serverUrl: string = "https://server.teamnameless.click"
+
     async checkQuestCreateTime(groupname: string) : Promise<boolean> {
         const group: Group | null = await this.dataService.getCache(groupname);
 
@@ -33,7 +35,7 @@ export class GroupService {
         if (group) {
             return group;
         }
-        const url = environment.apiUrl + `/api/group/getGroupInfo?name=${groupname}`;
+        const url = this.serverUrl + `/api/group/getGroupInfo?name=${groupname}`;
         const headers: HttpHeaders = new HttpHeaders({
             'Content-Type': 'application/json'
         });
@@ -52,7 +54,7 @@ export class GroupService {
     }
 
     async getGroupList(): Promise<Group[]> {
-        const url = environment.apiUrl + '/api/group/getGroupList';
+        const url = this.serverUrl + '/api/group/getGroupList';
         const headers: HttpHeaders = new HttpHeaders({
             'Content-Type': 'application/json'
         });
@@ -80,7 +82,7 @@ export class GroupService {
         user: string, 
         questList: {club: string, quest: string, feedback: string}[],
         ): Promise<boolean> {
-        const url = environment.apiUrl + '/api/group/questSuccess';
+        const url = this.serverUrl + '/api/group/questSuccess';
         const headers = new HttpHeaders({
             'Content-Type': 'application/json'
         });
