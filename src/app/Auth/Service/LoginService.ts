@@ -553,23 +553,64 @@ export class LoginService {
         }
     }
 
-  async getCurrentUserAttributes() {
-    try {
-      const attributes = await fetchUserAttributes();
-      return attributes;
-    } catch (error) {
-      console.error('Error fetching user attributes:', error);
-      throw error;
+    async getCurrentUserAttributes() {
+        try {
+            const authProvider = await this.getAuthProvider();
+            
+            if (authProvider === 'cognito') {
+            return await fetchUserAttributes();
+            } else {
+            // Google OAuth의 경우 ID Token에서 정보 추출
+            const session = await fetchAuthSession();
+            if (session.tokens?.idToken) {
+                const idTokenPayload = JSON.parse(atob(session.tokens.idToken.toString().split('.')[1]));
+                return {
+                email: idTokenPayload.email,
+                name: idTokenPayload.name,
+                // Google OAuth에서는 custom:username이 없으므로 name 사용
+                };
+            }
+            throw new Error('ID Token not found');
+            }
+        } catch (error) {
+            console.error('Error fetching user attributes:', error);
+            throw error;
+        }
     }
-  }
 
-  async getCustomUsername(): Promise<string | null> {
+    async getCustomUsername(): Promise<string | null> {
     try {
-      const attributes = await fetchUserAttributes();
-      return attributes['custom:username'] || null;
+        const session = await fetchAuthSession();
+        const authProvider = await this.getAuthProvider();
+        
+        switch (authProvider) {
+        case 'cognito':
+            // Cognito 직접 로그인: fetchUserAttributes() 사용 가능
+            const attributes = await fetchUserAttributes();
+            return attributes['custom:username'] || null;
+            
+        case 'google':
+            // Google OAuth: ID Token에서 name 사용 (custom:username 없음)
+            if (session.tokens?.idToken) {
+            const idTokenPayload = JSON.parse(atob(session.tokens.idToken.toString().split('.')[1]));
+            return idTokenPayload.name || idTokenPayload.email?.split('@')[0] || null;
+            }
+            return null;
+            
+        default:
+            // Unknown인 경우 ID Token이 있으면 Google로 간주
+            if (session.tokens?.idToken) {
+            const idTokenPayload = JSON.parse(atob(session.tokens.idToken.toString().split('.')[1]));
+            return idTokenPayload.name || idTokenPayload.email?.split('@')[0] || null;
+            } else {
+            // ID Token이 없으면 Cognito로 시도
+            const attributes = await fetchUserAttributes();
+            return attributes['custom:username'] || null;
+            }
+        }
     } catch (error) {
-      console.error('Error fetching custom username:', error);
-      return null;
+        console.error('Error fetching custom username:', error);
+        return null;
     }
-  }
+    }
 }
