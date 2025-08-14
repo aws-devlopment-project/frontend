@@ -44,7 +44,7 @@ export class SharedStateService {
   });
   private _sidebarExpanded = signal(false);
   private _expandedSections = signal<string[]>([]);
-  private _userJoin = signal<UserJoin | null>(null);
+  public _userJoin = signal<UserJoin | null>(null);
   private _groupList = signal<{id: number, name: string}[]>([]);
   private _clubList = signal<{id: number, name: string, groupId: number}[]>([]);
   private _initialized = signal(false);
@@ -92,7 +92,7 @@ export class SharedStateService {
     if (!selectedChannel || !selectedGroup) {
       return { id: -1, name: '', groupId: -1 };
     }
-    
+
     // groupList에서 그룹 ID 찾기
     const group = this._groupList().find(g => g.name === selectedGroup);
     if (!group) {
