@@ -369,33 +369,40 @@ export class MainContainerComponent implements OnInit, OnDestroy {
       const reader = new FileReader();
 
       // 1. 파일 리더기가 준비되면 내용물을 하나씩 읽기 시작한다
-      console.log(reader);
       reader.onload = () => {
         console.log("onLoad");
-        const base64 = (reader.result as string).split(',')[1];
-        console.log('📤 이미지 전송:', base64);
-         // 🔥 1. 먼저 UI에 즉시 표시 (낙관적 업데이트)
+        const base64WithPrefix = reader.result as string; // 전체 Data URL (접두사 포함)
+        console.log('📤 이미지 전송:', base64WithPrefix);
+
         const optimisticMessage: DisplayMessage = {
           id: this.generateMessageId(),
           senderEmail: userEmail,
           senderUsername: username,
-          content: base64,
+          content: base64WithPrefix, // UI 표시도 접두사 포함
           timestamp: new Date(),
           type: 'user',
           messageType: 'IMAGE',
           isOwn: true
         };
-        console.log('📤 메시지 전송:', { clubId, userEmail, username, base64 });
-        // 메시지를 전송 캐시에 추가 (서버 응답과 중복 방지용)
-        const messageKey = this.generateSentMessageKey(base64, userEmail);
-        this.sentMessages.set(messageKey, Date.now());      // UI에 즉시 추가
+
+        const messageKey = this.generateSentMessageKey(base64WithPrefix, userEmail);
+        this.sentMessages.set(messageKey, Date.now());
+
         this.messages.update(messages => [...messages, optimisticMessage]);
-        this.stompWebSocketService.sendChatMessage(clubId, userEmail, username, base64, optimisticMessage.messageType);
-        // 🔥 3. 캐시 정리 스케줄링
+
+        // 서버에도 접두사 포함 버전 전송
+        this.stompWebSocketService.sendChatMessage(
+          clubId,
+          userEmail,
+          username,
+          base64WithPrefix,
+          optimisticMessage.messageType
+        );
+
         setTimeout(() => {
           this.sentMessages.delete(messageKey);
         }, this.SENT_MESSAGE_CACHE_DURATION);
-      }
+      };
 
       reader.onerror = (err) => {
         console.error("File read error", err);

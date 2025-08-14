@@ -26,24 +26,12 @@ export class DonationPointsService {
       const userStatus = await this.userService.getUserStatus();
       if (userStatus) {
         // UserStatus에 points 필드가 있다고 가정하거나, 다른 방식으로 포인트 계산
-        const calculatedPoints = await this.calculateUserPoints();
-        this._userPoints.set(calculatedPoints);
+        const calculatedPoints = this.activityService.getActivityStats();
+        this._userPoints.set(calculatedPoints.totalPoints);
       }
     } catch (error) {
       console.error('Failed to initialize points:', error);
       this._userPoints.set(0); // 기본값
-    }
-  }
-
-  private async calculateUserPoints(): Promise<number> {
-    try {
-      // 활동 기반 포인트 계산
-      const activityStats = this.activityService.getActivityStats();
-      
-      return activityStats.totalPoints;
-    } catch (error) {
-      console.error('Error calculating points:', error);
-      return 0; // 기본값
     }
   }
 
@@ -102,7 +90,7 @@ export class DonationPointsService {
 
   // 포인트 새로고침
   async refreshPoints(): Promise<void> {
-    const newPoints = await this.calculateUserPoints();
+    const newPoints = this.activityService.getActivityStats().totalPoints;
     this._userPoints.set(newPoints);
   }
 
