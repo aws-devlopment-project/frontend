@@ -24,7 +24,7 @@ export class UserService {
         private loginService: LoginService
     ) {}
 
-    serverUrl: string = "https://server.teamnameless.click";
+    serverUrl: string = "https://stage.teamnameless.click";
 
     // === 개선된 사용자 인증 정보 조회 ===
     async getUserCredentials(): Promise<UserCredentials | null> {
