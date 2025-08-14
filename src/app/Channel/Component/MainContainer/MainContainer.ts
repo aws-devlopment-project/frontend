@@ -355,7 +355,47 @@ export class MainContainerComponent implements OnInit, OnDestroy {
     }
   }
 
-  sendImage(file: File) {
+  private resizeImage(file: File, maxWidth: number, maxHeight: number): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+
+      reader.onload = e => {
+        img.src = e.target?.result as string;
+      };
+
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        // 비율 유지하며 크기 조정
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        // JPEG 변환 (품질 0.8)
+        const resizedBase64 = canvas.toDataURL("image/jpeg", 0.8);
+        resolve(resizedBase64);
+      };
+
+      img.onerror = err => reject(err);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async sendImage(file: File) {
     if (!this.stompWebSocketService.isConnected()) {
       this.addSystemMessage('서버에 연결되지 않았습니다.');
       return;
@@ -366,50 +406,44 @@ export class MainContainerComponent implements OnInit, OnDestroy {
     const username = this.currentUsername();
 
     if (clubId !== -1 && userEmail && username) {
-      const reader = new FileReader();
+      try {
+        // 1. 리사이즈 처리
+        const resizedBase64 = await this.resizeImage(file, 800, 800);
 
-      // 1. 파일 리더기가 준비되면 내용물을 하나씩 읽기 시작한다
-      reader.onload = () => {
-        console.log("onLoad");
-        const base64WithPrefix = reader.result as string; // 전체 Data URL (접두사 포함)
-        console.log('📤 이미지 전송:', base64WithPrefix);
-
+        // 2. UI 낙관적 업데이트
         const optimisticMessage: DisplayMessage = {
           id: this.generateMessageId(),
           senderEmail: userEmail,
           senderUsername: username,
-          content: base64WithPrefix, // UI 표시도 접두사 포함
+          content: resizedBase64, // 접두사 포함
           timestamp: new Date(),
           type: 'user',
           messageType: 'IMAGE',
           isOwn: true
         };
 
-        const messageKey = this.generateSentMessageKey(base64WithPrefix, userEmail);
+        const messageKey = this.generateSentMessageKey(resizedBase64, userEmail);
         this.sentMessages.set(messageKey, Date.now());
-
         this.messages.update(messages => [...messages, optimisticMessage]);
 
-        // 서버에도 접두사 포함 버전 전송
+        // 3. 서버로 전송
         this.stompWebSocketService.sendChatMessage(
           clubId,
           userEmail,
           username,
-          base64WithPrefix,
+          resizedBase64,
           optimisticMessage.messageType
         );
 
+        // 4. 캐시 삭제 예약
         setTimeout(() => {
           this.sentMessages.delete(messageKey);
         }, this.SENT_MESSAGE_CACHE_DURATION);
-      };
 
-      reader.onerror = (err) => {
-        console.error("File read error", err);
+      } catch (err) {
+        console.error("이미지 리사이즈 실패", err);
+        this.addSystemMessage("이미지 전송 중 오류가 발생했습니다.");
       }
-      console.log("Before readAsDataURL", file);
-      reader.readAsDataURL(file);
-      console.log("After readAsDataURL");
     } else {
       console.warn('메시지 전송 실패:', { 
         clubId, 
