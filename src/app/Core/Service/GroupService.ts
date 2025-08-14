@@ -3,13 +3,17 @@ import { DataCacheService } from "./DataCacheService";
 import { HttpService } from "./HttpService";
 import { HttpHeaders } from "@angular/common/http";
 import { Group } from "../Models/group";
+import { firstValueFrom } from 'rxjs';
+import { createGroup, createGroupList } from "../Models/group";
+import { UserQuestCur } from "../Models/user";
+import { UserService } from "./UserService";
 
 @Injectable({
     providedIn: 'root'
 })
 export class GroupService {
 
-    constructor(private httpService: HttpService, private dataService: DataCacheService) {}
+    constructor(private httpService: HttpService, private dataService: DataCacheService, private userService: UserService) {}
 
     async checkQuestCreateTime(groupname: string) : Promise<boolean> {
         const group: Group | null = await this.dataService.getCache(groupname);
@@ -33,7 +37,10 @@ export class GroupService {
             'Content-Type': 'application/json'
         });
         try {
-            const response = this.httpService.get(url, headers).subscribe(async (data: Group) => {
+            const response = this.httpService.get(url, createGroup, headers).subscribe(async (data: Group) => {
+                if (data.id === -1) {
+                    return undefined;
+                }
                 this.dataService.setCache(groupname, data);
                 return await this.dataService.getCache(groupname);
             })
@@ -43,24 +50,28 @@ export class GroupService {
         return undefined;
     }
 
-    async getGroupList(): Promise<Group[] | []> {
+    async getGroupList(): Promise<Group[]> {
         const url = '/api/group/getGroupList';
         const headers: HttpHeaders = new HttpHeaders({
             'Content-Type': 'application/json'
         });
+        
         try {
-            const response = await this.httpService.get(url, headers).toPromise();
-            const groupList: Group[] | null = response;
-            if (groupList) {
-                groupList.forEach((group) => {
+            const data = await firstValueFrom(
+                this.httpService.get(url, createGroupList, headers)
+            );
+            
+            if (data && data.length !== 0) {
+                data.forEach((group) => {
                     this.dataService.setCache(group.name, group);
                 });
             }
-            return groupList || [];
+            
+            return data || [];
         } catch (e) {
             console.error("[API] getGroupList: " + e);
+            return [];
         }
-        return [];
     }
 
     async questSuccessWithFeedback(
@@ -88,12 +99,27 @@ export class GroupService {
                 questList.forEach((quest) => {
                     const questIndex = cacheGroup.questList.indexOf(quest.quest);
                     if (questIndex !== -1) {
-                    cacheGroup.questSuccessNum[questIndex] += 1;
+                        cacheGroup.questSuccessNum[questIndex] += 1;
                     }
                 });
                 this.dataService.setCache(group, cacheGroup);
             }
-            
+            let userQuestCur: UserQuestCur | null = await this.dataService.getCache('userQuestCur');
+            if (!userQuestCur)
+                userQuestCur = await this.userService.getUserQuestCur(user);
+            if (userQuestCur) {
+                questList.forEach((quest) => {
+                    const questIndex = userQuestCur.curQuestTotalList.findIndex(
+                        (q) => q.quest === quest.quest && q.group === group && q.club === quest.club
+                    );
+                    console.log("questIndex: " + questIndex);
+                    console.log("quest: " + quest.quest);
+                    if (questIndex !== -1) {
+                        userQuestCur.curQuestTotalList[questIndex].success = true;
+                    }
+                });
+                this.dataService.setCache('userQuestCur', userQuestCur);
+            }
             return true;
         } catch (error) {
             console.error('Error in questSuccessWithFeedback:', error);

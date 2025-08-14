@@ -63,6 +63,7 @@
       (navigationChange)="onNavigationChange($event)"
       (groupSelect)="onGroupSelect($event)"
       (channelSelect)="onChannelSelect($event)">
+
     </app-sidebar>
 
     <!-- 메인 콘텐츠 영역 -->
@@ -175,6 +176,9 @@
           
           @case ('member') {
             <app-member-dashboard></app-member-dashboard>
+          }
+          @case ('donation') {
+            <app-donation-page></app-donation-page>
           }
           
           @default {

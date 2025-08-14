@@ -36,6 +36,10 @@ export class LoginComponent implements OnInit {
     signInForm: FormGroup = new FormGroup({});
     signUpForm: FormGroup = new FormGroup({});
     emailForm: FormGroup = new FormGroup({});
+
+    currentUsername: string = '';
+    newUsername: string = '';
+    isUpdating: boolean = false;
     
     constructor(
         private fb: FormBuilder, 
@@ -47,6 +51,7 @@ export class LoginComponent implements OnInit {
     ngOnInit(): void {
         this.initializeForms();
         this.handleAuthCallback();
+        this.loadCurrentUsername();
     }
 
     private initializeForms(): void {
@@ -198,17 +203,14 @@ export class LoginComponent implements OnInit {
 
         try {
             const res = await this.auth.confirmUser(email, verificationCode);
-            console.log('인증 결과:', res);
             
             // autoSignIn이 완료되기를 기다림
             if (res.nextStep?.signUpStep === 'COMPLETE_AUTO_SIGN_IN') {
-                console.log('자동 로그인 진행 중...');
                 
                 // 잠시 기다린 후 인증 상태 확인
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 
                 const isAuthenticated = await this.auth.checkAuthState();
-                console.log('자동 로그인 후 인증 상태:', isAuthenticated);
                 
                 if (isAuthenticated) {
                     // 자동 로그인 성공 - 사용자 정보 처리
@@ -240,7 +242,6 @@ export class LoginComponent implements OnInit {
             }
             
             const userInfo = await this.auth.getCurrentUserInfo();
-            console.log('사용자 정보:', userInfo);
             
             // Google OAuth인 경우와 일반 회원가입 구분
             let displayName: string;
@@ -260,8 +261,6 @@ export class LoginComponent implements OnInit {
                             'User';
                 userId = userInfo.userAttributes?.email || userInfo.user.userId;
             }
-
-            console.log('처리된 사용자 정보:', { userId, displayName, authProvider: userInfo.authProvider });
 
             const user: UserCredentials = {
                 id: userId,
@@ -301,7 +300,6 @@ export class LoginComponent implements OnInit {
         try {
             this.isLoading.update(() => true);
             const result = await this.auth.requestPassswordReset(email);
-            console.log("비밀번호 재설정 요청 완료:", result);
             
             alert('비밀번호 재설정 링크가 이메일로 전송되었습니다.');
         } catch (error: any) {
@@ -359,14 +357,14 @@ export class LoginComponent implements OnInit {
         // 로컬에서 사용 시 try 내부 코드에서 주석 처리된 코드를 활성화 해주시고 기존에 활성화된 코드는 주석 처리해주세요
         try {
             // const user: UserCredentials = {
-            //     id: "wefwef@wefwefwef.wefwefwef",
-            //     name: "wefwefwefwefwef",
-            //     idToken: "1234",
+            //     id: "",
+            //     name: "",
+            //     idToken: "",
             // };
 
             // const userStatus: UserStatus = {
-            //     id: "wefwef@wefwefwef.wefwefwef",
-            //     name: "wefwefwefwefwef",
+            //     id: ",
+            //     name: "",
             //     status: 'online',
             //     joinDate: new Date(),
             //     lastSeen: new Date()
@@ -462,6 +460,34 @@ export class LoginComponent implements OnInit {
             this.errMsg = error.message || '로그인 중 오류가 발생했습니다.';
             this.successLogin.update(() => false);
             throw error;
+        }
+    }
+
+    async loadCurrentUsername() {
+        try {
+            const username = await this.auth.getCustomUsername();
+            this.currentUsername = username || '';
+        } catch (error) {
+        console.error('Failed to load username:', error);
+        }
+    }
+
+    async updateUsername() {
+        if (!this.newUsername.trim()) {
+            alert('Please enter a valid username');
+            return;
+        }
+
+        this.isUpdating = true;
+        
+        try {
+            await this.auth.updateCustomUsername(this.newUsername);
+            this.currentUsername = this.newUsername;
+            this.newUsername = '';
+        } catch (error) {
+            console.error('Failed to update username:', error);
+        } finally {
+            this.isUpdating = false;
         }
     }
 }

@@ -1,4 +1,4 @@
-import { Component, signal, OnInit, inject } from "@angular/core";
+import { Component, signal, OnInit, inject, input } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { MatIconModule } from "@angular/material/icon";
 import { ActivityDashboardService } from "../../Service/ActivityDashboard";
@@ -107,6 +107,12 @@ export class ActivityDashboardComponent implements OnInit {
         }
       };
 
+      if (!inputData.streak)
+        inputData.streak = 0;
+      if (!inputData.totalCompleted)
+        inputData.totalCompleted = 0;
+
+      console.log(inputData);
       this.activityData.set(inputData);
       this.processEnhancedActivityData(inputData);
       this.smartInsights.set(insights);

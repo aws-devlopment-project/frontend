@@ -49,8 +49,6 @@ export class HeaderBarComponent {
 
     // 네비게이션 메서드들
     navigateToGroup(groupName: string): void {
-        console.log('Navigating to group from search:', groupName);
-        
         // 1. 그룹 탭으로 변경
         this.sharedState.setActiveTab('group');
         

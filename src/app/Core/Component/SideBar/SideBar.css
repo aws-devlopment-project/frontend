@@ -62,6 +62,44 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
+/* 기부 탭 특별 스타일 */
+.menuBarIcon.donation-tab {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.2), rgba(104, 211, 145, 0.1));
+    border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.menuBarIcon.donation-tab:hover {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.3), rgba(104, 211, 145, 0.2));
+    border-color: rgba(76, 175, 80, 0.5);
+    transform: scale(1.08) translateY(-3px);
+    box-shadow: 0 6px 16px rgba(76, 175, 80, 0.3);
+}
+
+.menuBarIcon.donation-tab.active {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.4), rgba(104, 211, 145, 0.3));
+    border-color: rgba(76, 175, 80, 0.6);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+}
+
+.menuBarIcon.donation-tab mat-icon {
+    color: #68d391 !important;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+}
+
+.menuBarIcon.donation-tab.active mat-icon {
+    color: #ffffff !important;
+    animation: heartbeat 2s ease-in-out infinite;
+}
+
+@keyframes heartbeat {
+    0%, 50%, 100% {
+        transform: scale(1);
+    }
+    25%, 75% {
+        transform: scale(1.1);
+    }
+}
+
 .menuBarIcon mat-icon {
     font-size: 24px;
     margin-bottom: 4px;
@@ -270,6 +308,41 @@
     font-size: 16px;
 }
 
+/* 기부 액션 버튼 특별 스타일 */
+.action-button.donation-action {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.15), rgba(104, 211, 145, 0.1));
+    border: 1px solid rgba(76, 175, 80, 0.2);
+    color: #68d391;
+    font-weight: 600;
+}
+
+.action-button.donation-action:hover {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.25), rgba(104, 211, 145, 0.15));
+    border-color: rgba(76, 175, 80, 0.4);
+    color: #ffffff;
+    transform: translateX(4px) scale(1.02);
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+}
+
+.action-button.donation-action mat-icon {
+    color: #68d391;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.action-button.donation-action:hover mat-icon {
+    color: #ffffff;
+    animation: none;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
 /* 스크롤바 스타일링 */
 .groupBar::-webkit-scrollbar {
     width: 6px;
@@ -331,6 +404,10 @@
     min-width: 60px;
   }
   
+  .menuBarIcon.donation-tab {
+    min-width: 65px; /* 기부 탭은 조금 더 크게 */
+  }
+  
   .menuBarIcon mat-icon {
     font-size: 20px;
     margin-bottom: 2px;
@@ -378,6 +455,10 @@
   .menuBarIcon {
     padding: 6px 8px;
     min-width: 50px;
+  }
+  
+  .menuBarIcon.donation-tab {
+    min-width: 55px;
   }
   
   .menuBarIcon mat-icon {

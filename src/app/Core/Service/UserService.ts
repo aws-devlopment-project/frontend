@@ -4,6 +4,7 @@ import { HttpHeaders } from "@angular/common/http";
 import { DataCacheService } from "./DataCacheService";
 import { UserCredentials, UserJoin, UserStatus } from "../Models/user";
 import { UserQuestContinuous, UserQuestCur, UserQuestPrev, UserQuestWeekly } from "../Models/user";
+import { createUserQuestContinuous, createUserJoin, createUserCredentials, createUserQuestCur, createUserQuestPrev, createUserQuestWeekly, createUserStatus } from "../Models/user";
 import { Router } from "@angular/router";
 import { firstValueFrom, throwError } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
@@ -64,7 +65,7 @@ export class UserService {
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
             
             const response = await firstValueFrom(
-                this.httpService.get<UserStatus>(url, headers).pipe(
+                this.httpService.get<UserStatus>(url, createUserStatus, headers).pipe(
                     tap(data => {
                         this.cacheService.setCache('userStatus', data);
                     }),
@@ -102,11 +103,11 @@ export class UserService {
             }
 
             // API 호출  
-            const url = environment.apiUrl + `/api/user/getUserJoin?email=${id}`;
+            const url = `/api/user/getUserJoin?email=${id}`;
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
             const response = await firstValueFrom(
-                this.httpService.get<UserJoin>(url, headers).pipe(
+                this.httpService.get<UserJoin>(url, createUserJoin, headers).pipe(
                     tap(data => {
                         // ID 정보 추가하여 캐시
                         const dataWithId = { ...data, id };
@@ -145,9 +146,12 @@ export class UserService {
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
             const response = await firstValueFrom(
-                this.httpService.get<UserQuestCur>(url, headers).pipe(
+                this.httpService.get<UserQuestCur>(url, createUserQuestCur, headers).pipe(
                     tap(data => {
-                        this.cacheService.setCache('userQuestCur', data);
+                        if (data.id === 'default')
+                            this.cacheService.setCache('userQuestCur', data, 60 * 3600);
+                        else
+                            this.cacheService.setCache('userQuestCur', data);
                     }),
                     catchError(error => {
                         console.error('[API] getUserQuestCur error:', error);
@@ -155,7 +159,6 @@ export class UserService {
                     })
                 )
             );
-
             return response;
         } catch (error) {
             console.error('[API] getUserQuestCur failed:', error);
@@ -180,9 +183,12 @@ export class UserService {
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
             const response = await firstValueFrom(
-                this.httpService.get<UserQuestContinuous>(url, headers).pipe(
+                this.httpService.get<UserQuestContinuous>(url, createUserQuestContinuous, headers).pipe(
                     tap(data => {
-                        this.cacheService.setCache('userQuestContinuous', data);
+                        if (data.id === 'default')
+                            this.cacheService.setCache('userQuestContinuous', data, 60 * 3600);
+                        else
+                            this.cacheService.setCache('userQuestContinuous', data);
                     }),
                     catchError(error => {
                         console.error('[API] getUserQuestContinuous error:', error);
@@ -215,9 +221,12 @@ export class UserService {
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
             const response = await firstValueFrom(
-                this.httpService.get<UserQuestPrev>(url, headers).pipe(
+                this.httpService.get<UserQuestPrev>(url, createUserQuestPrev, headers).pipe(
                     tap(data => {
-                        this.cacheService.setCache('userQuestPrev', data);
+                        if (data.id === 'default')
+                            this.cacheService.setCache('userQuestPrev', data, 60 * 3600);
+                        else
+                            this.cacheService.setCache('userQuestPrev', data);
                     }),
                     catchError(error => {
                         console.error('[API] getUserQuestPrev error:', error);
@@ -250,9 +259,12 @@ export class UserService {
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
             const response = await firstValueFrom(
-                this.httpService.get<UserQuestWeekly>(url, headers).pipe(
+                this.httpService.get<UserQuestWeekly>(url, createUserQuestWeekly, headers).pipe(
                     tap(data => {
-                        this.cacheService.setCache('userQuestWeekly', data);
+                        if (data.id === 'default')
+                            this.cacheService.setCache('userQuestWeekly', data, 60 * 3600);
+                        else
+                            this.cacheService.setCache('userQuestWeekly', data);
                     }),
                     catchError(error => {
                         console.error('[API] getUserQuestWeekly error:', error);
@@ -265,51 +277,6 @@ export class UserService {
         } catch (error) {
             console.error('[API] getUserQuestWeekly failed:', error);
             return null;
-        }
-    }
-
-    // === 개선된 사용자 상태 업데이트 메서드들 ===
-    async setUserQuestRecord(id: string = "", group: string, userQuest: string[]): Promise<boolean> {
-        try {
-            if (!id) {
-                const user = await this.getUserCredentials();
-                if (!user) return false;
-                id = user.id;
-            }
-
-            let uq: UserQuestCur | null = this.cacheService.getCache('userQuestCur');
-
-            if (!uq || uq.id !== id) {
-                uq = await this.getUserQuestCur(id);
-                if (!uq) return false;
-            }
-
-            // 퀘스트 상태 업데이트
-            uq.curQuestTotalList = uq.curQuestTotalList.map(quest => ({
-                ...quest,
-                isSuccess: userQuest.includes(quest.quest) ? true : quest.isSuccess
-            }));
-
-            const url = `/api/user/setUserQuestRecord`;
-            const body = { user: id, group: group, quest: userQuest };
-            const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
-
-            await firstValueFrom(
-                this.httpService.post(url, body, headers).pipe(
-                    tap(() => {
-                        this.cacheService.setCache('userQuestCur', uq);
-                    }),
-                    catchError(error => {
-                        console.error('[API] setUserQuestRecord error:', error);
-                        return throwError(error);
-                    })
-                )
-            );
-
-            return true;
-        } catch (error) {
-            console.error('[API] setUserQuestRecord failed:', error);
-            return false;
         }
     }
 
@@ -396,6 +363,7 @@ export class UserService {
 
             const url = `/api/user/joinGroup`;
             const body = { user: id, group: group };
+            console.log("joinGroup: ", body);
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
             await firstValueFrom(
@@ -467,6 +435,7 @@ export class UserService {
 
             const url = `/api/user/joinClub`;
             const body = { user: id, group: group, clubList: clubList };
+            console.log("joinClub: " + body.user, body.group, body.clubList);
             const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
 
             await firstValueFrom(
@@ -758,7 +727,7 @@ export class UserService {
 
     async departUser(id: string) {
         try {
-            const url = `/api/user?email=${id}`;
+            const url = `/api/user`;
             const val = await this.loginService.deleteCurrentUser();
 
             if (val) {

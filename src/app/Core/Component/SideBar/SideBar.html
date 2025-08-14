@@ -18,7 +18,7 @@
         <div class="menuBarIcon"
             (click)="setActiveTab('activity')"
             [class.active]="isActiveTab('activity')"
-            title="Activity">
+            title="통계">
             <mat-icon>analytics</mat-icon>
             <p>통계</p>
         </div>
@@ -28,6 +28,15 @@
              title="회원관리">
             <mat-icon>admin_panel_settings</mat-icon>
             <p>관리</p>
+        </div>
+        
+        <!-- 새로 추가된 기부 탭 -->
+        <div class="menuBarIcon donation-tab" 
+             (click)="setActiveTab('donation')"
+             [class.active]="isActiveTab('donation')"
+             title="기부하기">
+            <mat-icon>volunteer_activism</mat-icon>
+            <p>기부</p>
         </div>
     </aside>
     
@@ -95,6 +104,12 @@
             <button class="action-button" (click)="browseChannels()">
                 <mat-icon>explore</mat-icon>
                 그룹 둘러보기
+            </button>
+            
+            <!-- 기부 페이지로 이동하는 추가 버튼 (그룹 탭에서도 접근 가능) -->
+            <button class="action-button donation-action" (click)="goToDonation()">
+                <mat-icon>volunteer_activism</mat-icon>
+                기부하기
             </button>
         </div>
     </aside>

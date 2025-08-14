@@ -1262,3 +1262,225 @@ input:checked + .toggle-slider:before {
     min-width: auto;
   }
 }
+
+/* 기존 CSS는 유지하고 사용자명 변경 관련 스타일만 추가 */
+
+/* 사용자명 입력 컨테이너 */
+.username-input-container {
+  position: relative;
+}
+
+.username-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  justify-content: flex-start;
+}
+
+/* 읽기 전용 입력 필드 스타일 */
+.form-input-readonly {
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 16px;
+  background-color: #f9fafb;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+/* 폼 힌트 텍스트 */
+.form-hint {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
+  display: block;
+}
+
+/* 사용자명 변경 성공/에러 메시지 스타일 개선 */
+.username-input-container .error-message,
+.username-input-container .success-message {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+/* 사용자명 입력 필드 상태별 스타일 */
+.form-input:disabled {
+  background-color: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.form-input:focus:not(:disabled) {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 1px #6366f1;
+}
+
+/* 사용자명 변경 버튼 애니메이션 */
+.username-actions .btn {
+  transition: all 0.2s ease;
+  font-size: 13px;
+  padding: 8px 12px;
+}
+
+.username-actions .btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+/* 변경사항이 있을 때 입력 필드 하이라이트 */
+.username-input-container .form-input.changed {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2);
+}
+
+/* 프로필 통계 개선 */
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-radius: 12px;
+  margin-top: 24px;
+}
+
+.stat-item {
+  text-align: center;
+  padding: 12px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease;
+}
+
+.stat-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: #6366f1;
+  margin-bottom: 4px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #6b7280;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+/* 사용자 배지 스타일 개선 */
+.user-badges {
+  margin-top: 24px;
+  padding: 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.user-badges h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.badges-list {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.badge-item {
+  font-size: 32px;
+  padding: 12px;
+  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.badge-item:hover {
+  transform: scale(1.1) rotate(5deg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+/* 로딩 상태 스타일 개선 */
+.btn:disabled .btn-spinner {
+  margin-right: 8px;
+}
+
+/* 반응형 디자인 개선 */
+@media (max-width: 768px) {
+  .profile-stats {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 16px;
+  }
+  
+  .username-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .username-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .stat-value {
+    font-size: 24px;
+  }
+  
+  .badges-list {
+    justify-content: center;
+  }
+  
+  .badge-item {
+    font-size: 28px;
+    padding: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .form-group {
+    margin-bottom: 16px;
+  }
+  
+  .username-input-container .error-message,
+  .username-input-container .success-message {
+    font-size: 12px;
+    padding: 8px 12px;
+  }
+  
+  .form-hint {
+    font-size: 11px;
+  }
+  
+  .profile-stats {
+    padding: 12px;
+  }
+  
+  .stat-item {
+    padding: 8px;
+  }
+  
+  .stat-value {
+    font-size: 20px;
+  }
+  
+  .stat-label {
+    font-size: 11px;
+  }
+}

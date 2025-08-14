@@ -4,7 +4,7 @@ export interface Quest {
   description: string;
   icon: string;
   progress: number;
-  status: 'pending' | 'in-progress' | 'completed';
+  status: 'pending' | 'in-progress' | 'completed' | 'not-started';
 }
 
 export interface Stat {

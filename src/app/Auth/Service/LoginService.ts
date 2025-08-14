@@ -1,5 +1,7 @@
 import { Injectable } from "@angular/core";
-import { updatePassword, UpdatePasswordInput } from "@aws-amplify/auth";
+import { DataCacheService } from "../../Core/Service/DataCacheService";
+import { updatePassword, UpdatePasswordInput, updateUserAttributes } from "@aws-amplify/auth";
+import { Router } from "@angular/router";
 
 import { 
   fetchAuthSession, 
@@ -23,6 +25,11 @@ import {
     providedIn: 'root',
 })
 export class LoginService {
+    constructor(
+        private cacheService: DataCacheService,
+        private router: Router
+    ) {}
+
     async signInUser(username: string, password: string) {
         try {
             const user = await signIn({username, password});
@@ -102,13 +109,11 @@ export class LoginService {
             if (tokenPayload['cognito:groups'] && 
                 Array.isArray(tokenPayload['cognito:groups']) && 
                 tokenPayload['cognito:groups'].some((group: string) => group.includes('Google'))) {
-                console.log('Google OAuth 감지 - cognito:groups에서 확인');
                 return 'google';
             }
             
             // 2. username이 "google_"로 시작하는 경우
             if (tokenPayload.username && tokenPayload.username.startsWith('google_')) {
-                console.log('Google OAuth 감지 - username 패턴에서 확인');
                 return 'google';
             }
             
@@ -116,24 +121,20 @@ export class LoginService {
             if (session.tokens?.idToken) {
                 const idTokenPayload = JSON.parse(atob(session.tokens.idToken.toString().split('.')[1]));
                 if (idTokenPayload.identities && Array.isArray(idTokenPayload.identities)) {
-                    console.log('Google OAuth 감지 - ID Token identities에서 확인');
                     return 'google';
                 }
             }
             
             // 4. scope에 aws.cognito.signin.user.admin이 있으면 Cognito 직접 로그인
             if (tokenPayload.scope?.includes('aws.cognito.signin.user.admin')) {
-                console.log('Cognito 직접 로그인 - scope에서 감지');
                 return 'cognito';
             }
             
             // 5. 위 조건들에 해당하지 않으면 Cognito 직접 로그인으로 간주
             if (tokenPayload.token_use === 'access' && tokenPayload.aud) {
-                console.log('Cognito 직접 로그인 - 기본값으로 감지');
                 return 'cognito';
             }
             
-            console.log('알 수 없는 토큰 패턴입니다.');
             return 'unknown';
         } catch (error) {
             console.error('인증 제공자 확인 오류:', error);
@@ -146,7 +147,9 @@ export class LoginService {
         try {
             const session = await fetchAuthSession();
             
+            console.log(session);
             if (!session.tokens?.accessToken) {
+                await this.signOutUser();
                 throw new Error('유효하지 않은 세션입니다.');
             }
             
@@ -161,14 +164,12 @@ export class LoginService {
             
             // 인증 제공자에 따라 다른 방식으로 사용자 정보 가져오기
             const authProvider = await this.getAuthProvider();
-            console.log('감지된 인증 제공자:', authProvider);
             
             let user, userAttributes;
             
             switch (authProvider) {
                 case 'cognito':
                     // Cognito 직접 로그인: fetchUserAttributes() 사용
-                    console.log('Cognito 직접 로그인 - fetchUserAttributes 사용');
                     [user, userAttributes] = await Promise.all([
                         getCurrentUser(),
                         fetchUserAttributes()
@@ -177,7 +178,6 @@ export class LoginService {
                     
                 case 'google':
                     // Google OAuth: ID Token에서 email과 name만 추출
-                    console.log('Google OAuth 로그인 - ID Token에서 email, name 추출');
                     if (!session.tokens?.idToken) {
                         throw new Error('ID 토큰을 찾을 수 없습니다.');
                     }
@@ -201,11 +201,8 @@ export class LoginService {
                 case 'unknown':
                 default:
                     // unknown인 경우 ID Token이 있으면 Google OAuth로 간주
-                    console.log('인증 방식 unknown - ID Token 확인 중...');
                     if (session.tokens?.idToken) {
-                        console.log('ID Token이 있으므로 Google OAuth로 처리');
                         const idTokenPayload = JSON.parse(atob(session.tokens.idToken.toString().split('.')[1]));
-                        console.log('ID Token 정보:', idTokenPayload);
                         
                         user = {
                             userId: idTokenPayload.sub,
@@ -220,7 +217,6 @@ export class LoginService {
                         };
                     } else {
                         // ID Token도 없으면 Cognito 직접 로그인으로 시도
-                        console.log('ID Token이 없으므로 Cognito 직접 로그인으로 시도');
                         try {
                             [user, userAttributes] = await Promise.all([
                                 getCurrentUser(),
@@ -266,7 +262,6 @@ export class LoginService {
             
             return !isExpired;
         } catch (error) {
-            console.log('인증 상태 확인 중 오류:', error);
             return false;
         }
     }
@@ -289,8 +284,6 @@ export class LoginService {
                     autoSignIn: true,
                 },
             });
-            
-            console.log("회원가입 결과:", { isSignUpComplete, userId, nextStep });
             return { success: true, userId, nextStep };
         } catch (error: any) {
             console.error('회원가입 오류:', error);
@@ -313,8 +306,6 @@ export class LoginService {
                 username, 
                 confirmationCode 
             });
-            
-            console.log('이메일 인증 완료:', { isSignUpComplete, userId, nextStep });
             return { 
                 status: 200, 
                 username: username, 
@@ -338,9 +329,10 @@ export class LoginService {
 
     async signOutUser() {
         try {
-            await signOut();
+            await signOut({global: true});
             // 로컬 저장소 정리
             this.clearLocalData();
+            this.router.navigate(['/board']);
             return { success: true };
         } catch (error: any) {
             console.error('로그아웃 오류:', error);
@@ -351,7 +343,6 @@ export class LoginService {
     async requestPassswordReset(username: string): Promise<ResetPasswordOutput> {
         try {
             const result = await resetPassword({ username });
-            console.log('비밀번호 재설정 코드 전송:', result.nextStep);
             return result;
         } catch (error: any) {
             console.error('비밀번호 재설정 요청 실패:', error);
@@ -428,8 +419,6 @@ export class LoginService {
             await deleteUser();
             await this.clearLocalData();
 
-            console.log('사용자 삭제 완료');
-
             return {
                 success: true,
                 message: '계정이 성공적으로 삭제되었습니다.'
@@ -491,8 +480,6 @@ export class LoginService {
                     }
                 });
             });
-
-            console.log('로컬 데이터 정리 완료');
         } catch (error) {
             console.error('로컬 데이터 정리 실패:', error);
         }
@@ -531,7 +518,6 @@ export class LoginService {
             };
 
             await updatePassword(updatePasswordInput);
-            console.log('비밀번호가 성공적으로 변경되었습니다.');
             
         } catch (error: any) {
             console.error('비밀번호 변경 실패:', error);
@@ -550,4 +536,40 @@ export class LoginService {
             throw new Error(error.message || '비밀번호 변경 중 오류가 발생했습니다.');
         }
     }
+
+    async updateCustomUsername(newUsername: string): Promise<boolean> {
+        try {
+            await updateUserAttributes({
+                userAttributes: {
+                    'custom:username': newUsername
+                }
+            });
+
+            console.log('Custom username updated successfully');
+            return true;
+        } catch (e) {
+            console.error('Error updating custom username: ', e);
+            throw e;
+        }
+    }
+
+  async getCurrentUserAttributes() {
+    try {
+      const attributes = await fetchUserAttributes();
+      return attributes;
+    } catch (error) {
+      console.error('Error fetching user attributes:', error);
+      throw error;
+    }
+  }
+
+  async getCustomUsername(): Promise<string | null> {
+    try {
+      const attributes = await fetchUserAttributes();
+      return attributes['custom:username'] || null;
+    } catch (error) {
+      console.error('Error fetching custom username:', error);
+      return null;
+    }
+  }
 }

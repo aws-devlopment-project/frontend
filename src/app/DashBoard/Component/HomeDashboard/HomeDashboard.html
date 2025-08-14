@@ -47,7 +47,6 @@
               <div class="stat-value">{{ stat.value }}</div>
               <div class="stat-title">{{ stat.title }}</div>
               <div class="stat-change" [style.color]="stat.color">
-                <mat-icon class="change-icon">{{ stat.trend === 'up' ? 'trending_up' : stat.trend === 'down' ? 'trending_down' : 'trending_flat' }}</mat-icon>
                 {{ stat.change }}
               </div>
             </div>
@@ -209,7 +208,7 @@
     </div>
 
     <!-- 추천 퀘스트 -->
-    @if (recommendedChallenges().length > 1) {
+    @if (recommendedChallenges().length > 0) {
       <div class="recommendations-section">
         <div class="section-header">
           <h2 class="section-title">

@@ -102,7 +102,6 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   ngOnInit(): void {
-    console.log('Enhanced Chatbot initialized');
     this.loadStoredNotifications();
     this.cleanupCache();
     this.schedulePerformanceCheck();
@@ -150,7 +149,6 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
     }
 
     const startTime = performance.now();
-    console.log('Sending message with Q&A support:', inputText);
 
     // 사용자 메시지 추가
     this.addMessageWithFeedback(inputText, true, false);
@@ -163,7 +161,6 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
       const cachedResponse = this.getCachedResponse(cacheKey);
       
       if (cachedResponse) {
-        console.log(`Cached response found in ${(performance.now() - startTime).toFixed(2)}ms`);
         await this.simulateTypingDelay(500);
         this.addMessageWithFeedback(cachedResponse, false, true);
         return;
@@ -175,8 +172,6 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
       // 개선된 응답 생성 (Q&A 통합)
       const response = await this.chatbotService.generateResponseWithActivity(inputText, userContext);
       
-      console.log(`Enhanced response generated in ${(performance.now() - startTime).toFixed(2)}ms`);
-      
       // 응답 캐시 저장
       this.setCachedResponse(cacheKey, response);
       
@@ -187,7 +182,6 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
       this.addMessage('죄송해요, 일시적인 오류가 발생했습니다. 다시 시도해 주세요.', false, true);
     } finally {
       this.isTyping.set(false);
-      console.log(`Total response time: ${(performance.now() - startTime).toFixed(2)}ms`);
     }
   }
 
@@ -248,8 +242,6 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
         feedback
       );
     }
-
-    console.log('Feedback provided:', { messageId, feedback });
   }
 
   // 부정적 피드백 처리
@@ -593,14 +585,12 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   clearCache(): void {
     this.responseCache.clear();
-    console.log('Response cache cleared');
   }
 
   resetChatbot(): void {
     this.allMessages.set([]);
     this.responseCache.clear();
     this.addWelcomeMessage();
-    console.log('Enhanced chatbot reset complete');
   }
 
   // === 기존 알림 관련 메서드들 (간소화) ===
@@ -651,8 +641,6 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
     if ('memory' in performance) {
       const memory = (performance as any).memory;
       const usedMB = Math.round(memory.usedJSHeapSize / 1048576);
-      console.log(`Memory usage: ${usedMB}MB`);
-      
       if (usedMB > 50) {
         this.performCleanup();
       }
@@ -661,7 +649,6 @@ export class ChatbotComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   private performCleanup(): void {
-    console.log('Performing cleanup...');
     const messages = this.allMessages();
     if (messages.length > this.MAX_MESSAGES) {
       const recentMessages = messages.slice(-this.MAX_MESSAGES);

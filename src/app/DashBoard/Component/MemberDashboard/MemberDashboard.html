@@ -12,6 +12,13 @@
         <div class="user-info">
           <h3>{{ userProfile().username }}</h3>
           <p>가입 {{ getJoinDuration() }} 차</p>
+          <!-- OAuth 사용자 표시 -->
+          @if (isOAuthUser()) {
+            <div class="auth-provider-badge">
+              <mat-icon>account_circle</mat-icon>
+              <span>{{ authProvider() === 'google' ? 'Google' : 'OAuth' }} 계정</span>
+            </div>
+          }
         </div>
       </div>
       
@@ -53,132 +60,237 @@
               </button>
               
               <!-- 아바타 업로드 -->
-              <!-- 개선된 아바타 업로더 -->
-            @if (showAvatarSelector()) {
-              <div class="avatar-uploader">
-                <h4>아바타 이미지 업로드</h4>
-                
-                <!-- 파일 입력 (숨김) -->
-                <input #fileInput 
-                      type="file" 
-                      accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                      (change)="onFileSelected($event)"
-                      style="display: none;">
-                
-                <!-- 드래그 앤 드롭 영역 -->
-                <div class="avatar-drop-zone"
-                    [class.drag-over]="isDragOver()"
-                    (click)="triggerFileInput()"
-                    (dragover)="onDragOver($event)"
-                    (dragleave)="onDragLeave($event)"
-                    (drop)="onFileDrop($event)">
-                  <div class="drop-zone-content">
-                    <mat-icon class="drop-zone-icon">cloud_upload</mat-icon>
-                    <p class="drop-zone-text">클릭하거나 파일을 드래그하여 업로드</p>
-                    <p class="drop-zone-hint">JPG, PNG, GIF, WebP (최대 5MB)</p>
+              @if (showAvatarSelector()) {
+                <div class="avatar-uploader">
+                  <h4>아바타 이미지 업로드</h4>
+                  
+                  <!-- 파일 입력 (숨김) -->
+                  <input #fileInput 
+                        type="file" 
+                        accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                        (change)="onFileSelected($event)"
+                        style="display: none;">
+                  
+                  <!-- 드래그 앤 드롭 영역 -->
+                  <div class="avatar-drop-zone"
+                      [class.drag-over]="isDragOver()"
+                      (click)="triggerFileInput()"
+                      (dragover)="onDragOver($event)"
+                      (dragleave)="onDragLeave($event)"
+                      (drop)="onFileDrop($event)">
+                    <div class="drop-zone-content">
+                      <mat-icon class="drop-zone-icon">cloud_upload</mat-icon>
+                      <p class="drop-zone-text">클릭하거나 파일을 드래그하여 업로드</p>
+                      <p class="drop-zone-hint">JPG, PNG, GIF, WebP (최대 5MB)</p>
+                    </div>
                   </div>
-                </div>
-                
-                <!-- 업로드 진행률 -->
-                @if (uploadProgress() > 0 && uploadProgress() < 100) {
-                  <div class="upload-progress">
-                    <div class="upload-progress-bar" 
-                        [style.width.%]="uploadProgress()"></div>
-                  </div>
-                }
-                
-                <!-- 에러 메시지 -->
-                @if (uploadError()) {
-                  <div class="upload-error">
-                    <mat-icon>error</mat-icon>
-                    {{ uploadError() }}
-                  </div>
-                }
-                
-                <!-- 성공 메시지 -->
-                @if (uploadSuccess()) {
-                  <div class="upload-success">
-                    <mat-icon>check_circle</mat-icon>
-                    아바타가 성공적으로 업데이트되었습니다.
-                  </div>
-                }
-                
-                <!-- 미리보기 영역 -->
-                @if (avatarPreviewUrl()) {
-                  <div class="avatar-preview">
-                    <img [src]="avatarPreviewUrl()" 
-                        alt="아바타 미리보기"
-                        class="preview-image">
-                    <p class="preview-info">미리보기</p>
-                  </div>
-                }
-                
-                <!-- 업로드 버튼들 -->
-                <div class="avatar-upload-actions">
-                  @if (!selectedAvatarFile()) {
-                    <button class="btn btn-secondary btn-sm" 
-                            (click)="triggerFileInput()"
-                            [disabled]="avatarUploading()">
-                      <mat-icon>photo_camera</mat-icon>
-                      이미지 선택
-                    </button>
-                  } @else {
-                    <button class="btn btn-primary btn-sm" 
-                            (click)="confirmAvatarChange()"
-                            [disabled]="avatarUploading()">
-                      @if (avatarUploading()) {
-                        <div class="btn-spinner"></div>
-                        업로드 중...
-                      } @else {
-                        <mat-icon>check</mat-icon>
-                        적용하기
-                      }
-                    </button>
-                    
-                    <button class="btn btn-secondary btn-sm" 
-                            (click)="resetAvatarSelection()"
-                            [disabled]="avatarUploading()">
-                      <mat-icon>refresh</mat-icon>
-                      다시 선택
-                    </button>
+                  
+                  <!-- 업로드 진행률 -->
+                  @if (uploadProgress() > 0 && uploadProgress() < 100) {
+                    <div class="upload-progress">
+                      <div class="upload-progress-bar" 
+                          [style.width.%]="uploadProgress()"></div>
+                    </div>
                   }
                   
-                  <button class="btn btn-secondary btn-sm" 
-                          (click)="toggleAvatarSelector()"
-                          [disabled]="avatarUploading()">
-                    취소
-                  </button>
+                  <!-- 에러 메시지 -->
+                  @if (uploadError()) {
+                    <div class="upload-error">
+                      <mat-icon>error</mat-icon>
+                      {{ uploadError() }}
+                    </div>
+                  }
+                  
+                  <!-- 성공 메시지 -->
+                  @if (uploadSuccess()) {
+                    <div class="upload-success">
+                      <mat-icon>check_circle</mat-icon>
+                      아바타가 성공적으로 업데이트되었습니다.
+                    </div>
+                  }
+                  
+                  <!-- 미리보기 영역 -->
+                  @if (avatarPreviewUrl()) {
+                    <div class="avatar-preview">
+                      <img [src]="avatarPreviewUrl()" 
+                          alt="아바타 미리보기"
+                          class="preview-image">
+                      <p class="preview-info">미리보기</p>
+                    </div>
+                  }
+                  
+                  <!-- 업로드 버튼들 -->
+                  <div class="avatar-upload-actions">
+                    @if (!selectedAvatarFile()) {
+                      <button class="btn btn-secondary btn-sm" 
+                              (click)="triggerFileInput()"
+                              [disabled]="avatarUploading()">
+                        <mat-icon>photo_camera</mat-icon>
+                        이미지 선택
+                      </button>
+                    } @else {
+                      <button class="btn btn-primary btn-sm" 
+                              (click)="confirmAvatarChange()"
+                              [disabled]="avatarUploading()">
+                        @if (avatarUploading()) {
+                          <div class="btn-spinner"></div>
+                          업로드 중...
+                        } @else {
+                          <mat-icon>check</mat-icon>
+                          적용하기
+                        }
+                      </button>
+                      
+                      <button class="btn btn-secondary btn-sm" 
+                              (click)="resetAvatarSelection()"
+                              [disabled]="avatarUploading()">
+                        <mat-icon>refresh</mat-icon>
+                        다시 선택
+                      </button>
+                    }
+                    
+                    <button class="btn btn-secondary btn-sm" 
+                            (click)="toggleAvatarSelector()"
+                            [disabled]="avatarUploading()">
+                      취소
+                    </button>
+                  </div>
                 </div>
-              </div>
-            }
+              }
             </div>
             
             <div class="profile-form">
               <div class="form-group">
                 <label>사용자명</label>
-                <input type="text" 
-                       [(ngModel)]="userProfile().username"
-                       class="form-input">
+                
+                <!-- OAuth 사용자의 경우 읽기 전용 -->
+                @if (isOAuthUser()) {
+                  <div class="form-input-readonly oauth-readonly">
+                    {{ userProfile().username }}
+                    <div class="oauth-notice">
+                      <mat-icon>info</mat-icon>
+                      <span>{{ authProvider() === 'google' ? 'Google' : 'OAuth' }} 계정은 사용자명을 변경할 수 없습니다.</span>
+                    </div>
+                  </div>
+                } @else {
+                  <!-- 일반 사용자의 경우 편집 가능 -->
+                  <div class="username-input-container">
+                    <input type="text" 
+                           [(ngModel)]="userProfile().username"
+                           [disabled]="usernameUpdating()"
+                           class="form-input"
+                           [class.changed]="isUsernameChanged()"
+                           placeholder="사용자명을 입력하세요"
+                           maxlength="20">
+                    
+                    <!-- 사용자명 변경 버튼들 -->
+                    @if (isUsernameChanged()) {
+                      <div class="username-actions">
+                        <button class="btn btn-primary btn-sm" 
+                                (click)="updateUsername()"
+                                [disabled]="usernameUpdating()">
+                          @if (usernameUpdating()) {
+                            <div class="btn-spinner"></div>
+                            저장 중...
+                          } @else {
+                            <mat-icon>check</mat-icon>
+                            저장
+                          }
+                        </button>
+                        
+                        <button class="btn btn-secondary btn-sm" 
+                                (click)="cancelUsernameChange()"
+                                [disabled]="usernameUpdating()">
+                          <mat-icon>cancel</mat-icon>
+                          취소
+                        </button>
+                      </div>
+                    }
+                  </div>
+                  
+                  <!-- 사용자명 관련 메시지 -->
+                  @if (usernameUpdateError()) {
+                    <div class="error-message">
+                      <mat-icon>error</mat-icon>
+                      {{ usernameUpdateError() }}
+                    </div>
+                  }
+                  
+                  @if (usernameUpdateSuccess()) {
+                    <div class="success-message">
+                      <mat-icon>check_circle</mat-icon>
+                      사용자명이 성공적으로 변경되었습니다!
+                    </div>
+                  }
+                  
+                  <!-- 사용자명 가이드 -->
+                  <small class="form-hint">
+                    한글, 영문, 숫자, 하이픈, 언더스코어 사용 가능 (2-20자)
+                  </small>
+                }
               </div>
               
               <div class="form-group">
                 <label>이메일</label>
-                <p class="form-input">{{userProfile().email}}</p>
+                <div class="form-input-readonly">{{ userProfile().email }}</div>
+                <small class="form-hint">이메일은 변경할 수 없습니다.</small>
               </div>
-            </div>
-          </div>
-          
-          <div class="section-actions">
-            <button class="btn btn-primary" 
-                    [disabled]="isLoading()"
-                    (click)="updateProfile()">
-              @if (isLoading()) {
-                <div class="btn-spinner"></div>
-                저장 중...
-              } @else {
-                저장하기
+              
+              <!-- 인증 방법 표시 -->
+              <div class="form-group">
+                <label>인증 방법</label>
+                <div class="auth-method-display">
+                  @if (isOAuthUser()) {
+                    <div class="auth-method oauth">
+                      <mat-icon>account_circle</mat-icon>
+                      <span>{{ authProvider() === 'google' ? 'Google OAuth' : 'OAuth 로그인' }}</span>
+                      <div class="auth-method-badge oauth">OAuth</div>
+                    </div>
+                  } @else {
+                    <div class="auth-method cognito">
+                      <mat-icon>security</mat-icon>
+                      <span>이메일/비밀번호 로그인</span>
+                      <div class="auth-method-badge cognito">Cognito</div>
+                    </div>
+                  }
+                </div>
+                <small class="form-hint">
+                  @if (isOAuthUser()) {
+                    OAuth 계정은 {{ authProvider() === 'google' ? 'Google' : '외부 제공업체' }}에서 관리됩니다.
+                  } @else {
+                    이메일과 비밀번호로 직접 로그인하는 계정입니다.
+                  }
+                </small>
+              </div>
+              
+              <!-- 프로필 통계 -->
+              <div class="profile-stats">
+                <div class="stat-item">
+                  <div class="stat-value">{{ userProfile().totalQuests }}</div>
+                  <div class="stat-label">총 퀘스트</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-value">{{ userProfile().completedQuests }}</div>
+                  <div class="stat-label">완료</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-value">{{ getCompletionRate() }}%</div>
+                  <div class="stat-label">달성률</div>
+                </div>
+              </div>
+              
+              <!-- 사용자 배지 -->
+              @if (userProfile().badges.length > 0) {
+                <div class="user-badges">
+                  <h4>획득 배지</h4>
+                  <div class="badges-list">
+                    @for (badge of userProfile().badges; track badge) {
+                      <div class="badge-item">{{ badge }}</div>
+                    }
+                  </div>
+                </div>
               }
-            </button>
+            </div>
           </div>
         </div>
       }
@@ -256,7 +368,7 @@
               <mat-icon>email</mat-icon>
               <div class="support-info">
                 <h4>이메일 문의</h4>
-                <p>support.com</p>
+                <p>support@example.com</p>
               </div>
             </div>
             
@@ -280,16 +392,31 @@
           </div>
           
           <div class="account-options">
-            <div class="account-option">
-              <div class="option-info">
-                <h4>비밀번호 변경</h4>
-                <p>보안을 위해 정기적으로 비밀번호를 변경해 주세요</p>
+            <!-- 비밀번호 변경 (Cognito 사용자만) -->
+            @if (canChangePassword()) {
+              <div class="account-option">
+                <div class="option-info">
+                  <h4>비밀번호 변경</h4>
+                  <p>보안을 위해 정기적으로 비밀번호를 변경해 주세요</p>
+                </div>
+                <button class="btn btn-primary" (click)="changePassword()">
+                  <mat-icon>lock</mat-icon>
+                  비밀번호 변경
+                </button>
               </div>
-              <button class="btn btn-primary" (click)="changePassword()">
-                <mat-icon>lock</mat-icon>
-                비밀번호 변경
-              </button>
-            </div>
+            } @else {
+              <!-- OAuth 사용자용 안내 -->
+              <div class="account-option oauth-disabled">
+                <div class="option-info">
+                  <h4>비밀번호 변경</h4>
+                  <p>{{ authProvider() === 'google' ? 'Google' : 'OAuth' }} 계정은 {{ authProvider() === 'google' ? 'Google' : '외부 제공업체' }}에서 비밀번호를 관리합니다</p>
+                </div>
+                <div class="oauth-notice-box">
+                  <mat-icon>info</mat-icon>
+                  <span>{{ authProvider() === 'google' ? 'Google 계정 설정' : 'OAuth 제공업체' }}에서 변경하세요</span>
+                </div>
+              </div>
+            }
             
             <div class="account-option danger-zone">
               <div class="option-info">
@@ -343,8 +470,9 @@
     </div>
   </div>
 </div>
-<!-- 비밀번호 변경 모달 -->a
-@if (showPasswordChangeModal()) {
+
+<!-- 비밀번호 변경 모달 (Cognito 사용자만) -->
+@if (showPasswordChangeModal() && canChangePassword()) {
   <div class="modal-backdrop" (click)="closePasswordChangeModal()">
     <div class="modal-content" (click)="$event.stopPropagation()">
       <div class="modal-header">

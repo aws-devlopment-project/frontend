@@ -245,30 +245,29 @@ export class HomeDashboardComponent implements OnInit {
     }
   }
 
-  // 퀘스트 캘린더 데이터 로드
   private async loadQuestCalendarData(): Promise<void> {
     try {
       const userCreds = await this.userService.getUserCredentials();
       if (!userCreds) return;
 
       // 현재 사용자의 퀘스트 데이터 가져오기
-      const [questCur, userJoin] = await Promise.all([
+      const [questCur, questPrev] = await Promise.all([
         this.userService.getUserQuestCur(userCreds.id),
-        this.userService.getUserJoin(userCreds.id)
+        this.userService.getUserQuestPrev(userCreds.id)
       ]);
 
-      if (!questCur || !userJoin) return;
-
-      // 지난 90일간의 데이터 생성
+      // 지난 90일간의 데이터 생성 (로컬 시간대 기준)
       const questData: { date: string; quests: DailyQuest[] }[] = [];
       const today = new Date();
 
       for (let i = 89; i >= 0; i--) {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
-        const dateStr = this.formatDate(date);
+        
+        // 로컬 시간대로 날짜 문자열 생성
+        const dateStr = this.formatDateLocal(date);
 
-        const dayQuests = this.generateQuestsForDate(dateStr, questCur, userJoin);
+        const dayQuests = this.generateQuestsForDate(dateStr, questCur, questPrev);
         questData.push({
           date: dateStr,
           quests: dayQuests
@@ -281,63 +280,104 @@ export class HomeDashboardComponent implements OnInit {
     }
   }
 
-  // 특정 날짜의 퀘스트 생성 (실제 데이터 기반)
-  private generateQuestsForDate(date: string, questCur: any, userJoin: any): DailyQuest[] {
-    const quests: DailyQuest[] = [];
+  // 날짜별 퀘스트 생성 로직 (시뮬레이션 완전 제거)
+  private generateQuestsForDate(
+    date: string, 
+    questCur: any, 
+    questPrev: any
+  ): DailyQuest[] {
     const dateObj = new Date(date);
     const today = new Date();
     
-    // 오늘 이후의 날짜는 퀘스트 없음
-    if (dateObj > today) return [];
-
-    // 현재 진행중인 퀘스트들을 기반으로 생성
-    if (questCur.curQuestTotalList) {
-      questCur.curQuestTotalList.forEach((quest: any, index: number) => {
-        // 모든 날짜에 모든 퀘스트를 표시하지 않고, 랜덤하게 일부만 표시
-        const shouldInclude = Math.random() < 0.7; // 70% 확률로 포함
-        
-        if (shouldInclude) {
-          const isCompleted = quest.isSuccess || Math.random() < 0.3; // 실제 완료 상태 또는 30% 확률로 완료
-          
-          quests.push({
-            id: `quest-${date}-${index}`,
-            title: quest.quest,
-            groupName: quest.group,
-            isCompleted: isCompleted,
-            priority: this.getQuestPriority(quest.quest),
-            dueTime: this.generateDueTime()
-          });
-        }
-      });
+    // 오늘 이후의 날짜는 현재 진행중인 퀘스트만 표시
+    if (dateObj > today) {
+      return this.getFutureQuests(questCur);
     }
+    
+    // 오늘은 현재 진행중인 퀘스트 표시
+    if (this.isSameDate(dateObj, today)) {
+      return this.getCurrentQuests(questCur);
+    }
+    
+    // 과거 날짜는 실제 기록만 표시 (시뮬레이션 없음)
+    return this.getPastQuestsFromHistory(date, questPrev, questCur);
+  }
 
-    // 추가로 더미 퀘스트 생성 (데이터가 부족한 경우)
-    if (quests.length === 0 && Math.random() < 0.5) {
-      const dummyQuests = [
-        '아침 운동하기', '독서 30분', '물 8잔 마시기', '일기 쓰기', '명상 10분',
-        '새로운 기술 학습', '친구와 연락하기', '건강한 식사', '스트레칭', '목표 점검'
-      ];
+  // 미래 날짜의 퀘스트 (현재 진행중인 퀘스트들)
+  private getFutureQuests(questCur: any): DailyQuest[] {
+    if (!questCur?.curQuestTotalList) return [];
+    
+    return questCur.curQuestTotalList.map((quest: any, index: number) => ({
+      id: `future-${quest.group}-${index}`,
+      title: quest.quest,
+      groupName: quest.group,
+      isCompleted: false, // 미래 날짜는 아직 완료되지 않음
+      priority: this.getQuestPriority(quest.quest),
+      dueTime: this.generateDueTime()
+    }));
+  }
+
+  // 현재 날짜의 퀘스트 (실제 현재 상태 반영)
+  private getCurrentQuests(questCur: any): DailyQuest[] {
+    if (!questCur?.curQuestTotalList) return [];
+    
+    return questCur.curQuestTotalList.map((quest: any, index: number) => ({
+      id: `current-${quest.group}-${index}`,
+      title: quest.quest,
+      groupName: quest.group,
+      isCompleted: quest.success || false,
+      priority: this.getQuestPriority(quest.quest),
+      dueTime: this.generateDueTime()
+    }));
+  }
+
+  // 과거 날짜의 퀘스트 (UserQuestPrev에서 실제 기록 조회)
+  private getPastQuestsFromHistory(
+    date: string, 
+    questPrev: any, 
+    questCur: any
+  ): DailyQuest[] {
+    const quests: DailyQuest[] = [];
+    
+    // UserQuestPrev에서 해당 날짜의 실제 기록 찾기
+    if (questPrev?.prevQuestTotalList) {
+      // completeTime이 해당 날짜와 일치하는 퀘스트들 찾기
+      const dayQuests = questPrev.prevQuestTotalList.filter((prevQuest: any) => {
+        if (!prevQuest.completeTime) return false;
+        
+        const completeDate = new Date(prevQuest.completeTime);
+        const targetDate = new Date(date);
+        
+        return this.isSameDate(completeDate, targetDate);
+      });
       
-      const questCount = Math.floor(Math.random() * 3) + 1; // 1-3개
-      for (let i = 0; i < questCount; i++) {
-        const questTitle = dummyQuests[Math.floor(Math.random() * dummyQuests.length)];
+      // 찾은 퀘스트들을 DailyQuest 형태로 변환
+      dayQuests.forEach((prevQuest: any, index: number) => {
         quests.push({
-          id: `dummy-${date}-${i}`,
-          title: questTitle,
-          groupName: '개인 목표',
-          isCompleted: Math.random() < 0.6,
-          priority: ['high', 'medium', 'low'][Math.floor(Math.random() * 3)] as 'high' | 'medium' | 'low',
+          id: `past-${date}-${index}`,
+          title: prevQuest.quest,
+          groupName: prevQuest.group,
+          isCompleted: prevQuest.success,
+          priority: this.getQuestPriority(prevQuest.quest),
           dueTime: this.generateDueTime()
         });
-      }
+      });
     }
-
+    
     return quests;
   }
 
+  // 날짜가 같은지 확인하는 유틸리티 메서드 (시간 무시)
+  private isSameDate(date1: Date, date2: Date): boolean {
+    return date1.getFullYear() === date2.getFullYear() &&
+          date1.getMonth() === date2.getMonth() &&
+          date1.getDate() === date2.getDate();
+  }
+
+  // 기존 메서드들 유지...
   private getQuestPriority(questTitle: string): 'high' | 'medium' | 'low' {
-    const highPriorityKeywords = ['운동', '건강', '중요', '필수'];
-    const lowPriorityKeywords = ['선택', '여가', '취미'];
+    const highPriorityKeywords = ['운동', '건강', '중요', '필수', '매일'];
+    const lowPriorityKeywords = ['선택', '여가', '취미', '가끔'];
     
     if (highPriorityKeywords.some(keyword => questTitle.includes(keyword))) {
       return 'high';
@@ -353,10 +393,16 @@ export class HomeDashboardComponent implements OnInit {
     return Math.random() < 0.7 ? times[Math.floor(Math.random() * times.length)] : '';
   }
 
+  // 로컬 시간대로 날짜를 YYYY-MM-DD 형식으로 변환
+  private formatDateLocal(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
   // 퀘스트 클릭 이벤트 핸들러
   onQuestClick(event: { quest: DailyQuest; date: string }): void {
-    console.log('Quest clicked:', event);
-    
     // 활동 추적
     this.localActivityService.trackActivity(
       'quest_view',
@@ -374,16 +420,15 @@ export class HomeDashboardComponent implements OnInit {
     this.sharedState.setActiveTab('group');
   }
 
-  // 날짜 클릭 이벤트 핸들러 (모달 표시, 완료 기능 제거)
+  // 날짜 클릭 이벤트 핸들러 (디버그 로그 추가)
   onDayClick(event: { date: string; quests: DailyQuest[] }): void {
-    console.log('Day clicked:', event);
-    
-    // 퀘스트 상세 모달 열기 (완료 기능 제거)
+    // 퀘스트 상세 모달 열기
     const dialogRef = this.dialog.open(QuestDetailModalComponent, {
       width: '600px',
       maxHeight: '80vh',
       data: {
-        date: this.formatDateForDisplay(event.date),
+        date: event.date, // 원본 날짜 문자열 (YYYY-MM-DD)
+        displayDate: this.formatDateForDisplay(event.date), // 표시용 날짜
         quests: event.quests,
         onQuestClick: (quest: DailyQuest) => {
           this.onQuestClick({ quest, date: event.date });
@@ -392,12 +437,6 @@ export class HomeDashboardComponent implements OnInit {
     });
   }
 
-  // 퀘스트 완료 표시 메서드 제거 (그룹 대시보드에서 처리)
-  // private onMarkQuestCompleted 메서드 삭제
-
-  // private updateQuestCompletionOnServer 메서드 삭제
-
-  // 기존 메서드들...
   private async loadActivitySummary(): Promise<void> {
     try {
       const activityStats = this.localActivityService.getActivityStats();
@@ -513,17 +552,33 @@ export class HomeDashboardComponent implements OnInit {
   }
 
   private formatDate(date: Date): string {
-    return date.toISOString().split('T')[0];
+    return this.formatDateLocal(date);
   }
 
+ // formatDateForDisplay 메서드도 더 안전하게 수정
   private formatDateForDisplay(dateStr: string): string {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('ko-KR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      weekday: 'long'
-    });
+    try {
+      // YYYY-MM-DD 형식의 문자열을 로컬 날짜로 파싱
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const date = new Date(year, month - 1, day); // month는 0부터 시작하므로 -1
+      
+      // 날짜가 유효한지 확인
+      if (isNaN(date.getTime())) {
+        console.error('Invalid date string:', dateStr);
+        return dateStr; // 원본 문자열 반환
+      }
+      
+      const formatted = date.toLocaleDateString('ko-KR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        weekday: 'long'
+      });
+      return formatted;
+    } catch (error) {
+      console.error('Error formatting date:', dateStr, error);
+      return dateStr; // 에러 시 원본 문자열 반환
+    }
   }
 
   // UI 메서드들
@@ -587,8 +642,6 @@ export class HomeDashboardComponent implements OnInit {
 
   // 액션 핸들러들
   onQuickAction(action: QuickAction): void {
-    console.log('Quick action clicked:', action.route);
-    
     this.localActivityService.trackActivity(
       'page_visit',
       `${action.title} 페이지 방문`,
@@ -616,8 +669,6 @@ export class HomeDashboardComponent implements OnInit {
   }
 
   onJoinChallenge(challenge: RecommendedChallenge): void {
-    console.log('Join challenge:', challenge.id);
-    
     this.localActivityService.trackActivity(
       'quest_start',
       `${challenge.title} 퀘스트 시작`,
@@ -635,7 +686,6 @@ export class HomeDashboardComponent implements OnInit {
   }
 
   onViewAllChallenges(): void {
-    console.log('View all challenges');
     this.localActivityService.trackActivity(
       'page_visit',
       '전체 챌린지 보기',
@@ -645,7 +695,6 @@ export class HomeDashboardComponent implements OnInit {
   }
 
   onViewAllHighlights(): void {
-    console.log('View all highlights');
     this.localActivityService.trackActivity(
       'page_visit',
       '전체 활동 보기',

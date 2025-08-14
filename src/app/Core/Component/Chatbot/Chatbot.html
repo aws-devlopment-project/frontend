@@ -12,7 +12,6 @@
     matBadgePosition="above before"
     (click)="toggleChatbot()"
     [attr.aria-label]="'챗봇 ' + (isOpen() ? '닫기' : '열기')"
-    [matTooltip]="'Q&A: ' + qaStats()?.totalItems + '개'"
     type="button">
     
     @if (isMinimized()) {
@@ -31,9 +30,6 @@
           <div class="bot-avatar" aria-hidden="true">🤖</div>
           <div class="bot-details">
             <h2 id="chatbot-title" class="bot-name">AI 어시스턴트</h2>
-            <span class="bot-status" aria-label="상태: 온라인">
-              ● 온라인 (Q&A: {{ qaStats()?.totalItems || 0 }}개)
-            </span>
           </div>
         </div>
         <div class="header-actions">

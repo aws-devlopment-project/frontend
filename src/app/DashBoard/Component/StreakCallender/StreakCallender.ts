@@ -58,61 +58,70 @@ export class StreakCalendarComponent {
   });
 
   calendarWeeks = computed(() => {
-    const date = this.currentDate();
-    const year = date.getFullYear();
-    const month = date.getMonth();
+  const date = this.currentDate();
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  
+  const startDate = new Date(firstDay);
+  startDate.setDate(startDate.getDate() - firstDay.getDay());
+  
+  const endDate = new Date(startDate);
+  endDate.setDate(endDate.getDate() + 41);
+  
+  const weeks: CalendarWeek[] = [];
+  const today = new Date();
+  
+  // 오늘 날짜를 정확히 YYYY-MM-DD 형식으로 변환 (시간대 문제 해결)
+  const todayStr = this.formatDateLocal(today);
+  
+  for (let weekStart = new Date(startDate); weekStart <= endDate; weekStart.setDate(weekStart.getDate() + 7)) {
+    const days: CalendarDay[] = [];
     
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    
-    const startDate = new Date(firstDay);
-    startDate.setDate(startDate.getDate() - firstDay.getDay());
-    
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + 41);
-    
-    const weeks: CalendarWeek[] = [];
-    const today = new Date();
-    // 오늘 날짜의 시간을 00:00:00으로 설정해서 정확한 비교
-    today.setHours(0, 0, 0, 0);
-    
-    for (let weekStart = new Date(startDate); weekStart <= endDate; weekStart.setDate(weekStart.getDate() + 7)) {
-      const days: CalendarDay[] = [];
+    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+      const currentDay = new Date(weekStart);
+      currentDay.setDate(currentDay.getDate() + dayOffset);
       
-      for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
-        const currentDay = new Date(weekStart);
-        currentDay.setDate(currentDay.getDate() + dayOffset);
-        currentDay.setHours(0, 0, 0, 0);
-        
-        const dateStr = this.formatDate(currentDay);
-        const dayQuests = this.getQuestsForDate(dateStr);
-        const completedCount = dayQuests.filter(q => q.isCompleted).length;
-        const totalCount = dayQuests.length;
-        const completionRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
-        
-        const isToday = currentDay.getTime() === today.getTime();
-        const isFuture = currentDay.getTime() > today.getTime();
-        const isPast = currentDay.getTime() < today.getTime();
-        
-        days.push({
-          date: dateStr,
-          dayOfMonth: currentDay.getDate(),
-          isToday,
-          isCurrentMonth: currentDay.getMonth() === month,
-          isFuture,
-          isPast,
-          quests: dayQuests,
-          completedCount,
-          totalCount,
-          completionRate
-        });
-      }
+      // 로컬 시간대로 날짜 문자열 생성
+      const dateStr = this.formatDateLocal(currentDay);
+      const dayQuests = this.getQuestsForDate(dateStr);
+      const completedCount = dayQuests.filter(q => q.isCompleted).length;
+      const totalCount = dayQuests.length;
+      const completionRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
       
-      weeks.push({ days });
+      const isToday = dateStr === todayStr;
+      const isFuture = dateStr > todayStr;
+      const isPast = dateStr < todayStr;
+      
+      days.push({
+        date: dateStr,
+        dayOfMonth: currentDay.getDate(),
+        isToday,
+        isCurrentMonth: currentDay.getMonth() === month,
+        isFuture,
+        isPast,
+        quests: dayQuests,
+        completedCount,
+        totalCount,
+        completionRate
+      });
     }
     
-    return weeks;
-  });
+    weeks.push({ days });
+  }
+  
+  return weeks;
+});
+
+// 로컬 시간대로 날짜를 YYYY-MM-DD 형식으로 변환하는 새로운 메서드
+private formatDateLocal(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
   private getQuestsForDate(date: string): DailyQuest[] {
     const questData = this.questData.find(d => d.date === date);
@@ -203,7 +212,7 @@ export class StreakCalendarComponent {
   }
 
   private formatDate(date: Date): string {
-    return date.toISOString().split('T')[0];
+    return this.formatDateLocal(date);
   }
 
   private isSameDay(date1: Date, date2: Date): boolean {

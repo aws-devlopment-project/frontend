@@ -157,7 +157,6 @@ export class SearchBarComponent implements OnInit {
             const uniqueResults = this.ensureUniqueIds(validResults);
             
             this.searchResults.set(uniqueResults);
-            console.log('Search results:', uniqueResults);
         } catch (error) {
             console.error('Search error:', error);
             this.searchResults.set([]);
@@ -220,8 +219,6 @@ export class SearchBarComponent implements OnInit {
         
         this.clearSearchResults();
         this.searchInput.nativeElement.blur();
-        
-        console.log('Selected search result:', result);
     }
 
     getResultIcon(result: SearchResult): string {
