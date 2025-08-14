@@ -33,7 +33,7 @@ export class ManagementDashboardService {
         private router: Router
     ) {}
 
-    serverUrl: string = "https://stage.teamnameless.click"
+    serverUrl: string = "https://server.teamnameless.click"
     async getUserProfile() {
         let userProfile: UserProfile = {
             username: '',
@@ -267,12 +267,6 @@ export class ManagementDashboardService {
         } else {
             await this.userService.leaveGroup("", groupId);
         }
-        this.shared._userJoin.update((joinList) => {
-            if (joinList) {
-                joinList.joinList = joinList.joinList.filter(join => join.groupname !== groupId);
-            }
-            return joinList;
-        });
     }
 
     async leaveChannel(groupId: string, channelId: string): Promise<void> {
@@ -282,16 +276,6 @@ export class ManagementDashboardService {
             
             // 채널 탈퇴 API 호출
             await this.userService.leaveClub(userId, groupId, channelId);
-
-            this.shared._userJoin.update((joinList) => {
-                if (joinList) {
-                    const group = joinList.joinList.find(g => g.groupname === groupId);
-                    if (group) {
-                        group.clubList = group.clubList.filter(club => club.name !== channelId);
-                    }
-                }
-                return joinList;
-            });
         } catch (error) {
             console.error('채널 탈퇴 실패:', error);
             throw error;
