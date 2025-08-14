@@ -98,7 +98,7 @@
               } @else if (message.messageType === 'IMAGE') {
                 <div class="message-text">
                   <img
-                    [src]="'dataLimage/png;base64,' + message.content"
+                    [src]="message.content"
                     alt="이미지"
                     stlye="max-width: 200px; border-radius-8px;" />
                 </div>
