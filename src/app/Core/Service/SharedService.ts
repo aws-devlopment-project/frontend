@@ -677,26 +677,72 @@ export class SharedStateService {
    * 그룹과 채널을 한번에 추가 (GroupJoin에서 사용)
    */
   addUserGroupWithChannels(groupId: number, groupName: string, clubs: Club[]): void {
-    const clubsName = clubs.map((club: Club) => {
-      return club.name;
-    })
+    console.log('🔄 addUserGroupWithChannels 시작:', {
+      groupId,
+      groupName,
+      clubsCount: clubs.length,
+      clubs: clubs.map(c => `${c.name}(ID:${c.clubId})`)
+    });
     
     const currentJoinList = this._userJoin();
     
     if (!currentJoinList) {
-      console.error('Cannot add group with channels - no join list initialized');
+      console.error('❌ Cannot add group with channels - no join list initialized');
       return;
     }
 
-    // Set을 사용하여 중복 체크
-    const existingGroupNames = new Set(currentJoinList.joinList.map(item => item.groupname));
+    // 중복 그룹 확인
+    const existingGroupIndex = currentJoinList.joinList.findIndex(item => item.groupname === groupName);
     
-    if (existingGroupNames.has(groupName)) {
-      // 기존 그룹에 채널만 추가 (중복 제거)
-      this.addUserChannels(groupName, clubs);
+    if (existingGroupIndex !== -1) {
+      // 기존 그룹이 있는 경우: 채널만 추가 (중복 제거)
+      console.log('📝 기존 그룹에 채널 추가:', groupName);
+      
+      const existingGroup = { ...currentJoinList.joinList[existingGroupIndex] };
+      const existingChannels = existingGroup.clubList || [];
+      
+      // 기존 채널명 세트 생성
+      const existingChannelNames = new Set(
+        existingChannels.map(club => typeof club === 'string' ? club : club.name)
+      );
+      
+      // 새로운 채널만 필터링
+      const newChannels = clubs.filter(club => !existingChannelNames.has(club.name));
+      
+      if (newChannels.length > 0) {
+        console.log('➕ 추가할 새 채널:', newChannels.map(c => c.name));
+        
+        // 기존 채널과 새 채널 합치기
+        const updatedClubList = [...existingChannels, ...newChannels];
+        const updatedGroup = {
+          ...existingGroup,
+          clubList: updatedClubList
+        };
+        
+        // 업데이트된 그룹으로 교체
+        const updatedJoinList = {
+          ...currentJoinList,
+          joinList: currentJoinList.joinList.map((group, index) => 
+            index === existingGroupIndex ? updatedGroup : group
+          )
+        };
+        
+        this._userJoin.set(updatedJoinList);
+        console.log('✅ 기존 그룹에 채널 추가 완료');
+      } else {
+        console.log('ℹ️ 추가할 새 채널 없음 (모든 채널이 이미 존재)');
+      }
+      
     } else {
-      // 새 그룹을 채널과 함께 추가 (채널 목록도 중복 제거)
-      const uniqueChannels = Array.from(new Set(clubs));
+      // 새 그룹인 경우: 그룹과 채널을 함께 추가
+      console.log('📝 새 그룹과 채널 추가:', groupName);
+      
+      // 채널 중복 제거 (안전장치)
+      const uniqueChannels = clubs.filter((club, index, array) => 
+        array.findIndex(c => c.name === club.name) === index
+      );
+      
+      console.log('📋 최종 채널 목록:', uniqueChannels.map(c => `${c.name}(ID:${c.clubId})`));
       
       const newGroupItem: JoinListItem = {
         groupId: groupId,
@@ -717,15 +763,266 @@ export class SharedStateService {
         return Array.from(sectionSet);
       });
 
-      // 첫 번째 그룹이거나 그룹 탭에서 선택된 그룹이 없다면 자동 선택
-      if ((currentJoinList.joinList.length === 0 || !this.selectedGroup()) && 
-          this.activeTab() === 'group') {
+      console.log('✅ 새 그룹과 채널 추가 완료');
+    }
+
+    // 업데이트 후 상태 검증
+    this.validateGroupChannelConsistency(groupName, clubs);
+    
+    // 첫 번째 그룹이거나 선택된 그룹이 없다면 자동 선택 (그룹 탭에서만)
+    if (this.activeTab() === 'group') {
+      if (currentJoinList.joinList.length === 0 || !this.selectedGroup()) {
+        console.log('🎯 새 그룹을 자동 선택:', groupName);
         this.setSelectedGroup(groupName);
-        if (uniqueChannels.length > 0) {
-          this.setSelectedChannel(uniqueChannels[0].name, groupName);
+        
+        if (clubs.length > 0) {
+          const firstChannelName = clubs[0].name;
+          console.log('🎯 첫 번째 채널을 자동 선택:', firstChannelName);
+          this.setSelectedChannel(firstChannelName, groupName);
         }
       }
     }
+    
+    console.log('🎉 addUserGroupWithChannels 완료');
+  }
+
+  private validateGroupChannelConsistency(groupName: string, expectedChannels: Club[]): void {
+    console.log('🔍 그룹-채널 일관성 검증 시작:', groupName);
+    
+    const currentJoinList = this._userJoin();
+    if (!currentJoinList) {
+      console.error('❌ UserJoin 데이터 없음');
+      return;
+    }
+    
+    const targetGroup = currentJoinList.joinList.find(g => g.groupname === groupName);
+    if (!targetGroup) {
+      console.error('❌ 그룹을 찾을 수 없음:', groupName);
+      return;
+    }
+    
+    const actualChannels = targetGroup.clubList || [];
+    const expectedChannelNames = expectedChannels.map(c => c.name);
+    
+    console.log('📊 채널 일관성 검증:', {
+      그룹: groupName,
+      기대채널수: expectedChannelNames.length,
+      실제채널수: actualChannels.length,
+      기대채널: expectedChannelNames,
+      실제채널: actualChannels.map(c => typeof c === 'string' ? c : c.name)
+    });
+    
+    // 모든 기대하는 채널이 실제로 존재하는지 확인
+    const missingChannels = expectedChannelNames.filter(name => 
+      !actualChannels.some(c => (typeof c === 'string' ? c : c.name) === name)
+    );
+    
+    if (missingChannels.length > 0) {
+      console.warn('⚠️ 누락된 채널:', missingChannels);
+    } else {
+      console.log('✅ 모든 채널이 정상적으로 추가됨');
+    }
+    
+    // 추가: 다른 그룹의 채널이 잘못 포함되었는지 확인
+    this.detectCrossGroupChannelContamination(groupName);
+  }
+
+  private detectCrossGroupChannelContamination(targetGroupName: string): void {
+    console.log('🔍 교차 그룹 채널 오염 감지:', targetGroupName);
+    
+    const currentJoinList = this._userJoin();
+    if (!currentJoinList || currentJoinList.joinList.length <= 1) {
+      console.log('ℹ️ 단일 그룹이므로 교차 오염 검사 불필요');
+      return;
+    }
+    
+    const targetGroup = currentJoinList.joinList.find(g => g.groupname === targetGroupName);
+    if (!targetGroup) return;
+    
+    const targetChannelNames = (targetGroup.clubList || []).map(c => 
+      typeof c === 'string' ? c : c.name
+    );
+    
+    // 다른 그룹들의 채널과 비교
+    const otherGroups = currentJoinList.joinList.filter(g => g.groupname !== targetGroupName);
+    const contaminatedChannels: string[] = [];
+    
+    otherGroups.forEach(otherGroup => {
+      const otherChannelNames = (otherGroup.clubList || []).map(c => 
+        typeof c === 'string' ? c : c.name
+      );
+      
+      // 채널명이 중복되는 경우 찾기
+      const duplicates = targetChannelNames.filter(name => otherChannelNames.includes(name));
+      contaminatedChannels.push(...duplicates);
+    });
+    
+    if (contaminatedChannels.length > 0) {
+      console.error('❌ 교차 그룹 채널 오염 감지:', {
+        대상그룹: targetGroupName,
+        오염된채널: contaminatedChannels
+      });
+      
+      // 오염된 데이터 자동 정리 시도
+      this.cleanupCrossGroupContamination(targetGroupName, contaminatedChannels);
+    } else {
+      console.log('✅ 교차 그룹 채널 오염 없음');
+    }
+  }
+
+  private cleanupCrossGroupContamination(targetGroupName: string, contaminatedChannels: string[]): void {
+    console.log('🧹 교차 그룹 채널 오염 정리 시작:', { targetGroupName, contaminatedChannels });
+    
+    const currentJoinList = this._userJoin();
+    if (!currentJoinList) return;
+    
+    // 실제로는 서버 데이터를 다시 가져와서 정리하는 것이 안전
+    console.warn('⚠️ 교차 오염 감지됨 - 서버 데이터 재동기화 권장');
+    
+    // 긴급 상황시 강제 새로고침 트리거
+    setTimeout(() => {
+      console.log('🔄 오염 정리를 위한 강제 새로고침 실행');
+      this.forceRefreshUserJoin().catch(error => {
+        console.error('❌ 강제 새로고침 실패:', error);
+      });
+    }, 1000);
+  }
+
+  addUserGroupSafely(groupId: number, groupName: string, clubs: Club[]): Promise<boolean> {
+    return new Promise((resolve) => {
+      console.log('🔒 안전한 그룹 추가 시작:', { groupId, groupName, clubsCount: clubs.length });
+      
+      try {
+        // 1. 현재 상태 백업
+        const backupState = this._userJoin();
+        
+        // 2. 그룹 추가 시도
+        this.addUserGroupWithChannels(groupId, groupName, clubs);
+        
+        // 3. 추가 후 검증
+        const addedSuccessfully = this.verifyGroupAddition(groupName, clubs);
+        
+        if (addedSuccessfully) {
+          console.log('✅ 안전한 그룹 추가 성공');
+          resolve(true);
+        } else {
+          console.error('❌ 그룹 추가 검증 실패, 롤백 실행');
+          this._userJoin.set(backupState);
+          resolve(false);
+        }
+        
+      } catch (error) {
+        console.error('❌ 안전한 그룹 추가 실패:', error);
+        resolve(false);
+      }
+    });
+  }
+
+  private verifyGroupAddition(groupName: string, expectedChannels: Club[]): boolean {
+    console.log('🔍 그룹 추가 검증:', groupName);
+    
+    const currentJoinList = this._userJoin();
+    if (!currentJoinList) {
+      console.error('❌ UserJoin 데이터 없음');
+      return false;
+    }
+    
+    // 그룹이 존재하는지 확인
+    const addedGroup = currentJoinList.joinList.find(g => g.groupname === groupName);
+    if (!addedGroup) {
+      console.error('❌ 그룹이 추가되지 않음:', groupName);
+      return false;
+    }
+    
+    // 채널이 올바르게 추가되었는지 확인
+    const actualChannels = addedGroup.clubList || [];
+    const expectedChannelNames = expectedChannels.map(c => c.name);
+    
+    const allChannelsPresent = expectedChannelNames.every(name =>
+      actualChannels.some(c => (typeof c === 'string' ? c : c.name) === name)
+    );
+    
+    if (!allChannelsPresent) {
+      console.error('❌ 일부 채널이 누락됨');
+      return false;
+    }
+    
+    // 다른 그룹의 채널이 오염되지 않았는지 확인
+    if (currentJoinList.joinList.length > 1) {
+      const hasContamination = this.checkForChannelContamination(groupName);
+      if (hasContamination) {
+        console.error('❌ 채널 오염 감지됨');
+        return false;
+      }
+    }
+    
+    console.log('✅ 그룹 추가 검증 통과');
+    return true;
+  }
+
+  async emergencyCleanupUserJoin(): Promise<void> {
+    console.log('🚨 UserJoin 데이터 응급 정리 시작...');
+    
+    try {
+      // 1. 현재 상태 백업
+      const backup = this._userJoin();
+      
+      // 2. 서버에서 최신 데이터 가져오기
+      console.log('📡 서버에서 최신 데이터 가져오는 중...');
+      const freshData = await this.loadUserJoin();
+      
+      if (freshData) {
+        // 3. 새로운 데이터로 교체
+        this._userJoin.set(freshData);
+        
+        // 4. 선택 상태 검증 및 정리
+        this.validateAndCleanupSelections();
+        
+        console.log('✅ UserJoin 데이터 응급 정리 완료');
+      } else {
+        console.error('❌ 서버에서 데이터를 가져올 수 없음, 백업 데이터 유지');
+        this._userJoin.set(backup);
+      }
+      
+    } catch (error) {
+      console.error('❌ UserJoin 데이터 응급 정리 실패:', error);
+      
+      // 최후의 수단: 빈 상태로 초기화
+      this._userJoin.set({ id: '', joinList: [] });
+      this.validateAndCleanupSelections();
+    }
+  }
+
+  private checkForChannelContamination(targetGroupName: string): boolean {
+    const currentJoinList = this._userJoin();
+    if (!currentJoinList || currentJoinList.joinList.length <= 1) return false;
+    
+    const groups = currentJoinList.joinList;
+    const channelGroups = new Map<string, string[]>(); // 채널명 -> 포함된 그룹들
+    
+    // 각 채널이 어떤 그룹들에 포함되어 있는지 매핑
+    groups.forEach(group => {
+      const channels = (group.clubList || []).map(c => 
+        typeof c === 'string' ? c : c.name
+      );
+      
+      channels.forEach(channelName => {
+        if (!channelGroups.has(channelName)) {
+          channelGroups.set(channelName, []);
+        }
+        channelGroups.get(channelName)!.push(group.groupname);
+      });
+    });
+    
+    // 하나의 채널이 여러 그룹에 속해있는지 확인
+    for (const [channelName, groupNames] of channelGroups.entries()) {
+      if (groupNames.length > 1) {
+        console.error('❌ 채널 중복 오염:', { channelName, groups: groupNames });
+        return true;
+      }
+    }
+    
+    return false;
   }
 
   /**
