@@ -28,6 +28,12 @@ interface FeedbackData {
   groupName: string;
 }
 
+interface QuestCompletionData {
+  questId: string;
+  questTitle: string;
+  questDescription: string;
+}
+
 @Component({
   selector: 'app-group-dashboard',
   templateUrl: './GroupDashboard.html',
@@ -50,12 +56,16 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
   // === 핵심 상태 관리 ===
   readonly title = signal<string>("");
   readonly quests = signal<Quest[]>([]);
-  readonly selectedQuestIds = signal<Set<string>>(new Set());
   readonly stats = signal<Stat[]>([]);
 
   // === UI 상태 ===
   readonly isLoading = signal<boolean>(true);
   readonly error = signal<string | null>(null);
+
+  // === 퀘스트 완료 확인 모달 ===
+  readonly showQuestConfirmModal = signal<boolean>(false);
+  readonly questConfirmData = signal<QuestCompletionData | null>(null);
+  readonly isCompletingQuest = signal<boolean>(false);
 
   // === 피드백 관련 ===
   readonly showFeedback = signal<boolean>(false);
@@ -64,15 +74,7 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
   readonly feedbackLike = signal<boolean | null>(null);
   readonly isSubmittingFeedback = signal<boolean>(false);
 
-  // === 확인 모달 ===
-  readonly showConfirmModal = signal<boolean>(false);
-  readonly confirmModalData = signal<{
-    questNames: string[];
-    questCount: number;
-  } | null>(null);
-
   // === Computed signals ===
-  readonly hasSelectedQuests = computed(() => this.selectedQuestIds().size > 0);
   readonly isFeedbackValid = computed(() => {
     const hasLikeSelection = this.feedbackLike() !== null;
     const text = this.feedbackText()?.trim() || '';
@@ -83,7 +85,7 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
   readonly achievementRate = computed(() => {
     const quests = this.quests();
     if (quests.length === 0) return 0;
-    const completed = quests.filter(q => this.isPersonallyCompleted(q)).length;
+    const completed = quests.filter((q: Quest) => this.isPersonallyCompleted(q)).length;
     return Math.round((completed / quests.length) * 100);
   });
 
@@ -106,7 +108,6 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  // === 데이터 로딩 ===
   private async loadData(): Promise<void> {
     this.isLoading.set(true);
     
@@ -234,52 +235,54 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
     ]);
   }
 
-  // === 퀘스트 관리 ===
+  // === 퀘스트 개별 완료 처리 ===
   onQuestClick(quest: Quest): void {
-    if (!this.canSelectQuest(quest)) return;
+    const enhancedQuest = quest as EnhancedQuest;
     
-    this.selectedQuestIds.update(selected => {
-      const newSelected = new Set(selected);
-      if (newSelected.has(quest.id)) {
-        newSelected.delete(quest.id);
-      } else {
-        newSelected.add(quest.id);
-      }
-      return newSelected;
-    });
-  }
-
-  async onQuestAction(): Promise<void> {
-    const selectedIds = Array.from(this.selectedQuestIds());
-    const selectedQuests = this.quests()
-      .filter(quest => selectedIds.includes(quest.id))
-      .filter(quest => this.canSelectQuest(quest));
+    // 이미 완료된 퀘스트는 클릭할 수 없음
+    if (enhancedQuest.isPersonallyCompleted) {
+      this.showToast('error', '이미 완료된 퀘스트입니다.');
+      return;
+    }
     
-    if (selectedQuests.length === 0) {
-      this.showToast('error', '완료할 수 있는 퀘스트를 선택해주세요.');
+    // 완료 가능한 퀘스트만 처리
+    if (!enhancedQuest.isSelectable) {
+      this.showToast('error', '완료할 수 없는 퀘스트입니다.');
       return;
     }
 
-    this.showConfirmationModal(selectedQuests);
+    // 퀘스트 완료 확인 모달 표시
+    this.showQuestCompletionModal(quest);
   }
 
-  private showConfirmationModal(quests: Quest[]): void {
-    this.confirmModalData.set({
-      questNames: quests.map(q => q.title),
-      questCount: quests.length
+  private showQuestCompletionModal(quest: Quest): void {
+    this.questConfirmData.set({
+      questId: quest.id,
+      questTitle: quest.title,
+      questDescription: quest.description
     });
-    this.showConfirmModal.set(true);
+    this.showQuestConfirmModal.set(true);
   }
 
-  async confirmQuestCompletion(): Promise<void> {
-    this.closeConfirmModal();
-    
-    const selectedIds = Array.from(this.selectedQuestIds());
-    const selectedQuests = this.quests()
-      .filter(quest => selectedIds.includes(quest.id) && this.canSelectQuest(quest));
+  async confirmSingleQuestCompletion(): Promise<void> {
+    const questData = this.questConfirmData();
+    if (!questData) return;
 
-    for (const quest of selectedQuests) {
+    this.isCompletingQuest.set(true);
+    
+    try {
+      const quest = this.quests().find(q => q.id === questData.questId);
+      if (!quest) {
+        throw new Error('퀘스트를 찾을 수 없습니다.');
+      }
+
       await this.completeQuest(quest);
+      this.closeQuestConfirmModal();
+      
+    } catch (error) {
+      this.handleError(error, '퀘스트 완료');
+    } finally {
+      this.isCompletingQuest.set(false);
     }
   }
 
@@ -292,18 +295,6 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
         throw new Error('사용자 또는 그룹 정보가 없습니다.');
       }
 
-      const success = await this.groupDashboardService.questSuccessWithFeedback(
-        groupName, 
-        userId, 
-        [quest.title],
-        '',
-        undefined
-      );
-
-      if (!success) {
-        throw new Error('퀘스트 완료 처리에 실패했습니다.');
-      }
-
       this.updateQuestUI(quest);
       this.showQuestCompletionFeedback(quest);
       await this.refreshData();
@@ -314,16 +305,10 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
   }
 
   private updateQuestUI(quest: Quest): void {
-    this.selectedQuestIds.update(selected => {
-      const newSelected = new Set(selected);
-      newSelected.delete(quest.id);
-      return newSelected;
-    });
-
     this.quests.update(quests => 
       quests.map(q => 
         q.id === quest.id 
-          ? { ...q, status: 'completed' as const, progress: 100 }
+          ? { ...q, status: 'completed' as const, progress: 100, isPersonallyCompleted: true }
           : q
       )
     );
@@ -360,7 +345,7 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
       const success = await this.groupDashboardService.questSuccessWithFeedback(
         data.groupName,
         userId,
-        [data.questTitle],
+        data.questTitle,
         text,
         isLike
       );
@@ -402,13 +387,13 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
     this.resetFeedbackForm();
   }
 
-  closeConfirmModal(): void {
-    this.showConfirmModal.set(false);
-    this.confirmModalData.set(null);
+  closeQuestConfirmModal(): void {
+    this.showQuestConfirmModal.set(false);
+    this.questConfirmData.set(null);
   }
 
   cancelQuestCompletion(): void {
-    this.closeConfirmModal();
+    this.closeQuestConfirmModal();
   }
 
   async refreshData(): Promise<void> {
@@ -420,28 +405,26 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
   }
 
   // === 상태 확인 메서드들 ===
-  isQuestSelected(questId: string): boolean {
-    return this.selectedQuestIds().has(questId);
-  }
-
   canSelectQuest(quest: Quest): boolean {
+    if (!quest) return false;
     const enhancedQuest = quest as EnhancedQuest;
     return enhancedQuest.isSelectable && !enhancedQuest.isPersonallyCompleted;
   }
 
   isPersonallyCompleted(quest: Quest): boolean {
+    if (!quest) return false;
     const enhancedQuest = quest as EnhancedQuest;
-    return enhancedQuest.isPersonallyCompleted;
+    return enhancedQuest.isPersonallyCompleted || false;
   }
 
   getQuestCardClass(quest: Quest): string {
+    if (!quest) return 'quest-card disabled';
+    
     const enhancedQuest = quest as EnhancedQuest;
     const classes = ['quest-card'];
     
     if (enhancedQuest.isPersonallyCompleted) {
       classes.push('completed');
-    } else if (this.isQuestSelected(quest.id)) {
-      classes.push('selected');
     } else if (enhancedQuest.isSelectable) {
       classes.push('selectable');
     } else {
@@ -452,6 +435,8 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
   }
 
   getStatusColor(status: string): string {
+    if (!status) return '#a0aec0';
+    
     const colorMap = {
       'completed': '#48bb78',
       'in-progress': '#4299e1',
@@ -461,11 +446,15 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
   }
 
   getGroupProgressText(quest: Quest): string {
+    if (!quest) return '0명 / 0명 완료';
+    
     const enhancedQuest = quest as EnhancedQuest;
-    return `${enhancedQuest.groupCompletions}명 / ${enhancedQuest.totalMembers}명 완료`;
+    return `${enhancedQuest.groupCompletions || 0}명 / ${enhancedQuest.totalMembers || 0}명 완료`;
   }
 
   getPersonalStatusIcon(quest: Quest): string {
+    if (!quest) return 'block';
+    
     const enhancedQuest = quest as EnhancedQuest;
     if (enhancedQuest.isPersonallyCompleted) return 'check_circle';
     if (enhancedQuest.isSelectable) return 'radio_button_unchecked';
@@ -473,10 +462,17 @@ export class GroupDashboardComponent implements OnInit, OnDestroy {
   }
 
   getPersonalStatusColor(quest: Quest): string {
+    if (!quest) return '#a0aec0';
+    
     const enhancedQuest = quest as EnhancedQuest;
     if (enhancedQuest.isPersonallyCompleted) return '#48bb78';
     if (enhancedQuest.isSelectable) return '#3182ce';
     return '#a0aec0';
+  }
+
+  getCompletedQuestCount(): number {
+    const quests = this.quests();
+    return quests.filter((q: Quest) => this.isPersonallyCompleted(q)).length;
   }
 
   // === 유틸리티 메서드들 ===
