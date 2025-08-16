@@ -3,9 +3,6 @@ import { DataCacheService } from '../../Core/Service/DataCacheService';
 import { UserService } from '../../Core/Service/UserService';
 import { GroupService } from '../../Core/Service/GroupService';
 import { SharedStateService } from '../../Core/Service/SharedService';
-import { UserCredentials, UserStatus, UserJoin, UserQuestCur, UserQuestPrev, UserQuestWeekly } from '../../Core/Models/user'
-import { Group } from '../../Core/Models/group';
-import { Club } from '../../Core/Models/club';
 
 interface UserAction {
   id: string;

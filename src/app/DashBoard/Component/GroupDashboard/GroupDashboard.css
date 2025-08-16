@@ -179,13 +179,18 @@
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
 }
 
-.quest-card.selected {
+.quest-card.selectable {
   border-color: #3182ce;
-  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+}
+
+.quest-card.selectable:hover {
+  border-color: #2b6cb0;
+  background: linear-gradient(135deg, #ebf8ff 0%, #bee3f8 100%);
   box-shadow: 0 8px 24px rgba(49, 130, 206, 0.3);
 }
 
-.quest-card.selected::before {
+.quest-card.selectable::before {
   height: 6px;
   background: linear-gradient(90deg, #3182ce, #1e40af);
 }
@@ -306,23 +311,7 @@
   color: #2d3748;
 }
 
-/* === 선택/완료 표시 === */
-.selection-indicator {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(135deg, #3182ce, #2b6cb0);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  box-shadow: 0 4px 12px rgba(49, 130, 206, 0.4);
-  animation: bounceIn 0.3s ease-out;
-}
-
+/* === 완료 표시 === */
 .completion-badge {
   position: absolute;
   top: 12px;
@@ -339,62 +328,77 @@
   box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
 }
 
-/* === 액션 섹션 === */
-.action-section {
-  text-align: center;
-  padding-top: 16px;
-  border-top: 1px solid #e2e8f0;
-}
-
-/* === 버튼 스타일 === */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 24px;
-  border-radius: 12px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: all 0.3s ease;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-  justify-content: center;
-}
-
-.btn.primary {
-  background: linear-gradient(135deg, #3182ce, #2b6cb0);
-  color: white;
-  box-shadow: 0 4px 12px rgba(49, 130, 206, 0.3);
-}
-
-.btn.primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(49, 130, 206, 0.4);
-}
-
-.btn.secondary {
-  background: white;
+/* === 액션 힌트 === */
+.action-hint {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  background: rgba(49, 130, 206, 0.1);
   color: #3182ce;
-  border: 2px solid #3182ce;
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid rgba(49, 130, 206, 0.2);
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
-.btn.secondary:hover:not(:disabled) {
-  background: #3182ce;
+.quest-card.selectable:hover .action-hint {
+  opacity: 1;
+}
+
+/* === 퀘스트 요약 === */
+.quest-summary {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.summary-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
   color: white;
-  transform: translateY(-2px);
-}
-
-.btn.large {
-  padding: 16px 32px;
-  font-size: 16px;
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
   min-width: 200px;
 }
 
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none !important;
+.summary-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(10px);
+}
+
+.summary-icon mat-icon {
+  font-size: 24px;
+}
+
+.summary-content {
+  flex: 1;
+}
+
+.summary-number {
+  font-size: 24px;
+  font-weight: 800;
+  margin-bottom: 4px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.summary-label {
+  font-size: 14px;
+  opacity: 0.9;
 }
 
 /* === 모달 스타일 === */
@@ -488,6 +492,32 @@
   margin-bottom: 20px !important;
 }
 
+/* === 완료 확인 모달 추가 스타일 === */
+.completion-info {
+  background: rgba(102, 126, 234, 0.05);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 16px 0;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: #4a5568;
+  font-size: 14px;
+}
+
+.info-item:last-child {
+  margin-bottom: 0;
+}
+
+.info-item mat-icon {
+  font-size: 18px;
+  color: #667eea;
+}
+
 /* === 피드백 좋아요/싫어요 === */
 .like-section {
   margin-bottom: 20px;
@@ -567,19 +597,6 @@
   width: 100%;
 }
 
-/* === 퀘스트 리스트 (모달) === */
-.quest-list {
-  margin: 16px 0;
-}
-
-.quest-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 0;
-  color: #4a5568;
-}
-
 /* === 모달 액션 === */
 .modal-actions {
   display: flex;
@@ -590,6 +607,57 @@
 
 .modal-actions .btn {
   min-width: 120px;
+}
+
+/* === 버튼 스타일 === */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  justify-content: center;
+}
+
+.btn.primary {
+  background: linear-gradient(135deg, #3182ce, #2b6cb0);
+  color: white;
+  box-shadow: 0 4px 12px rgba(49, 130, 206, 0.3);
+}
+
+.btn.primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(49, 130, 206, 0.4);
+}
+
+.btn.secondary {
+  background: white;
+  color: #3182ce;
+  border: 2px solid #3182ce;
+}
+
+.btn.secondary:hover:not(:disabled) {
+  background: #3182ce;
+  color: white;
+  transform: translateY(-2px);
+}
+
+.btn.large {
+  padding: 16px 32px;
+  font-size: 16px;
+  min-width: 200px;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
 }
 
 /* === 로딩 및 에러 상태 === */
@@ -723,21 +791,6 @@
   to {
     opacity: 0;
     transform: translateX(100%);
-  }
-}
-
-@keyframes bounceIn {
-  0% {
-    transform: scale(0);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1.2);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
   }
 }
 

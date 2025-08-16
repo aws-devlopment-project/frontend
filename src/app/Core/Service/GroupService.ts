@@ -80,7 +80,10 @@ export class GroupService {
     async questSuccessWithFeedback(
         group: string, 
         user: string, 
-        questList: {club: string, quest: string, feedback: string}[],
+        club: string,
+        quest: string,
+        feedback: string,
+        isLike: boolean | undefined
         ): Promise<boolean> {
         const url = this.serverUrl + '/api/group/questSuccess';
         const headers = new HttpHeaders({
@@ -90,7 +93,10 @@ export class GroupService {
         const body = JSON.stringify({
             group,
             user,
-            questList
+            club,
+            quest,
+            feedback,
+            isLike
         });
         
         try {
@@ -99,30 +105,26 @@ export class GroupService {
             // 기존 캐시 업데이트 로직
             let cacheGroup: Group | null = await this.dataService.getCache(group);
             if (cacheGroup) {
-                questList.forEach((quest) => {
-                    const questIndex = cacheGroup.questList.indexOf(quest.quest);
-                    if (questIndex !== -1) {
-                        cacheGroup.questSuccessNum[questIndex] += 1;
-                    }
-                });
-                this.dataService.setCache(group, cacheGroup);
-            }
+                const questIndex = cacheGroup.questList.indexOf(quest);
+                if (questIndex !== -1) {
+                    cacheGroup.questSuccessNum[questIndex] += 1;
+                }
+            };
+            this.dataService.setCache(group, cacheGroup);
             let userQuestCur: UserQuestCur | null = await this.dataService.getCache('userQuestCur');
             if (!userQuestCur)
                 userQuestCur = await this.userService.getUserQuestCur(user);
             if (userQuestCur) {
-                questList.forEach((quest) => {
-                    const questIndex = userQuestCur.curQuestTotalList.findIndex(
-                        (q) => q.quest === quest.quest && q.group === group && q.club === quest.club
-                    );
-                    console.log("questIndex: " + questIndex);
-                    console.log("quest: " + quest.quest);
-                    if (questIndex !== -1) {
-                        userQuestCur.curQuestTotalList[questIndex].success = true;
-                    }
-                });
-                this.dataService.setCache('userQuestCur', userQuestCur);
-            }
+                const questIndex = userQuestCur.curQuestTotalList.findIndex(
+                    (q) => q.quest === quest && q.group === group && q.club === club
+                );
+                console.log("questIndex: " + questIndex);
+                console.log("quest: " + quest);
+                if (questIndex !== -1) {
+                    userQuestCur.curQuestTotalList[questIndex].success = true;
+                }
+            };
+            this.dataService.setCache('userQuestCur', userQuestCur);
             return true;
         } catch (error) {
             console.error('Error in questSuccessWithFeedback:', error);

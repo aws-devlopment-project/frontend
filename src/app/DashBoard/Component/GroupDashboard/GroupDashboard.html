@@ -91,8 +91,8 @@
     </div>
   }
 
-  <!-- 확인 모달 -->
-  @if (showConfirmModal()) {
+  <!-- 퀘스트 완료 확인 모달 -->
+  @if (showQuestConfirmModal()) {
     <div class="modal-overlay">
       <div class="confirm-modal">
         <div class="modal-header">
@@ -101,24 +101,40 @@
         </div>
         
         <div class="modal-content">
-          <p>다음 퀘스트들을 완료하시겠습니까?</p>
+          <h4>{{ questConfirmData()?.questTitle }}</h4>
+          <p>{{ questConfirmData()?.questDescription }}</p>
+          <p><strong>이 퀘스트를 완료하시겠습니까?</strong></p>
           
-          <div class="quest-list">
-            @for (questName of confirmModalData()?.questNames || []; track questName) {
-              <div class="quest-item">
-                <mat-icon>assignment_turned_in</mat-icon>
-                <span>{{ questName }}</span>
-              </div>
-            }
+          <div class="completion-info">
+            <div class="info-item">
+              <mat-icon>info</mat-icon>
+              <span>완료 후 되돌릴 수 없습니다</span>
+            </div>
+            <div class="info-item">
+              <mat-icon>feedback</mat-icon>
+              <span>완료 후 피드백을 남겨주세요</span>
+            </div>
           </div>
         </div>
         
         <div class="modal-actions">
-          <button class="btn secondary" (click)="cancelQuestCompletion()">
+          <button 
+            class="btn secondary" 
+            (click)="cancelQuestCompletion()"
+            [disabled]="isCompletingQuest()">
             취소
           </button>
-          <button class="btn primary" (click)="confirmQuestCompletion()">
-            완료 처리
+          <button 
+            class="btn primary" 
+            (click)="confirmSingleQuestCompletion()"
+            [disabled]="isCompletingQuest()">
+            @if (isCompletingQuest()) {
+              <div class="spinner"></div>
+              완료 처리 중...
+            } @else {
+              <mat-icon>check_circle</mat-icon>
+              완료하기
+            }
           </button>
         </div>
       </div>
@@ -184,7 +200,7 @@
           <mat-icon>assignment</mat-icon>
           일일 퀘스트
         </h2>
-        <p>클릭하여 퀘스트를 선택하고 완료해보세요</p>
+        <p>퀘스트를 클릭하여 개별적으로 완료하고 피드백을 남겨보세요</p>
       </div>
       
       @if (quests().length > 0) {
@@ -224,13 +240,6 @@
                 <div class="progress-percentage">{{ quest.progress }}%</div>
               </div>
 
-              <!-- 선택 표시 -->
-              @if (isQuestSelected(quest.id)) {
-                <div class="selection-indicator">
-                  <mat-icon>check_circle</mat-icon>
-                </div>
-              }
-
               <!-- 완료 표시 -->
               @if (isPersonallyCompleted(quest)) {
                 <div class="completion-badge">
@@ -238,19 +247,31 @@
                   <span>완료됨</span>
                 </div>
               }
+
+              <!-- 완료 가능 표시 -->
+              @if (canSelectQuest(quest)) {
+                <div class="action-hint">
+                  <mat-icon>touch_app</mat-icon>
+                  <span>클릭하여 완료하기</span>
+                </div>
+              }
             </div>
           }
         </div>
 
-        <!-- 액션 버튼 -->
-        <div class="action-section">
-          <button 
-            class="btn primary large"
-            [disabled]="!hasSelectedQuests()"
-            (click)="onQuestAction()">
-            <mat-icon>check</mat-icon>
-            선택한 퀘스트 완료하기 ({{ selectedQuestIds().size }})
-          </button>
+        <!-- 완료된 퀘스트 수 표시 -->
+        <div class="quest-summary">
+          <div class="summary-card">
+            <div class="summary-icon">
+              <mat-icon>assignment_turned_in</mat-icon>
+            </div>
+            <div class="summary-content">
+              <div class="summary-number">
+                {{ getCompletedQuestCount() }} / {{ quests().length }}
+              </div>
+              <div class="summary-label">완료된 퀘스트</div>
+            </div>
+          </div>
         </div>
       } @else {
         <div class="empty-state">

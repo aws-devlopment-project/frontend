@@ -155,34 +155,6 @@
                       {{ message.timestamp | date:'HH:mm' }}
                     </time>
                   </div>
-
-                  <!-- 피드백 버튼 (봇 메시지에만) -->
-                  @if (message.showFeedback && !message.feedbackProvided) {
-                  <div class="message-feedback">
-                    <span class="feedback-label">도움이 되었나요?</span>
-                    <div class="feedback-buttons">
-                      <button 
-                        class="feedback-btn helpful"
-                        (click)="onMessageFeedback(message.id, 'helpful')"
-                        type="button">
-                        👍
-                      </button>
-                      <button 
-                        class="feedback-btn unhelpful"
-                        (click)="onMessageFeedback(message.id, 'unhelpful')"
-                        type="button">
-                        👎
-                      </button>
-                    </div>
-                  </div>
-                }
-                @if (message.feedbackProvided) {
-                  <div class="feedback-status">
-                    <span class="feedback-thanks">
-                      {{ message.feedback === 'helpful' ? '✅ 감사합니다!' : 'ℹ️ 피드백 감사합니다' }}
-                    </span>
-                  </div>
-                }
                 </div>
               </div>
             </article>
