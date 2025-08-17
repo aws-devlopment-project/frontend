@@ -90,11 +90,12 @@ export class GroupService {
             'Content-Type': 'application/json'
         });
         
+        console.log(group, user, club, quest, feedback, isLike);
         const body = JSON.stringify({
             group,
             user,
-            quest,
             club,
+            quest,
             feedback,
             isLike
         });
