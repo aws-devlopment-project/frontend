@@ -50,16 +50,6 @@ interface HighlightItem {
   avatar?: string;
 }
 
-interface RecommendedChallenge {
-  id: string;
-  title: string;
-  description: string;
-  participants: number;
-  difficulty: 'easy' | 'medium' | 'hard';
-  category: string;
-  image: string;
-}
-
 interface ActivitySummary {
   totalActivities: number;
   questsCompleted: number;
@@ -210,9 +200,6 @@ export class HomeDashboardComponent implements OnInit {
     return highlights;
   });
 
-  // 추천 퀘스트
-  recommendedChallenges = signal<RecommendedChallenge[]>([]);
-
   // 개인화된 인사이트
   personalInsights = signal<string[]>([]);
 
@@ -233,7 +220,6 @@ export class HomeDashboardComponent implements OnInit {
       await Promise.all([
         this.loadActivitySummary(),
         this.loadQuickStats(),
-        this.loadRecommendedChallenges(),
         this.loadPersonalInsights(),
         this.loadQuestCalendarData()
       ]);
@@ -522,15 +508,6 @@ export class HomeDashboardComponent implements OnInit {
     }
   }
 
-  private async loadRecommendedChallenges(): Promise<void> {
-    try {
-      const challenges = await this.homeDashboardService.getRecommendedChallenge();
-      this.recommendedChallenges.set(challenges);
-    } catch (error) {
-      console.error('Error loading recommended challenges:', error);
-    }
-  }
-
   private async loadPersonalInsights(): Promise<void> {
     try {
       const insights = await this.localActivityService.getPersonalizedInsights();
@@ -668,23 +645,6 @@ export class HomeDashboardComponent implements OnInit {
     }
   }
 
-  onJoinChallenge(challenge: RecommendedChallenge): void {
-    this.localActivityService.trackActivity(
-      'quest_start',
-      `${challenge.title} 퀘스트 시작`,
-      `${challenge.category} 카테고리의 퀘스트에 참여했습니다.`,
-      { 
-        questName: challenge.title,
-        groupName: challenge.category,
-        difficulty: challenge.difficulty 
-      }
-    );
-
-    this.sharedState.setSelectedGroup(challenge.category);
-    this.sharedState.setSelectedChannel(null);
-    this.sharedState.setActiveTab('group');
-  }
-
   onViewAllChallenges(): void {
     this.localActivityService.trackActivity(
       'page_visit',
@@ -712,7 +672,6 @@ export class HomeDashboardComponent implements OnInit {
     this.sharedState.setActiveTab('activity');
   }
 
-  // 사용자 정보 관련
   isUserLoaded(): boolean {
     return this.sharedState.currentUser() !== null;
   }
