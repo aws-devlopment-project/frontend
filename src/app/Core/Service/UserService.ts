@@ -679,10 +679,21 @@ export class UserService {
     }
 
     // === 캐시 관리 메서드들 ===
+    clearSelectUserCache(cacheName: string) {
+        this.cacheService.removeCache(cacheName);
+    }
+    
     clearUserCache(): void {
         this.cacheService.removeCache('user');
         this.cacheService.removeCache('userStatus');
         this.cacheService.removeCache('userJoin');
+        this.cacheService.removeCache('userQuestCur');
+        this.cacheService.removeCache('userQuestContinuous');
+        this.cacheService.removeCache('userQuestPrev');
+        this.cacheService.removeCache('userQuestWeekly');
+    }
+
+    clearUserQuestCache(): void {
         this.cacheService.removeCache('userQuestCur');
         this.cacheService.removeCache('userQuestContinuous');
         this.cacheService.removeCache('userQuestPrev');

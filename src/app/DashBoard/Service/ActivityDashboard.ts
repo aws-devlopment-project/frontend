@@ -32,7 +32,7 @@ export class ActivityDashboardService {
             return [0, 0, 0, 0];
         }
         const days = userQuestContinuous.continuousSuccessQuestList.days;
-        totalSuccess = userQuestContinuous.continuousSuccessQuestList.successQuestNum;
+        totalSuccess = userQuestContinuous.continuousSuccessQuestList.totalQuestNum;
         let totalSuccessInWeeks = 0;
         userQuestPrev.prevQuestTotalList.forEach((quest) => {
             if (quest.success) {
