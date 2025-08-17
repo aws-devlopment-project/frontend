@@ -57,80 +57,137 @@ export class LocalActivityService {
     this.initializeStreakData();
   }
 
-  // === 캐시 데이터 기반 활동 추적 ===
+  // === 개선된 캐시 데이터 기반 활동 추적 ===
   
   // 퀘스트 완료 추적 (실제 UserQuestCur 데이터 기반)
   async trackQuestCompletion(groupName: string, questList: string[]): Promise<void> {
-    const userCreds = await this.userService.getUserCredentials();
-    if (!userCreds) return;
+    try {
+      const userCreds = await this.userService.getUserCredentials();
+      if (!userCreds) {
+        console.warn('❌ 사용자 인증 정보 없음 - 퀘스트 완료 추적 불가');
+        return;
+      }
 
-    // 실제 API 호출과 연동
-    const success = await this.userService.getUserQuestCur(userCreds.id);
-    
-    if (success) {
+      // 🔧 캐시 무효화 후 최신 데이터 가져오기
+      this.userService.clearSelectUserCache('userQuestCur');
+      const questCurData = await this.userService.getUserQuestCur(userCreds.id);
+      
+      if (!questCurData || !questCurData.curQuestTotalList) {
+        console.warn('❌ UserQuestCur 데이터 로드 실패');
+        return;
+      }
+
+      // 🔧 실제 완료된 퀘스트만 추적
       questList.forEach(quest => {
-        this.trackActivity(
-          'quest_complete',
-          `${quest} 퀘스트 완료`,
-          `${groupName} 그룹에서 "${quest}" 퀘스트를 성공적으로 완료했습니다!`,
-          {
-            groupName,
-            questName: quest,
-            questList
-          }
+        const questEntry = questCurData.curQuestTotalList.find(
+          (q: any) => q && q.quest === quest && q.group === groupName && q.success === true
         );
+
+        if (questEntry) {
+          this.trackActivity(
+            'quest_complete',
+            `${quest} 퀘스트 완료`,
+            `${groupName} 그룹에서 "${quest}" 퀘스트를 성공적으로 완료했습니다!`,
+            {
+              groupName,
+              questName: quest,
+              questList,
+              clubName: questEntry.club // 🔧 실제 클럽명 추가
+            }
+          );
+          
+          console.log('✅ 퀘스트 완료 추적됨:', { quest, group: groupName, club: questEntry.club });
+        } else {
+          console.log('⏳ 퀘스트 아직 미완료:', { quest, group: groupName });
+        }
       });
       
       // 연속 완료 체크
       await this.checkConsecutiveQuests(groupName, questList);
+      
+    } catch (error) {
+      console.error('❌ 퀘스트 완료 추적 오류:', error);
     }
   }
 
   // 그룹 가입 추적 (실제 UserJoin 업데이트와 연동)
   async trackGroupJoin(groupName: string): Promise<void> {
-    const userCreds = await this.userService.getUserCredentials();
-    if (!userCreds) return;
+    try {
+      const userCreds = await this.userService.getUserCredentials();
+      if (!userCreds) {
+        console.warn('❌ 사용자 인증 정보 없음 - 그룹 가입 추적 불가');
+        return;
+      }
 
-    const group = this.shared.groupList().filter((group) => group.name === groupName);
-    const success = await this.userService.joinGroup(userCreds.id, group[0].id, groupName);
-    
-    if (success) {
-      // 그룹 정보 가져오기
-      const groupInfo = await this.groupService.getGroupInfo(groupName);
+      // 🔧 SharedStateService의 그룹 리스트 활용
+      const groupList = this.shared.groupList();
+      const targetGroup = groupList.find(group => group.name === groupName);
       
-      this.trackActivity(
-        'group_join',
-        `${groupName} 그룹 가입`,
-        `새로운 그룹 "${groupName}"에 가입했습니다. ${groupInfo ? `현재 ${groupInfo.memberNum}명의 멤버가 있습니다.` : ''}`,
-        { groupName }
-      );
+      if (!targetGroup) {
+        console.warn('❌ 그룹을 찾을 수 없음:', groupName);
+        return;
+      }
 
-      // 첫 그룹 가입인지 체크
-      await this.checkFirstTimeJoins('group', groupName);
+      const success = await this.userService.joinGroup(userCreds.id, targetGroup.id, groupName);
+      
+      if (success) {
+        // 🔧 캐시 무효화 후 최신 그룹 정보 가져오기
+        this.userService.clearSelectUserCache(groupName);
+        const groupInfo = await this.groupService.getGroupInfo(groupName);
+        
+        this.trackActivity(
+          'group_join',
+          `${groupName} 그룹 가입`,
+          `새로운 그룹 "${groupName}"에 가입했습니다. ${groupInfo ? `현재 ${groupInfo.memberNum}명의 멤버가 있습니다.` : ''}`,
+          { groupName }
+        );
+
+        // 첫 그룹 가입인지 체크
+        await this.checkFirstTimeJoins('group', groupName);
+        
+        console.log('✅ 그룹 가입 추적됨:', groupName);
+      } else {
+        console.warn('❌ 그룹 가입 실패:', groupName);
+      }
+      
+    } catch (error) {
+      console.error('❌ 그룹 가입 추적 오류:', error);
     }
   }
 
   // 클럽 가입 추적 (실제 UserJoin 업데이트와 연동)
   async trackClubJoin(groupName: string, clubList: string[]): Promise<void> {
-    const userCreds = await this.userService.getUserCredentials();
-    if (!userCreds) return;
-
-    const success = await this.userService.joinClub(userCreds.id, groupName, clubList);
-    
-    if (success) {
-      clubList.forEach(clubName => {
-        this.trackActivity(
-          'club_join',
-          `${clubName} 채널 가입`,
-          `${groupName} 그룹의 "${clubName}" 채널에 가입했습니다.`,
-          { groupName, clubName }
-        );
-      });
-
-      // 첫 클럽 가입인지 체크
-      for (const clubName of clubList) {
-        await this.checkFirstTimeJoins('club', clubName, groupName);
+    try {
+      const userCreds = await this.userService.getUserCredentials();
+      if (!userCreds) {
+        console.warn('❌ 사용자 인증 정보 없음 - 클럽 가입 추적 불가');
+        return;
       }
+
+      const success = await this.userService.joinClub(userCreds.id, groupName, clubList);
+      
+      if (success) {
+        clubList.forEach(clubName => {
+          this.trackActivity(
+            'club_join',
+            `${clubName} 채널 가입`,
+            `${groupName} 그룹의 "${clubName}" 채널에 가입했습니다.`,
+            { groupName, clubName }
+          );
+        });
+
+        // 첫 클럽 가입인지 체크
+        for (const clubName of clubList) {
+          await this.checkFirstTimeJoins('club', clubName, groupName);
+        }
+        
+        console.log('✅ 클럽 가입 추적됨:', { group: groupName, clubs: clubList });
+      } else {
+        console.warn('❌ 클럽 가입 실패:', { group: groupName, clubs: clubList });
+      }
+      
+    } catch (error) {
+      console.error('❌ 클럽 가입 추적 오류:', error);
     }
   }
 
@@ -156,7 +213,7 @@ export class LocalActivityService {
     this.saveToStorage(newActivities);
   }
 
-  // === 캐시 데이터 기반 분석 ===
+  // === 개선된 캐시 데이터 기반 분석 ===
 
   // 실제 퀘스트 데이터 기반 통계
   async getQuestBasedStats(): Promise<{
@@ -166,33 +223,50 @@ export class LocalActivityService {
     favoriteGroup: string;
     weeklyProgress: { day: string; completed: number; total: number }[];
   }> {
-    const userCreds = await this.userService.getUserCredentials();
-    if (!userCreds) return this.getEmptyQuestStats();
-
     try {
-      const [questCur, questWeekly] = await Promise.all([
-        this.userService.getUserQuestCur(userCreds.id),
-        this.userService.getUserQuestWeekly(userCreds.id)
-      ]);
+      const userCreds = await this.userService.getUserCredentials();
+      if (!userCreds) return this.getEmptyQuestStats();
 
-      const currentQuests = questCur?.curQuestTotalList.length || 0;
-      const completedQuests = questCur?.curQuestTotalList.filter(q => q.success).length || 0;
+      // 🔧 캐시된 데이터 우선 확인, 없으면 새로 로드
+      let questCur: any = this.cacheService.getCache('userQuestCur');
+      if (!questCur || !questCur.id || questCur.id !== userCreds.id) {
+        questCur = await this.userService.getUserQuestCur(userCreds.id);
+      }
+
+      let questWeekly: any = this.cacheService.getCache('userQuestWeekly');
+      if (!questWeekly || !questWeekly.id || questWeekly.id !== userCreds.id) {
+        questWeekly = await this.userService.getUserQuestWeekly(userCreds.id);
+      }
+
+      if (!questCur || !questWeekly) {
+        console.warn('❌ 퀘스트 데이터 로드 실패');
+        return this.getEmptyQuestStats();
+      }
+
+      // 안전한 접근을 위한 null 체크
+      const questList = questCur.curQuestTotalList || [];
+      const currentQuests = questList.length;
+      const completedQuests = questList.filter((q: any) => q && q.success === true).length;
       const completionRate = currentQuests > 0 ? Math.round((completedQuests / currentQuests) * 100) : 0;
 
       // 가장 참여도가 높은 그룹 찾기
       const groupStats: { [key: string]: number } = {};
-      questCur?.curQuestTotalList.forEach(quest => {
-        groupStats[quest.group] = (groupStats[quest.group] || 0) + (quest.success ? 1 : 0);
+      questList.forEach((quest: any) => {
+        if (quest && quest.group && quest.success === true) {
+          groupStats[quest.group] = (groupStats[quest.group] || 0) + 1;
+        }
       });
+      
       const favoriteGroup = Object.entries(groupStats)
         .sort(([,a], [,b]) => b - a)[0]?.[0] || '없음';
 
-      // 주간 진행률
-      const weeklyProgress = questWeekly?.weeklyQuestList.map(week => ({
-        day: this.getDayName(week.day),
-        completed: week.successQuestNum,
-        total: week.questTotalNum
-      })) || [];
+      // 주간 진행률 - 안전한 접근
+      const weeklyList = questWeekly.weeklyQuestList || [];
+      const weeklyProgress = weeklyList.map((week: any) => ({
+        day: this.getDayName(week?.day || 0),
+        completed: week?.successQuestNum || 0,
+        total: week?.questTotalNum || 0
+      }));
 
       return {
         currentQuests,
@@ -202,7 +276,7 @@ export class LocalActivityService {
         weeklyProgress
       };
     } catch (error) {
-      console.error('Error getting quest stats:', error);
+      console.error('❌ 퀘스트 통계 조회 오류:', error);
       return this.getEmptyQuestStats();
     }
   }
@@ -215,15 +289,27 @@ export class LocalActivityService {
     recentlyJoinedGroup: string;
     groupDetails: { name: string; memberCount: number; questCount: number }[];
   }> {
-    const userCreds = await this.userService.getUserCredentials();
-    if (!userCreds) return this.getEmptyGroupStats();
-
     try {
-      const joinList = await this.userService.getUserJoin(userCreds.id);
-      if (!joinList) return this.getEmptyGroupStats();
+      const userCreds = await this.userService.getUserCredentials();
+      if (!userCreds) return this.getEmptyGroupStats();
 
-      const totalGroups = joinList.joinList.length;
-      const totalClubs = joinList.joinList.reduce((sum, group) => sum + group.clubList.length, 0);
+      // 🔧 캐시된 UserJoin 데이터 우선 확인
+      let joinList: any = this.cacheService.getCache('userJoin');
+      if (!joinList || !joinList.id || joinList.id !== userCreds.id) {
+        joinList = await this.userService.getUserJoin(userCreds.id);
+      }
+
+      if (!joinList) {
+        console.warn('❌ 사용자 가입 목록 로드 실패');
+        return this.getEmptyGroupStats();
+      }
+
+      // 안전한 접근을 위한 null 체크
+      const joinListArray = joinList.joinList || [];
+      const totalGroups = joinListArray.length;
+      const totalClubs = joinListArray.reduce((sum: number, group: any) => {
+        return sum + ((group && group.clubList) ? group.clubList.length : 0);
+      }, 0);
 
       // 최근 활동이 많은 그룹 찾기 (로컬 활동 기록 기반)
       const groupActivityCounts: { [key: string]: number } = {};
@@ -235,7 +321,8 @@ export class LocalActivityService {
       });
 
       const mostActiveGroup = Object.entries(groupActivityCounts)
-        .sort(([,a], [,b]) => b - a)[0]?.[0] || joinList.joinList[0]?.groupname || '없음';
+        .sort(([,a], [,b]) => b - a)[0]?.[0] || 
+        (joinListArray[0]?.groupname || '없음');
 
       // 최근 가입한 그룹 (가장 최근 group_join 활동)
       const recentGroupJoin = this.activities()
@@ -243,14 +330,32 @@ export class LocalActivityService {
         .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())[0];
       const recentlyJoinedGroup = recentGroupJoin?.context?.groupName || '없음';
 
-      // 그룹 상세 정보
+      // 그룹 상세 정보 (캐시 활용)
       const groupDetails = await Promise.all(
-        joinList.joinList.map(async (group) => {
-          const groupInfo = await this.groupService.getGroupInfo(group.groupname);
+        joinListArray.map(async (group: any) => {
+          if (!group || !group.groupname) {
+            return {
+              name: '알 수 없음',
+              memberCount: 0,
+              questCount: 0
+            };
+          }
+
+          // 🔧 캐시된 그룹 정보 우선 확인
+          let groupInfo: any = this.cacheService.getCache(group.groupname);
+          if (!groupInfo) {
+            try {
+              groupInfo = await this.groupService.getGroupInfo(group.groupname);
+            } catch (error) {
+              console.warn(`❌ 그룹 정보 로드 실패: ${group.groupname}`, error);
+              groupInfo = null;
+            }
+          }
+          
           return {
             name: group.groupname,
             memberCount: groupInfo?.memberNum || 0,
-            questCount: groupInfo?.questList.length || 0
+            questCount: groupInfo?.questList?.length || 0
           };
         })
       );
@@ -263,7 +368,7 @@ export class LocalActivityService {
         groupDetails
       };
     } catch (error) {
-      console.error('Error getting group participation stats:', error);
+      console.error('❌ 그룹 참여 통계 조회 오류:', error);
       return this.getEmptyGroupStats();
     }
   }
@@ -273,7 +378,7 @@ export class LocalActivityService {
     const insights: ActivityInsight[] = [];
     
     try {
-      // 퀘스트 기반 인사이트
+      // 🔧 캐시 기반 퀘스트 인사이트
       const questStats = await this.getQuestBasedStats();
       if (questStats.completionRate >= 80) {
         insights.push({
@@ -281,6 +386,13 @@ export class LocalActivityService {
           message: `🎯 퀘스트 달성률 ${questStats.completionRate}%! 대단해요!`,
           priority: 'high',
           icon: '🏆'
+        });
+      } else if (questStats.completionRate >= 50) {
+        insights.push({
+          type: 'quest',
+          message: `📈 퀘스트 달성률 ${questStats.completionRate}%! 좋은 페이스입니다!`,
+          priority: 'medium',
+          icon: '💪'
         });
       }
 
@@ -293,6 +405,13 @@ export class LocalActivityService {
           priority: 'high',
           icon: '🔥'
         });
+      } else if (currentStreak >= 3) {
+        insights.push({
+          type: 'streak',
+          message: `⭐ ${currentStreak}일 연속 활동! 꾸준함이 빛나고 있어요!`,
+          priority: 'medium',
+          icon: '⭐'
+        });
       }
 
       // 그룹 참여 인사이트
@@ -304,6 +423,13 @@ export class LocalActivityService {
           priority: 'medium',
           icon: '🌟'
         });
+      } else if (groupStats.totalGroups === 1) {
+        insights.push({
+          type: 'social',
+          message: `🌱 첫 번째 그룹 활동을 시작하셨네요! 환영합니다!`,
+          priority: 'medium',
+          icon: '🎉'
+        });
       }
 
       // 선호 활동 패턴 인사이트
@@ -313,7 +439,7 @@ export class LocalActivityService {
         const activityName = this.getActivityTypeName(topActivityType.type);
         insights.push({
           type: 'quest',
-          message: `📊 ${activityName} 활동을 특히 좋아하시는군요!`,
+          message: `📊 ${activityName} 활동을 특히 좋아하시는군요! (${topActivityType.count}회)`,
           priority: 'medium',
           icon: '📈'
         });
@@ -325,7 +451,7 @@ export class LocalActivityService {
       });
 
     } catch (error) {
-      console.error('Error getting enhanced insights:', error);
+      console.error('❌ 개인화 인사이트 생성 오류:', error);
       return [{
         type: 'quest',
         message: '🌱 새로운 활동을 시작해보세요!',
@@ -335,15 +461,22 @@ export class LocalActivityService {
     }
   }
 
-  // === 연속성 및 성취 체크 ===
+  // === 연속성 및 성취 체크 (개선됨) ===
 
   private async checkConsecutiveQuests(groupName: string, questList: string[]): Promise<void> {
-    const userCreds = await this.userService.getUserCredentials();
-    if (!userCreds) return;
-
     try {
-      const questContinuous = await this.userService.getUserQuestContinuous(userCreds.id);
-      if (questContinuous && questContinuous.continuousSuccessQuestList.days >= 3) {
+      const userCreds = await this.userService.getUserCredentials();
+      if (!userCreds) return;
+
+      // 🔧 캐시된 연속 데이터 우선 확인
+      let questContinuous: any = this.cacheService.getCache('userQuestContinuous');
+      if (!questContinuous || !questContinuous.id || questContinuous.id !== userCreds.id) {
+        questContinuous = await this.userService.getUserQuestContinuous(userCreds.id);
+      }
+      
+      if (questContinuous && 
+          questContinuous.continuousSuccessQuestList && 
+          questContinuous.continuousSuccessQuestList.days >= 3) {
         this.trackActivity(
           'quest_complete',
           '연속 퀘스트 달성!',
@@ -352,17 +485,22 @@ export class LocalActivityService {
         );
       }
     } catch (error) {
-      console.error('Error checking consecutive quests:', error);
+      console.error('❌ 연속 퀘스트 체크 오류:', error);
     }
   }
 
   private async checkFirstTimeJoins(type: 'group' | 'club', name: string, groupName?: string): Promise<void> {
-    const userCreds = await this.userService.getUserCredentials();
-    if (!userCreds) return;
-
     try {
-      const joinList = await this.userService.getUserJoin(userCreds.id);
-      if (!joinList) return;
+      const userCreds = await this.userService.getUserCredentials();
+      if (!userCreds) return;
+
+      // 🔧 캐시된 가입 목록 우선 확인
+      let joinList: any = this.cacheService.getCache('userJoin');
+      if (!joinList || !joinList.id || joinList.id !== userCreds.id) {
+        joinList = await this.userService.getUserJoin(userCreds.id);
+      }
+      
+      if (!joinList || !joinList.joinList) return;
 
       if (type === 'group' && joinList.joinList.length === 1) {
         this.trackActivity(
@@ -372,7 +510,10 @@ export class LocalActivityService {
           { groupName: name }
         );
       } else if (type === 'club') {
-        const totalClubs = joinList.joinList.reduce((sum, group) => sum + group.clubList.length, 0);
+        const totalClubs = joinList.joinList.reduce((sum: number, group: any) => {
+          return sum + ((group && group.clubList) ? group.clubList.length : 0);
+        }, 0);
+        
         if (totalClubs === 1) {
           this.trackActivity(
             'club_join',
@@ -383,7 +524,7 @@ export class LocalActivityService {
         }
       }
     } catch (error) {
-      console.error('Error checking first time joins:', error);
+      console.error('❌ 첫 가입 체크 오류:', error);
     }
   }
 
@@ -703,5 +844,195 @@ export class LocalActivityService {
     if (percentage <= 50) return 2;
     if (percentage <= 75) return 3;
     return 4;
+  }
+
+  // === 🔧 캐시 상태 확인 및 디버깅 메서드 추가 ===
+  
+  /**
+   * 캐시 상태 진단 (개발용)
+   */
+  async diagnoseCacheState(): Promise<void> {
+    console.group('🔍 LocalActivityService 캐시 진단');
+    
+    try {
+      const userCreds = await this.userService.getUserCredentials();
+      if (!userCreds) {
+        console.error('❌ 사용자 인증 정보 없음');
+        console.groupEnd();
+        return;
+      }
+
+      console.log('👤 현재 사용자:', userCreds.id);
+
+      // 캐시 상태 체크
+      const cacheKeys = ['userStatus', 'userJoin', 'userQuestCur', 'userQuestContinuous', 'userQuestWeekly'];
+      
+      for (const key of cacheKeys) {
+        const cached: any = this.cacheService.getCache(key);
+        const hasCache = this.cacheService.hasCache(key);
+        const expiry = this.cacheService.getCacheExpiry(key);
+        
+        console.log(`📦 ${key}:`, {
+          존재: hasCache,
+          데이터: cached ? '✅' : '❌',
+          만료시간: expiry ? new Date(expiry).toLocaleString() : '없음',
+          사용자일치: (cached && cached.id) === userCreds.id ? '✅' : '❌'
+        });
+      }
+
+      // SharedStateService 상태 체크
+      console.log('🔗 SharedStateService 상태:', {
+        초기화됨: this.shared.initialized(),
+        그룹수: this.shared.groupList().length,
+        클럽수: this.shared.clubList().length,
+        가입그룹수: this.shared.userJoin()?.joinList?.length || 0
+      });
+
+    } catch (error) {
+      console.error('❌ 캐시 진단 오류:', error);
+    }
+    
+    console.groupEnd();
+  }
+
+  /**
+   * 캐시 불일치 감지 및 해결
+   */
+  async detectAndFixCacheMismatches(): Promise<void> {
+    console.log('🔧 캐시 불일치 감지 및 해결 시작...');
+    
+    try {
+      const userCreds = await this.userService.getUserCredentials();
+      if (!userCreds) return;
+
+      const issues: string[] = [];
+
+      // 1. UserJoin과 SharedStateService 불일치 체크
+      const cachedUserJoin: any = this.cacheService.getCache('userJoin');
+      const sharedUserJoin: any = this.shared.userJoin();
+      
+      if (cachedUserJoin && sharedUserJoin) {
+        const cacheGroupCount = (cachedUserJoin.joinList && cachedUserJoin.joinList.length) || 0;
+        const sharedGroupCount = (sharedUserJoin.joinList && sharedUserJoin.joinList.length) || 0;
+        
+        if (cacheGroupCount !== sharedGroupCount) {
+          issues.push(`UserJoin 그룹 수 불일치: 캐시(${cacheGroupCount}) vs Shared(${sharedGroupCount})`);
+          
+          // SharedStateService 강제 새로고침
+          await this.shared.forceRefreshUserJoin();
+        }
+      }
+
+      // 2. Quest 데이터 ID 불일치 체크
+      const questCaches = ['userQuestCur', 'userQuestContinuous', 'userQuestWeekly'];
+      for (const cacheKey of questCaches) {
+        const cached: any = this.cacheService.getCache(cacheKey);
+        if (cached && cached.id && cached.id !== userCreds.id) {
+          issues.push(`${cacheKey} 사용자 ID 불일치: ${cached.id} vs ${userCreds.id}`);
+          this.userService.clearSelectUserCache(cacheKey);
+        }
+      }
+
+      // 3. 그룹 정보 캐시 만료 체크
+      const userJoin: any = this.shared.userJoin();
+      if (userJoin && userJoin.joinList) {
+        for (const group of userJoin.joinList) {
+          if (group && group.groupname && !this.cacheService.hasCache(group.groupname)) {
+            issues.push(`그룹 정보 캐시 없음: ${group.groupname}`);
+            // 백그라운드에서 그룹 정보 로드
+            this.groupService.getGroupInfo(group.groupname).catch(console.error);
+          }
+        }
+      }
+
+      if (issues.length > 0) {
+        console.warn('⚠️ 캐시 불일치 발견:', issues);
+      } else {
+        console.log('✅ 캐시 상태 정상');
+      }
+
+    } catch (error) {
+      console.error('❌ 캐시 불일치 감지 오류:', error);
+    }
+  }
+
+  /**
+   * 캐시 워밍업 (앱 시작 시 호출 권장)
+   */
+  async warmupCache(): Promise<void> {
+    console.log('🔥 캐시 워밍업 시작...');
+    
+    try {
+      const userCreds = await this.userService.getUserCredentials();
+      if (!userCreds) return;
+
+      // 1. 기본 사용자 데이터 예열
+      const promises = [
+        this.userService.getUserStatus(userCreds.id),
+        this.userService.getUserJoin(userCreds.id),
+        this.userService.getUserQuestCur(userCreds.id),
+        this.userService.getUserQuestContinuous(userCreds.id),
+        this.userService.getUserQuestWeekly(userCreds.id)
+      ];
+
+      await Promise.allSettled(promises);
+
+      // 2. 가입한 그룹 정보 예열
+      const userJoin: any = this.cacheService.getCache('userJoin');
+      if (userJoin && userJoin.joinList) {
+        const groupPromises = userJoin.joinList.map((group: any) => 
+          group && group.groupname ? this.groupService.getGroupInfo(group.groupname) : Promise.resolve(null)
+        );
+        await Promise.allSettled(groupPromises);
+      }
+
+      console.log('✅ 캐시 워밍업 완료');
+
+    } catch (error) {
+      console.error('❌ 캐시 워밍업 오류:', error);
+    }
+  }
+
+  /**
+   * 선택적 캐시 갱신
+   */
+  async refreshSpecificCache(cacheKeys: string[]): Promise<void> {
+    console.log('🔄 선택적 캐시 갱신:', cacheKeys);
+    
+    try {
+      const userCreds = await this.userService.getUserCredentials();
+      if (!userCreds) return;
+
+      for (const key of cacheKeys) {
+        // 기존 캐시 제거
+        this.userService.clearSelectUserCache(key);
+        
+        // 새 데이터 로드
+        switch (key) {
+          case 'userStatus':
+            await this.userService.getUserStatus(userCreds.id);
+            break;
+          case 'userJoin':
+            await this.userService.getUserJoin(userCreds.id);
+            break;
+          case 'userQuestCur':
+            await this.userService.getUserQuestCur(userCreds.id);
+            break;
+          case 'userQuestContinuous':
+            await this.userService.getUserQuestContinuous(userCreds.id);
+            break;
+          case 'userQuestWeekly':
+            await this.userService.getUserQuestWeekly(userCreds.id);
+            break;
+          default:
+            console.warn('⚠️ 알 수 없는 캐시 키:', key);
+        }
+      }
+
+      console.log('✅ 선택적 캐시 갱신 완료');
+
+    } catch (error) {
+      console.error('❌ 선택적 캐시 갱신 오류:', error);
+    }
   }
 }
