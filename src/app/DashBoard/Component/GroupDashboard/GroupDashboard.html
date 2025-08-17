@@ -68,12 +68,6 @@
           
           <div class="modal-actions">
             <button 
-              class="btn secondary" 
-              (click)="closeFeedback()"
-              [disabled]="isSubmittingFeedback()">
-              건너뛰기
-            </button>
-            <button 
               class="btn primary" 
               [disabled]="!isFeedbackValid() || isSubmittingFeedback()"
               (click)="submitFeedback()">
