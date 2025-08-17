@@ -99,6 +99,8 @@ export class GroupService {
             feedback,
             isLike
         });
+
+        console.log(body);
         
         try {
             const response = await this.httpService.post(url + `?email=${user}`, body, headers).toPromise();
