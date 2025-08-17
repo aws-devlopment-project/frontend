@@ -78,11 +78,240 @@ export class ActivityDashboardComponent implements OnInit {
     this.loadEnhancedActivityData();
   }
 
+  // generateEnhancedDailyQuests 메서드 개선 - 실제 데이터만 사용
+  private async generateEnhancedDailyQuests(): Promise<DailyActivity[]> {
+    try {
+      // 🔧 실제 존재하는 데이터 소스만 가져오기
+      const [userQuestCur, userQuestPrev] = await Promise.all([
+        this.getUserQuestCur(), // 당일 진행중인 퀘스트
+        this.getUserQuestPrev() // 어제까지의 완료된 퀘스트
+      ]);
+      
+      const localActivities = this.localActivityService.activities();
+
+      console.log('🎯 Current Quest Data (오늘):', userQuestCur);
+      console.log('📚 Previous Quest Data (어제까지):', userQuestPrev);
+
+      // 🔧 오늘 날짜와 요일 계산
+      const today = new Date();
+      const todayDayIndex = today.getDay(); // 0=일요일, 1=월요일, ...
+
+      // 📊 요일별 퀘스트 현황 생성 (실제 데이터만)
+      const enhancedQuests = ['일', '월', '화', '수', '목', '금', '토'].map((day, dayIndex) => {
+        let completed = 0;
+        let target = 0;
+        let hasRealData = false;
+        let questDetails = [];
+        let dataSource = 'none';
+
+        if (dayIndex === todayDayIndex) {
+          // 🔥 오늘 데이터 = userQuestCur 활용 (실제 데이터만)
+          if (userQuestCur?.curQuestTotalList?.length > 0) {
+            const todayQuests = userQuestCur.curQuestTotalList;
+            completed = todayQuests.filter((q: any) => q.success === true).length;
+            target = todayQuests.length;
+            hasRealData = true;
+            questDetails = todayQuests;
+            dataSource = 'userQuestCur';
+            
+            console.log(`📅 오늘(${day}) 실제 퀘스트:`, { completed, target, todayQuests });
+          }
+          
+        } else if (dayIndex < todayDayIndex) {
+          // 📚 과거 데이터 = userQuestPrev 활용 (실제 데이터만)
+          if (userQuestPrev?.prevQuestTotalList?.length > 0) {
+            const pastQuests = this.getQuestsForDay(userQuestPrev, dayIndex, today);
+            if (pastQuests.totalCount > 0) {
+              completed = pastQuests.completedCount;
+              target = pastQuests.totalCount;
+              hasRealData = true;
+              questDetails = pastQuests.quests;
+              dataSource = 'userQuestPrev';
+              
+              console.log(`📅 과거(${day}) 실제 퀘스트:`, { completed, target, quests: pastQuests.quests });
+            }
+          }
+        }
+        // 🚫 미래 데이터는 생성하지 않음 (예상 데이터 제거)
+
+        // LocalActivity 데이터로 보완 (실제 완료된 활동만)
+        const localDayActivities = localActivities.filter(activity => {
+          const activityDay = new Date(activity.timestamp).getDay();
+          return activityDay === dayIndex && activity.type === 'quest_complete';
+        }).length;
+
+        // 실제 데이터가 있는 경우에만 LocalActivity로 보완
+        if (hasRealData && localDayActivities > completed) {
+          completed = localDayActivities;
+          console.log(`📅 ${day} LocalActivity로 보완:`, { original: completed, local: localDayActivities });
+        }
+
+        return {
+          date: day,
+          completed: completed,
+          target: target,
+          currentQuests: questDetails,
+          hasRealData: hasRealData, // 실제 데이터 존재 여부
+          isToday: dayIndex === todayDayIndex,
+          isPast: dayIndex < todayDayIndex,
+          isFuture: dayIndex > todayDayIndex,
+          dataSource: dataSource,
+          isEmpty: !hasRealData // 데이터 없음 표시
+        };
+      });
+
+      console.log('📊 Real Data Only Weekly Quest Data:', enhancedQuests);
+      return enhancedQuests;
+
+    } catch (error) {
+      console.error('❌ Error generating real daily quests:', error);
+      return this.getEmptyDailyQuests();
+    }
+  }
+
+  // 🔧 특정 요일의 과거 퀘스트 데이터 추출 (실제 데이터만)
+  private getQuestsForDay(userQuestPrev: any, targetDayIndex: number, referenceDate: Date): {
+    completedCount: number;
+    totalCount: number;
+    quests: any[];
+  } {
+    if (!userQuestPrev?.prevQuestTotalList || userQuestPrev.prevQuestTotalList.length === 0) {
+      return { completedCount: 0, totalCount: 0, quests: [] };
+    }
+
+    // 이번 주 시작일 계산 (일요일 기준)
+    const weekStart = new Date(referenceDate);
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    
+    // 타겟 날짜 계산
+    const targetDate = new Date(weekStart);
+    targetDate.setDate(weekStart.getDate() + targetDayIndex);
+
+    // 해당 날짜의 퀘스트 필터링 (실제 완료 시간이 있는 것만)
+    const dayQuests = userQuestPrev.prevQuestTotalList.filter((quest: any) => {
+      if (!quest.completeTime) return false;
+      
+      const questDate = new Date(quest.completeTime);
+      return questDate.toDateString() === targetDate.toDateString();
+    });
+
+    const completedCount = dayQuests.filter((q: any) => q.success === true).length;
+    const totalCount = dayQuests.length;
+
+    console.log(`📅 ${targetDate.toDateString()} 실제 퀘스트:`, {
+      날짜: targetDate.toDateString(),
+      전체: totalCount,
+      완료: completedCount,
+      퀘스트목록: dayQuests.map((q: any) => ({ quest: q.quest, success: q.success }))
+    });
+
+    return {
+      completedCount,
+      totalCount,
+      quests: dayQuests
+    };
+  }
+
+  // 🔧 빈 데이터 생성 (실제 데이터 없을 때)
+  private getEmptyDailyQuests(): DailyActivity[] {
+    const todayIndex = new Date().getDay();
+    
+    return ['일', '월', '화', '수', '목', '금', '토'].map((day, index) => ({
+      date: day,
+      completed: 0,
+      target: 0,
+      currentQuests: [],
+      hasRealData: false,
+      isToday: index === todayIndex,
+      isPast: index < todayIndex,
+      isFuture: index > todayIndex,
+      dataSource: 'none',
+      isEmpty: true
+    }));
+  }
+
+  // 🔧 processEnhancedActivityData 메서드 개선 - 실제 데이터만 반영
+  private processEnhancedActivityData(data: ActivityData): void {
+    const localStats = data.personalizedStats?.localStats;
+
+    // 🔧 실제 주간 퀘스트 현황 계산 (빈 데이터 제외)
+    const weeklyQuests = data.dailyQuests || [];
+    const daysWithData = weeklyQuests.filter((day: any) => day.hasRealData === true);
+    
+    const totalWeeklyQuests = daysWithData.reduce((sum, day: any) => sum + (day.target || 0), 0);
+    const completedWeeklyQuests = daysWithData.reduce((sum, day: any) => sum + (day.completed || 0), 0);
+    const weeklyCompletionRate = totalWeeklyQuests > 0 
+      ? Math.round((completedWeeklyQuests / totalWeeklyQuests) * 100) 
+      : 0;
+
+    // 🔧 오늘 실제 진행상황 (데이터가 있을 때만)
+    const todayData = weeklyQuests.find((day: any) => day.isToday === true && day.hasRealData === true);
+    const todayProgress = todayData 
+      ? `${todayData.completed}/${todayData.target}`
+      : null; // 데이터 없으면 null
+
+    // 🔧 데이터 존재 여부 기반 통계
+    const dataExistsCount = daysWithData.length;
+    const dataCompleteness = Math.round((dataExistsCount / 7) * 100);
+
+    const weeklyStats = [
+      {
+        label: '연속 참여',
+        value: data.streak || 0,
+        unit: '일',
+        icon: 'local_fire_department',
+        color: '#3182ce',
+        trend: (data.streak || 0) > 7 ? 'up' : 'stable'
+      },
+      {
+        label: '오늘 진행',
+        value: todayData?.completed || 0,
+        unit: todayData ? `/${todayData.target}` : '',
+        icon: 'today',
+        color: '#4299e1',
+        trend: todayData && todayData.completed >= todayData.target ? 'up' : 'stable',
+        hasData: !!todayData // 데이터 존재 여부
+      },
+      {
+        label: '완료율 (실제)',
+        value: weeklyCompletionRate,
+        unit: '%',
+        icon: 'trending_up',
+        color: '#2b6cb0',
+        trend: weeklyCompletionRate >= 80 ? 'up' : weeklyCompletionRate >= 50 ? 'stable' : 'down',
+        hasData: totalWeeklyQuests > 0
+      },
+      {
+        label: '데이터 일수',
+        value: dataExistsCount,
+        unit: '/7일',
+        icon: 'assessment',
+        color: '#68d391',
+        trend: dataExistsCount >= 5 ? 'up' : dataExistsCount >= 3 ? 'stable' : 'down',
+        hasData: true
+      }
+    ];
+
+    console.log('📊 Real Data Only Stats:', {
+      totalWeeklyQuests,
+      completedWeeklyQuests,
+      weeklyCompletionRate,
+      todayProgress,
+      dataExistsCount,
+      dataCompleteness
+    });
+
+    this.weeklyStats.set(weeklyStats);
+    this.recentActivities.set(data.recentActivities || []);
+  }
+
+  // 🔧 loadEnhancedActivityData 메서드 - 실제 데이터만 로드
   private async loadEnhancedActivityData(): Promise<void> {
     this.isLoading.set(true);
 
     try {
-      // 기존 데이터와 LocalActivity 데이터를 병합
+      console.log('🔍 실제 데이터만 로딩 시작...');
+
       const [fundamentalData, getBestType, localStats, groupStats, insights] = await Promise.all([
         this.activityDashboardService.getQuestScore().catch(() => [0, 0, 0, 0]),
         this.activityDashboardService.getBestType().catch(() => ['', '']),
@@ -109,12 +338,13 @@ export class ActivityDashboardComponent implements OnInit {
         }])
       ]);
 
+      // 🔧 실제 데이터만으로 구성된 주간 데이터
       const inputData: ActivityData = {
-        dailyQuests: await this.generateEnhancedDailyQuests().catch(() => []),
+        dailyQuests: await this.generateEnhancedDailyQuests(), // 실제 데이터만
         streak: Math.max(fundamentalData[0] || 0, this.localActivityService.getCurrentStreak()),
         totalCompleted: (fundamentalData[1] || 0) + localStats.completedQuests,
         monthlyAchievementRate: Math.max(fundamentalData[2] || 0, localStats.completionRate),
-        recentActivities: this.generatePrioritizedRecentActivities(),
+        recentActivities: this.generateBasicRecentActivities(), // 🔧 존재하는 메서드 사용
         weeklyPattern: await this.generateEnhancedWeeklyPattern().catch(() => []),
         favoriteQuestType: localStats.favoriteGroup || getBestType[0] || '없음',
         bestDay: getBestType[1] || '없음',
@@ -126,116 +356,161 @@ export class ActivityDashboardComponent implements OnInit {
         }
       };
 
-      // 기본값 설정
-      if (!inputData.streak) inputData.streak = 0;
-      if (!inputData.totalCompleted) inputData.totalCompleted = 0;
-      if (!inputData.monthlyAchievementRate) inputData.monthlyAchievementRate = 0;
-
-      console.log('Enhanced Activity Data:', inputData);
+      console.log('📊 Real Data Only Activity Data:', inputData);
       this.activityData.set(inputData);
       this.processEnhancedActivityData(inputData);
       this.smartInsights.set(insights);
+
     } catch (error) {
-      console.error('Error loading enhanced activity data:', error);
-      // 폴백 데이터 로드
-      await this.loadFallbackData();
+      console.error('❌ Error loading real data only:', error);
+      // 🔧 간단한 폴백 데이터 직접 설정
+      const fallbackData: ActivityData = {
+        dailyQuests: this.getEmptyDailyQuests(),
+        streak: 0,
+        totalCompleted: 0,
+        monthlyAchievementRate: 0,
+        recentActivities: this.generateBasicRecentActivities(),
+        weeklyPattern: [],
+        favoriteQuestType: '없음',
+        bestDay: '없음',
+        smartInsights: [],
+        personalizedStats: null
+      };
+      this.activityData.set(fallbackData);
+      this.processEnhancedActivityData(fallbackData);
     } finally {
       this.isLoading.set(false);
     }
   }
 
-  private async loadFallbackData(): Promise<void> {
-    const fundamentalData = await this.activityDashboardService.getQuestScore();
-    const getBestType = await this.activityDashboardService.getBestType();
-    
-    const inputData: ActivityData = {
-      dailyQuests: await this.generateDailyQuests(),
-      streak: fundamentalData[0],
-      totalCompleted: fundamentalData[1],
-      monthlyAchievementRate: fundamentalData[2],
-      recentActivities: this.generateBasicRecentActivities(),
-      weeklyPattern: await this.generateWeeklyPattern(),
-      favoriteQuestType: getBestType[0],
-      bestDay: getBestType[1],
-      smartInsights: [{
-        type: 'quest',
-        message: '🌱 새로운 활동을 시작해보세요!',
-        priority: 'medium',
-        icon: '✨',
-        suggestion: '첫 번째 퀘스트에 도전해보세요'
-      }],
-      personalizedStats: null
-    };
-
-    this.activityData.set(inputData);
-    this.processEnhancedActivityData(inputData);
-  }
-
-  // generateEnhancedDailyQuests 메서드 개선 (안전한 데이터 처리)
-  private async generateEnhancedDailyQuests(): Promise<DailyActivity[]> {
+  // 🔧 getUserQuestPrev 메서드
+  async getUserQuestPrev(): Promise<any> {
     try {
-      const baseQuests = await this.activityDashboardService.pastDailyComplete();
-      const localActivities = this.localActivityService.activities();
-
-      // LocalActivity 데이터로 보완
-      const enhancedQuests = baseQuests.map(quest => {
-        const dayIndex = ['일', '월', '화', '수', '목', '금', '토'].indexOf(quest.date);
-        const dayActivities = localActivities.filter(activity => {
-          const activityDay = new Date(activity.timestamp).getDay();
-          return activityDay === dayIndex && activity.type === 'quest_complete';
-        });
-
-        return {
-          ...quest,
-          completed: Math.max(quest.completed || 0, dayActivities.length),
-          target: Math.max(quest.target || 0, (quest.completed || 0) + 2) // 동적 목표 조정
-        };
-      });
-
-      return enhancedQuests;
+      const userService = this.activityDashboardService.userService;
+      if (userService && userService.getUserQuestPrev) {
+        return await userService.getUserQuestPrev();
+      }
+      return null;
     } catch (error) {
-      console.error('Error generating enhanced daily quests:', error);
-      // 기본 빈 데이터 반환
-      return ['일', '월', '화', '수', '목', '금', '토'].map(day => ({
-        date: day,
-        completed: 0,
-        target: 0
-      }));
+      console.error('❌ Error getting userQuestPrev:', error);
+      return null;
     }
   }
 
-  private generatePrioritizedRecentActivities(): ActivityItem[] {
-    const localActivities = this.localActivityService.activities();
-    const recentLocal = localActivities.slice(0, 10);
-
-    // 우선순위 기반 활동 필터링 및 변환
-    const prioritizedActivities: ActivityItem[] = recentLocal
-      .map(activity => ({
-        id: activity.id,
-        type: this.mapActivityType(activity.type),
-        title: this.generateEngagingTitle(activity),
-        description: this.generatePersonalizedDescription(activity),
-        timestamp: activity.timestamp,
-        icon: this.getActivityIcon(activity.type, activity.context),
-        points: activity.points,
-        priority: this.calculatePriority(activity)
-      }))
-      .filter(activity => activity.priority !== 'low')
-      .sort((a, b) => {
-        const priorityOrder = { high: 3, medium: 2, low: 1 };
-        if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
-          return priorityOrder[b.priority] - priorityOrder[a.priority];
-        }
-        return b.timestamp.getTime() - a.timestamp.getTime();
-      })
-      .slice(0, 6);
-
-    // 기본 활동이 없을 경우 샘플 데이터
-    if (prioritizedActivities.length === 0) {
-      return this.generateBasicRecentActivities();
+  // 🔧 getUserQuestCur 메서드
+  async getUserQuestCur(): Promise<any> {
+    try {
+      const userService = this.activityDashboardService.userService;
+      if (userService && userService.getUserQuestCur) {
+        return await userService.getUserQuestCur();
+      }
+      return null;
+    } catch (error) {
+      console.error('❌ Error getting userQuestCur:', error);
+      return null;
     }
+  }
 
-    return prioritizedActivities;
+  // 🔧 실제 데이터 존재 여부 확인 메서드들
+  hasRealQuestData(): boolean {
+    const data = this.activityData();
+    const weeklyQuests = data?.dailyQuests || [];
+    return weeklyQuests.some((day: any) => day.hasRealData === true);
+  }
+
+  getRealDataDays(): number {
+    const data = this.activityData();
+    const weeklyQuests = data?.dailyQuests || [];
+    return weeklyQuests.filter((day: any) => day.hasRealData === true).length;
+  }
+
+  getWeeklyRealDataSummary(): string {
+    const data = this.activityData();
+    const weeklyQuests = data?.dailyQuests || [];
+    const realDataDays = weeklyQuests.filter((day: any) => day.hasRealData === true);
+    
+    if (realDataDays.length === 0) {
+      return '이번 주 퀘스트 데이터가 없습니다.';
+    }
+    
+    const totalCompleted = realDataDays.reduce((sum: number, day: any) => sum + (day.completed || 0), 0);
+    const totalTarget = realDataDays.reduce((sum: number, day: any) => sum + (day.target || 0), 0);
+    const completionRate = totalTarget > 0 ? Math.round((totalCompleted / totalTarget) * 100) : 0;
+    
+    return `${realDataDays.length}일간 ${totalTarget}개 퀘스트 중 ${totalCompleted}개 완료 (${completionRate}%)`;
+  }
+
+  // 🔧 요일별 실제 데이터 상세 정보
+  getDayRealDataInfo(dayIndex: number): { 
+    completed: number; 
+    target: number; 
+    hasRealData: boolean; 
+    dataSource: string;
+    isToday: boolean;
+    isEmpty: boolean;
+  } {
+    const data = this.activityData();
+    const dailyQuest = data?.dailyQuests?.[dayIndex];
+    
+    if (!dailyQuest || typeof dailyQuest !== 'object') {
+      return { 
+        completed: 0, 
+        target: 0, 
+        hasRealData: false, 
+        dataSource: 'none',
+        isToday: false,
+        isEmpty: true
+      };
+    }
+    
+    const questData = dailyQuest as any;
+    
+    return {
+      completed: questData.completed || 0,
+      target: questData.target || 0,
+      hasRealData: questData.hasRealData || false,
+      dataSource: questData.dataSource || 'none',
+      isToday: questData.isToday || false,
+      isEmpty: questData.isEmpty || false
+    };
+  }
+
+  // 🔧 데이터 소스별 표시 (실제 데이터만)
+  getDataSourceText(dataSource: string): string {
+    const textMap: { [key: string]: string } = {
+      'userQuestCur': '진행중',
+      'userQuestPrev': '완료됨',
+      'none': '데이터 없음'
+    };
+    return textMap[dataSource] || '알 수 없음';
+  }
+
+  // 🔧 실제 데이터만으로 완료율 계산
+  getRealDataCompletionRate(): number {
+    const data = this.activityData();
+    const weeklyQuests = data?.dailyQuests || [];
+    const realDataDays = weeklyQuests.filter((day: any) => day.hasRealData === true);
+    
+    if (realDataDays.length === 0) return 0;
+    
+    const totalTarget = realDataDays.reduce((sum: number, day: any) => sum + (day.target || 0), 0);
+    const totalCompleted = realDataDays.reduce((sum: number, day: any) => sum + (day.completed || 0), 0);
+    
+    return totalTarget > 0 ? Math.round((totalCompleted / totalTarget) * 100) : 0;
+  }
+
+  // 🔧 오늘 실제 데이터 존재 여부
+  hasTodayRealData(): boolean {
+    const data = this.activityData();
+    const todayData = data?.dailyQuests?.find((day: any) => day.isToday === true);
+    return (todayData as any)?.hasRealData === true;
+  }
+
+  // 🔧 과거 실제 데이터 일수
+  getPastRealDataDays(): number {
+    const data = this.activityData();
+    const weeklyQuests = data?.dailyQuests || [];
+    return weeklyQuests.filter((day: any) => day.isPast === true && day.hasRealData === true).length;
   }
 
   private async generateEnhancedWeeklyPattern(): Promise<WeeklyPattern[]> {
@@ -331,52 +606,6 @@ export class ActivityDashboardComponent implements OnInit {
 
   private async generateWeeklyPattern(): Promise<WeeklyPattern[]> {
     return await this.activityDashboardService.getWeeklyPattern();
-  }
-
-  private processEnhancedActivityData(data: ActivityData): void {
-    // 개인화된 통계 계산
-    const localStats = data.personalizedStats?.localStats;
-    const activityStats = data.personalizedStats?.activityStats;
-
-    const weeklyStats = [
-      {
-        label: '연속 참여',
-        value: data.streak || 0, // null/undefined 처리
-        unit: '일',
-        icon: 'local_fire_department',
-        color: '#3182ce',
-        trend: (data.streak || 0) > 7 ? 'up' : 'stable'
-      },
-      {
-        label: '총 완료',
-        value: data.totalCompleted || 0, // null/undefined 처리
-        unit: '개',
-        icon: 'check_circle',
-        color: '#2b6cb0',
-        trend: 'up'
-      },
-      {
-        label: '주간 달성률',
-        value: data.monthlyAchievementRate || 0, // null/undefined 처리
-        unit: '%',
-        icon: 'trending_up',
-        color: '#4299e1',
-        trend: (data.monthlyAchievementRate || 0) >= 80 ? 'up' : 'stable'
-      },
-      {
-        label: localStats ? '참여 그룹' : '평균 점수',
-        value: localStats 
-          ? (data.personalizedStats?.groupStats?.totalGroups || 0) 
-          : 8.5,
-        unit: localStats ? '개' : '점',
-        icon: localStats ? 'groups' : 'star',
-        color: '#68d391',
-        trend: 'stable'
-      }
-    ];
-
-    this.weeklyStats.set(weeklyStats);
-    this.recentActivities.set(data.recentActivities || []); // null/undefined 처리
   }
 
   // UI 메서드들
