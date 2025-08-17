@@ -107,9 +107,11 @@
   border-bottom: none;
 }
 
+/* 캘린더 일자별 컨테이너 높이 고정 - 개선됨 */
 .calendar-day {
   position: relative;
   min-height: 120px;
+  max-height: 120px; /* 최대 높이도 설정하여 일관성 보장 */
   padding: 8px;
   border-right: 1px solid #e2e8f0;
   cursor: pointer;
@@ -117,6 +119,7 @@
   display: flex;
   flex-direction: column;
   background: white;
+  overflow: hidden; /* 내용이 넘치지 않도록 */
 }
 
 .calendar-day:last-child {
@@ -166,25 +169,31 @@
   background: rgba(56, 161, 105, 0.1);
 }
 
+/* 일자 표시 영역 개선 */
 .day-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 8px;
+  min-height: 20px;
+  max-height: 20px;
 }
 
 .day-number {
   font-size: 14px;
   font-weight: 500;
   color: #2d3748;
+  flex-shrink: 0;
 }
 
 .quest-summary {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-shrink: 0;
 }
 
+/* 완료 표시기 개선 */
 .completion-indicator {
   background: rgba(66, 153, 225, 0.1);
   color: #3182ce;
@@ -192,6 +201,8 @@
   border-radius: 10px;
   font-size: 10px;
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .calendar-day.completion-perfect .completion-indicator {
@@ -199,14 +210,18 @@
   color: #38a169;
 }
 
+/* 퀘스트 리스트 컨테이너 높이 제한 */
 .quest-list {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 4px;
   overflow: hidden;
+  /* 최대 높이 설정으로 일관성 보장 */
+  max-height: 80px;
 }
 
+/* 퀘스트 아이템 전체 구조 개선 */
 .quest-item {
   display: flex;
   align-items: center;
@@ -219,6 +234,10 @@
   transition: all 0.2s ease;
   cursor: pointer;
   border: 1px solid transparent;
+  /* 높이 고정으로 일관성 보장 */
+  min-height: 28px;
+  max-height: 28px;
+  position: relative;
 }
 
 .quest-item:hover {
@@ -226,6 +245,11 @@
   border-color: #3182ce;
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(49, 130, 206, 0.15);
+}
+
+.quest-item:hover .quest-title {
+  /* 호버 시에도 말줄임표 유지하되, 약간의 시각적 피드백 제공 */
+  color: #1a202c;
 }
 
 .quest-item.completed {
@@ -247,11 +271,18 @@
   border-left: 2px solid #4299e1;
 }
 
+/* 우선순위 아이콘 크기 고정 */
 .priority-icon {
   font-size: 12px;
   flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
+/* 퀘스트 제목 길이 제한 및 말줄임표 처리 개선 */
 .quest-title {
   flex: 1;
   overflow: hidden;
@@ -259,14 +290,30 @@
   white-space: nowrap;
   color: #2d3748;
   font-weight: 500;
+  /* 최대 너비를 명시적으로 설정하여 일관성 보장 */
+  max-width: 100px;
+  min-width: 0; /* flexbox에서 텍스트 오버플로우를 위해 필요 */
 }
 
+/* 긴 텍스트를 위한 추가 스타일 */
+.quest-title.long-text {
+  max-width: 80px;
+}
+
+.quest-title.short-text {
+  max-width: 120px;
+}
+
+/* 완료 아이콘 크기 고정 */
 .completed-icon {
   font-size: 14px !important;
   color: #48bb78;
   flex-shrink: 0;
+  width: 14px;
+  height: 14px;
 }
 
+/* more-quests 스타일 개선 */
 .more-quests {
   background: rgba(113, 128, 150, 0.1);
   color: #718096;
@@ -277,23 +324,36 @@
   text-align: center;
   cursor: pointer;
   transition: all 0.2s ease;
+  /* 높이 고정 */
+  min-height: 20px;
+  max-height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .more-quests:hover {
   background: rgba(113, 128, 150, 0.2);
 }
 
+/* 빈 상태 표시 개선 */
 .no-quests {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 60px;
 }
 
 .empty-indicator {
   color: #a0aec0;
   font-size: 10px;
   font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .calendar-day.today .quest-item,
@@ -370,7 +430,7 @@
   color: #718096;
 }
 
-/* 반응형 */
+/* 반응형 디자인에서 퀘스트 제목 길이 조정 */
 @media (max-width: 768px) {
   .streak-calendar {
     padding: 16px;
@@ -383,6 +443,7 @@
 
   .calendar-day {
     min-height: 100px;
+    max-height: 100px;
     padding: 4px;
   }
 
@@ -393,10 +454,25 @@
   .quest-item {
     padding: 4px 6px;
     font-size: 10px;
+    min-height: 24px;
+    max-height: 24px;
+  }
+
+  .quest-title {
+    max-width: 60px;
+    font-size: 10px;
   }
 
   .priority-icon {
     font-size: 10px;
+    width: 10px;
+    height: 10px;
+  }
+
+  .completed-icon {
+    font-size: 12px !important;
+    width: 12px;
+    height: 12px;
   }
 
   .completion-indicator {
@@ -409,29 +485,35 @@
     justify-content: center;
   }
 
-  .quest-title {
-    max-width: 60px;
+  .quest-list {
+    max-height: 64px;
   }
 }
 
 @media (max-width: 480px) {
   .calendar-day {
     min-height: 80px;
+    max-height: 80px;
     padding: 2px;
   }
 
   .quest-item {
     padding: 2px 4px;
     font-size: 9px;
+    min-height: 20px;
+    max-height: 20px;
   }
 
   .quest-title {
     max-width: 40px;
+    font-size: 9px;
   }
 
   .more-quests {
     font-size: 8px;
     padding: 2px 4px;
+    min-height: 16px;
+    max-height: 16px;
   }
 
   .streak-info {
@@ -440,6 +522,22 @@
 
   .streak-number {
     font-size: 20px;
+  }
+
+  .quest-list {
+    max-height: 48px;
+  }
+
+  .priority-icon {
+    font-size: 8px;
+    width: 8px;
+    height: 8px;
+  }
+
+  .completed-icon {
+    font-size: 10px !important;
+    width: 10px;
+    height: 10px;
   }
 }
 
@@ -626,4 +724,242 @@
 .calendar-day.past-day.has-quests:hover {
   box-shadow: none;
   transform: none;
+}
+
+/* 퀘스트 아이템 전체 구조 개선 */
+.quest-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.2;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: 1px solid transparent;
+  /* 높이 고정으로 일관성 보장 */
+  min-height: 28px;
+  max-height: 28px;
+}
+
+/* 우선순위 아이콘 크기 고정 */
+.priority-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 완료 아이콘 크기 고정 */
+.completed-icon {
+  font-size: 14px !important;
+  color: #48bb78;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}
+
+/* 캘린더 일자별 컨테이너 높이 고정 */
+.calendar-day {
+  position: relative;
+  min-height: 120px;
+  max-height: 120px; /* 최대 높이도 설정하여 일관성 보장 */
+  padding: 8px;
+  border-right: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  overflow: hidden; /* 내용이 넘치지 않도록 */
+}
+
+/* 퀘스트 리스트 컨테이너 높이 제한 */
+.quest-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+  /* 최대 높이 설정으로 일관성 보장 */
+  max-height: 80px;
+}
+
+/* more-quests 스타일 개선 */
+.more-quests {
+  background: rgba(113, 128, 150, 0.1);
+  color: #718096;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  /* 높이 고정 */
+  min-height: 20px;
+  max-height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 반응형 디자인에서 퀘스트 제목 길이 조정 */
+@media (max-width: 768px) {
+  .quest-title {
+    max-width: 60px;
+    font-size: 10px;
+  }
+  
+  .quest-item {
+    padding: 4px 6px;
+    font-size: 10px;
+    min-height: 24px;
+    max-height: 24px;
+  }
+  
+  .priority-icon {
+    font-size: 10px;
+    width: 10px;
+    height: 10px;
+  }
+  
+  .completed-icon {
+    font-size: 12px !important;
+    width: 12px;
+    height: 12px;
+  }
+  
+  .calendar-day {
+    min-height: 100px;
+    max-height: 100px;
+    padding: 4px;
+  }
+  
+  .quest-list {
+    max-height: 64px;
+  }
+}
+
+@media (max-width: 480px) {
+  .quest-title {
+    max-width: 40px;
+    font-size: 9px;
+  }
+  
+  .quest-item {
+    padding: 2px 4px;
+    font-size: 9px;
+    min-height: 20px;
+    max-height: 20px;
+  }
+  
+  .more-quests {
+    font-size: 8px;
+    padding: 2px 4px;
+    min-height: 16px;
+    max-height: 16px;
+  }
+  
+  .calendar-day {
+    min-height: 80px;
+    max-height: 80px;
+    padding: 2px;
+  }
+  
+  .quest-list {
+    max-height: 48px;
+  }
+  
+  .priority-icon {
+    font-size: 8px;
+    width: 8px;
+    height: 8px;
+  }
+  
+  .completed-icon {
+    font-size: 10px !important;
+    width: 10px;
+    height: 10px;
+  }
+}
+
+/* 퀘스트 아이템에 툴팁 효과 추가 (선택사항) */
+.quest-item {
+  position: relative;
+}
+
+.quest-item:hover .quest-title {
+  /* 호버 시에도 말줄임표 유지하되, 약간의 시각적 피드백 제공 */
+  color: #1a202c;
+}
+
+/* 긴 텍스트를 위한 추가 스타일 */
+.quest-title.long-text {
+  max-width: 80px;
+}
+
+.quest-title.short-text {
+  max-width: 120px;
+}
+
+/* 완료 표시기 개선 */
+.completion-indicator {
+  background: rgba(66, 153, 225, 0.1);
+  color: #3182ce;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* 일자 표시 영역 개선 */
+.day-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  min-height: 20px;
+  max-height: 20px;
+}
+
+.day-number {
+  font-size: 14px;
+  font-weight: 500;
+  color: #2d3748;
+  flex-shrink: 0;
+}
+
+.quest-summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* 빈 상태 표시 개선 */
+.no-quests {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+}
+
+.empty-indicator {
+  color: #a0aec0;
+  font-size: 10px;
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
 }
