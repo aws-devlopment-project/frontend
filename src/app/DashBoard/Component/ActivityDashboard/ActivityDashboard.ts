@@ -83,22 +83,40 @@ export class ActivityDashboardComponent implements OnInit {
     try {
       // 기존 데이터와 LocalActivity 데이터를 병합
       const [fundamentalData, getBestType, localStats, groupStats, insights] = await Promise.all([
-        this.activityDashboardService.getQuestScore(),
-        this.activityDashboardService.getBestType(),
-        this.localActivityService.getQuestBasedStats(),
-        this.localActivityService.getGroupParticipationStats(),
-        this.localActivityService.getEnhancedPersonalizedInsights()
+        this.activityDashboardService.getQuestScore().catch(() => [0, 0, 0, 0]),
+        this.activityDashboardService.getBestType().catch(() => ['', '']),
+        this.localActivityService.getQuestBasedStats().catch(() => ({
+          currentQuests: 0,
+          completedQuests: 0,
+          completionRate: 0,
+          favoriteGroup: '없음',
+          weeklyProgress: []
+        })),
+        this.localActivityService.getGroupParticipationStats().catch(() => ({
+          totalGroups: 0,
+          totalClubs: 0,
+          mostActiveGroup: '없음',
+          recentlyJoinedGroup: '없음',
+          groupDetails: []
+        })),
+        this.localActivityService.getEnhancedPersonalizedInsights().catch(() => [{
+          type: 'quest' as const,
+          message: '🌱 새로운 활동을 시작해보세요!',
+          priority: 'medium' as const,
+          icon: '✨',
+          suggestion: '첫 번째 퀘스트에 도전해보세요'
+        }])
       ]);
 
       const inputData: ActivityData = {
-        dailyQuests: await this.generateEnhancedDailyQuests(),
-        streak: Math.max(fundamentalData[0], this.localActivityService.getCurrentStreak()),
-        totalCompleted: fundamentalData[1] + localStats.completedQuests,
-        monthlyAchievementRate: Math.max(fundamentalData[2], localStats.completionRate),
+        dailyQuests: await this.generateEnhancedDailyQuests().catch(() => []),
+        streak: Math.max(fundamentalData[0] || 0, this.localActivityService.getCurrentStreak()),
+        totalCompleted: (fundamentalData[1] || 0) + localStats.completedQuests,
+        monthlyAchievementRate: Math.max(fundamentalData[2] || 0, localStats.completionRate),
         recentActivities: this.generatePrioritizedRecentActivities(),
-        weeklyPattern: await this.generateEnhancedWeeklyPattern(),
-        favoriteQuestType: localStats.favoriteGroup || getBestType[0],
-        bestDay: getBestType[1],
+        weeklyPattern: await this.generateEnhancedWeeklyPattern().catch(() => []),
+        favoriteQuestType: localStats.favoriteGroup || getBestType[0] || '없음',
+        bestDay: getBestType[1] || '없음',
         smartInsights: insights,
         personalizedStats: {
           localStats,
@@ -107,12 +125,12 @@ export class ActivityDashboardComponent implements OnInit {
         }
       };
 
-      if (!inputData.streak)
-        inputData.streak = 0;
-      if (!inputData.totalCompleted)
-        inputData.totalCompleted = 0;
+      // 기본값 설정
+      if (!inputData.streak) inputData.streak = 0;
+      if (!inputData.totalCompleted) inputData.totalCompleted = 0;
+      if (!inputData.monthlyAchievementRate) inputData.monthlyAchievementRate = 0;
 
-      console.log(inputData);
+      console.log('Enhanced Activity Data:', inputData);
       this.activityData.set(inputData);
       this.processEnhancedActivityData(inputData);
       this.smartInsights.set(insights);
@@ -152,26 +170,37 @@ export class ActivityDashboardComponent implements OnInit {
     this.processEnhancedActivityData(inputData);
   }
 
+  // generateEnhancedDailyQuests 메서드 개선 (안전한 데이터 처리)
   private async generateEnhancedDailyQuests(): Promise<DailyActivity[]> {
-    const baseQuests = await this.activityDashboardService.pastDailyComplete();
-    const localActivities = this.localActivityService.activities();
+    try {
+      const baseQuests = await this.activityDashboardService.pastDailyComplete();
+      const localActivities = this.localActivityService.activities();
 
-    // LocalActivity 데이터로 보완
-    const enhancedQuests = baseQuests.map(quest => {
-      const dayIndex = ['일', '월', '화', '수', '목', '금', '토'].indexOf(quest.date);
-      const dayActivities = localActivities.filter(activity => {
-        const activityDay = new Date(activity.timestamp).getDay();
-        return activityDay === dayIndex && activity.type === 'quest_complete';
+      // LocalActivity 데이터로 보완
+      const enhancedQuests = baseQuests.map(quest => {
+        const dayIndex = ['일', '월', '화', '수', '목', '금', '토'].indexOf(quest.date);
+        const dayActivities = localActivities.filter(activity => {
+          const activityDay = new Date(activity.timestamp).getDay();
+          return activityDay === dayIndex && activity.type === 'quest_complete';
+        });
+
+        return {
+          ...quest,
+          completed: Math.max(quest.completed || 0, dayActivities.length),
+          target: Math.max(quest.target || 0, (quest.completed || 0) + 2) // 동적 목표 조정
+        };
       });
 
-      return {
-        ...quest,
-        completed: Math.max(quest.completed, dayActivities.length),
-        target: Math.max(quest.target, quest.completed + 2) // 동적 목표 조정
-      };
-    });
-
-    return enhancedQuests;
+      return enhancedQuests;
+    } catch (error) {
+      console.error('Error generating enhanced daily quests:', error);
+      // 기본 빈 데이터 반환
+      return ['일', '월', '화', '수', '목', '금', '토'].map(day => ({
+        date: day,
+        completed: 0,
+        target: 0
+      }));
+    }
   }
 
   private generatePrioritizedRecentActivities(): ActivityItem[] {
@@ -311,15 +340,15 @@ export class ActivityDashboardComponent implements OnInit {
     const weeklyStats = [
       {
         label: '연속 참여',
-        value: data.streak,
+        value: data.streak || 0, // null/undefined 처리
         unit: '일',
         icon: 'local_fire_department',
         color: '#3182ce',
-        trend: data.streak > 7 ? 'up' : 'stable'
+        trend: (data.streak || 0) > 7 ? 'up' : 'stable'
       },
       {
         label: '총 완료',
-        value: data.totalCompleted,
+        value: data.totalCompleted || 0, // null/undefined 처리
         unit: '개',
         icon: 'check_circle',
         color: '#2b6cb0',
@@ -327,15 +356,17 @@ export class ActivityDashboardComponent implements OnInit {
       },
       {
         label: '주간 달성률',
-        value: data.monthlyAchievementRate,
+        value: data.monthlyAchievementRate || 0, // null/undefined 처리
         unit: '%',
         icon: 'trending_up',
         color: '#4299e1',
-        trend: data.monthlyAchievementRate >= 80 ? 'up' : 'stable'
+        trend: (data.monthlyAchievementRate || 0) >= 80 ? 'up' : 'stable'
       },
       {
         label: localStats ? '참여 그룹' : '평균 점수',
-        value: localStats ? data.personalizedStats.groupStats.totalGroups : 8.5,
+        value: localStats 
+          ? (data.personalizedStats?.groupStats?.totalGroups || 0) 
+          : 8.5,
         unit: localStats ? '개' : '점',
         icon: localStats ? 'groups' : 'star',
         color: '#68d391',
@@ -344,7 +375,7 @@ export class ActivityDashboardComponent implements OnInit {
     ];
 
     this.weeklyStats.set(weeklyStats);
-    this.recentActivities.set(data.recentActivities);
+    this.recentActivities.set(data.recentActivities || []); // null/undefined 처리
   }
 
   // UI 메서드들
@@ -389,12 +420,13 @@ export class ActivityDashboardComponent implements OnInit {
     return '방금 전';
   }
 
+  // 완료율 계산 개선 (null 체크 추가)
   getCompletionRate(): number {
     const data = this.activityData();
-    if (!data) return 0;
+    if (!data || !data.dailyQuests || data.dailyQuests.length === 0) return 0;
     
-    const totalTarget = data.dailyQuests.reduce((sum, day) => sum + day.target, 0);
-    const totalCompleted = data.dailyQuests.reduce((sum, day) => sum + day.completed, 0);
+    const totalTarget = data.dailyQuests.reduce((sum, day) => sum + (day.target || 0), 0);
+    const totalCompleted = data.dailyQuests.reduce((sum, day) => sum + (day.completed || 0), 0);
     
     return totalTarget > 0 ? Math.round((totalCompleted / totalTarget) * 100) : 0;
   }
@@ -440,6 +472,20 @@ export class ActivityDashboardComponent implements OnInit {
   // HTML 템플릿에서 사용할 헬퍼 메서드
   getPatternWidth(totalActivities: number): number {
     return Math.min((totalActivities / 8) * 100, 100);
+  }
+
+  // 안전한 퍼센티지 계산 (0으로 나누기 방지 및 유효하지 않은 값 처리)
+  getSafePercentage(completed: number, target: number): number {
+    // null, undefined, 또는 0인 값들을 안전하게 처리
+    const safeCompleted = completed || 0;
+    const safeTarget = target || 0;
+    
+    if (safeTarget === 0) return 0;
+    
+    const percentage = (safeCompleted / safeTarget) * 100;
+    
+    // 100%를 초과하지 않도록 제한
+    return Math.min(Math.max(percentage, 0), 100);
   }
 
   // 활동 패턴 바 너비 계산 (최대값 기준으로 정규화)
