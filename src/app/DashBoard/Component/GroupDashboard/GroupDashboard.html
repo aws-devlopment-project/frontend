@@ -217,22 +217,6 @@
                   </mat-icon>
                 </div>
               </div>
-              
-              <!-- 진행률 바 -->
-              <div class="progress-section">
-                <div class="progress-header">
-                  <span class="progress-label">그룹 진행률</span>
-                  <span class="progress-text">{{ getGroupProgressText(quest) }}</span>
-                </div>
-                <div class="progress-bar">
-                  <div 
-                    class="progress-fill" 
-                    [style.width.%]="quest.progress"
-                    [style.background-color]="getStatusColor(quest.status)">
-                  </div>
-                </div>
-                <div class="progress-percentage">{{ quest.progress }}%</div>
-              </div>
 
               <!-- 완료 표시 -->
               @if (isPersonallyCompleted(quest)) {
