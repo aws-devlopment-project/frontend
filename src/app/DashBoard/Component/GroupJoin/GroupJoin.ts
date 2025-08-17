@@ -254,11 +254,14 @@ export class GroupJoinComponent implements OnInit {
         throw new Error('SharedState 업데이트에 실패했습니다.');
       }
 
-      // 4. SharedState 강제 새로고침으로 최신 데이터 보장
+      // 4. 신규 채널 참여 시 퀘스트 업데이트에 대한 캐시 비우기
+      this.userService.clearUserQuestCache();
+
+      // 5. SharedState 강제 새로고침으로 최신 데이터 보장
       console.log('📝 4단계: SharedState 강제 새로고침...');
       await this.shared.forceRefreshUserJoin();
       
-      // 5. 최종 검증
+      // 6. 최종 검증
       console.log('📝 5단계: 최종 데이터 검증...');
       const finalValidation = this.validateFinalState(group, channelDetails);
       if (!finalValidation.isValid) {
@@ -266,7 +269,7 @@ export class GroupJoinComponent implements OnInit {
         // 문제가 있어도 진행 (서버 상태는 정상이므로)
       }
 
-      // 6. 그룹 탭으로 전환하고 선택된 그룹/채널 설정
+      // 7. 그룹 탭으로 전환하고 선택된 그룹/채널 설정
       console.log('📝 6단계: 탭 전환 및 선택 상태 설정...');
       this.shared.setActiveTab('group');
       this.shared.setSelectedGroup(group.name);
@@ -277,7 +280,7 @@ export class GroupJoinComponent implements OnInit {
         this.shared.setSelectedChannel(firstSelectedChannel, group.name);
       }
 
-      // 7. 완료 단계로 이동
+      // 8. 완료 단계로 이동
       this.updateStep(3);
       console.log('🎉 그룹 참여 프로세스 완료!');
 
