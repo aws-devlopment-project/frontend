@@ -51,8 +51,8 @@ export class GroupDashboardService {
       const success = await this.groupService.questSuccessWithFeedback(
         groupName, 
         username,
-        questFeedbackData.quest,
         questFeedbackData.club,
+        questFeedbackData.quest,
         questFeedbackData.feedback,
         isLike
       );

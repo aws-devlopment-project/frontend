@@ -93,16 +93,14 @@ export class GroupService {
         const body = JSON.stringify({
             group,
             user,
-            club,
             quest,
+            club,
             feedback,
             isLike
         });
         
         try {
             const response = await this.httpService.post(url + `?email=${user}`, body, headers).toPromise();
-            
-            // 기존 캐시 업데이트 로직
             let cacheGroup: Group | null = await this.dataService.getCache(group);
             if (cacheGroup) {
                 const questIndex = cacheGroup.questList.indexOf(quest);
