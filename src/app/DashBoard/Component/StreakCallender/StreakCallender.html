@@ -1,0 +1,139 @@
+<div class="streak-calendar">
+  <div class="calendar-header">
+    <div class="calendar-controls">
+      <button class="nav-btn" (click)="previousMonth()" [disabled]="!canGoPrevious()">
+        <mat-icon>chevron_left</mat-icon>
+      </button>
+      <h3 class="month-title">{{ currentMonthTitle() }}</h3>
+      <button class="nav-btn" (click)="nextMonth()" [disabled]="!canGoNext()">
+        <mat-icon>chevron_right</mat-icon>
+      </button>
+    </div>
+    <div class="streak-info">
+      <div class="streak-stat">
+        <span class="streak-number">{{ currentStreak }}</span>
+        <span class="streak-label">일 연속</span>
+      </div>
+      <div class="streak-stat">
+        <span class="streak-number">{{ longestStreak }}</span>
+        <span class="streak-label">최고 기록</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="calendar-grid">
+    <div class="weekday-header">
+      @for (day of weekdays; track day) {
+        <div class="weekday">{{ day }}</div>
+      }
+    </div>
+    
+    @for (week of calendarWeeks(); track $index) {
+      <div class="calendar-week">
+        @for (day of week.days; track day.date) {
+          <div 
+            class="calendar-day"
+            [class.today]="day.isToday"
+            [class.other-month]="!day.isCurrentMonth"
+            [class.has-quests]="day.totalCount > 0"
+            [class.past-day]="day.isPast"
+            [class.future-day]="day.isFuture"
+            [class.clickable]="isDayClickable(day)"
+            [class]="getCompletionColorClass(day.completionRate)"
+            (click)="onDayClick(day)">
+            
+            <!-- 날짜 숫자 -->
+            <div class="day-header">
+              <span class="day-number">{{ day.dayOfMonth }}</span>
+              @if (day.totalCount > 0) {
+                <div class="quest-summary">
+                  <span class="completion-indicator">
+                    {{ day.completedCount }}/{{ day.totalCount }}
+                  </span>
+                </div>
+              }
+            </div>
+
+            <!-- 퀘스트 목록 (최대 2개 표시) -->
+            @if (day.totalCount > 0) {
+              <div class="quest-list">
+                @for (quest of getVisibleQuests(day.quests); track quest.id) {
+                  <div class="quest-item" 
+                       [class.completed]="quest.isCompleted"
+                       [class.priority]="quest.priority"
+                       [class.clickable]="isQuestClickable(day)"
+                       [class.disabled]="!isQuestClickable(day)"
+                       (click)="onQuestClick($event, quest, day.date, day)">
+                    <span class="priority-icon">{{ getPriorityIcon(quest.priority) }}</span>
+                    <span class="quest-title">{{ quest.title }}</span>
+                    @if (quest.isCompleted) {
+                      <mat-icon class="completed-icon">check_circle</mat-icon>
+                    }
+                  </div>
+                }
+                
+                <!-- 숨겨진 퀘스트 개수 표시 -->
+                @if (getHiddenQuestCount(day.quests) > 0) {
+                  <div class="more-quests" 
+                       [class.clickable]="isDayClickable(day)"
+                       [class.disabled]="!isDayClickable(day)">
+                    +{{ getHiddenQuestCount(day.quests) }}개 더
+                  </div>
+                }
+              </div>
+            }
+            
+            <!-- 퀘스트가 없는 날 -->
+            @if (day.totalCount === 0 && day.isCurrentMonth) {
+              <div class="no-quests">
+                <span class="empty-indicator">
+                  @if (day.isPast) {
+                    휴식일
+                  } @else if (day.isToday) {
+                    오늘
+                  } @else {
+                    예정
+                  }
+                </span>
+              </div>
+            }
+
+            <!-- 과거 날짜 오버레이 -->
+            @if (day.isPast && day.totalCount > 0) {
+              <div class="past-overlay">
+                <mat-icon>history</mat-icon>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  <!-- 범례 -->
+  <div class="calendar-legend">
+    <span class="legend-label">완료율:</span>
+    <div class="legend-items">
+      <div class="legend-item">
+        <div class="legend-square completion-none"></div>
+        <span class="legend-text">0%</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-square completion-low"></div>
+        <span class="legend-text">~50%</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-square completion-medium"></div>
+        <span class="legend-text">~75%</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-square completion-high"></div>
+        <span class="legend-text">~99%</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-square completion-perfect"></div>
+        <span class="legend-text">100%</span>
+      </div>
+    </div>
+  </div>
+</div>

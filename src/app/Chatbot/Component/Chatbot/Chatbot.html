@@ -1,0 +1,237 @@
+<!-- 개선된 Chatbot.html - 피드백 기능 및 Q&A 통계 포함 -->
+<div class="chatbot-container">
+  <!-- 챗봇 토글 버튼 -->
+  <button 
+    class="chatbot-toggle" 
+    [class.minimized]="isMinimized()"
+    [class.has-notifications]="hasNotifications()"
+    [matBadge]="notificationCount()"
+    [matBadgeHidden]="!hasNotifications()"
+    matBadgeColor="warn"
+    matBadgeSize="small"
+    matBadgePosition="above before"
+    (click)="toggleChatbot()"
+    [attr.aria-label]="'챗봇 ' + (isOpen() ? '닫기' : '열기')"
+    type="button">
+    
+    @if (isMinimized()) {
+      <mat-icon aria-hidden="true">chat_bubble</mat-icon>
+    } @else {
+      <mat-icon aria-hidden="true">smart_toy</mat-icon>
+    }
+  </button>
+
+  <!-- 챗봇 창 -->
+  @if (isOpen()) {
+    <div class="chatbot-window" role="dialog" aria-labelledby="chatbot-title" aria-modal="false">
+      <!-- 헤더 -->
+      <header class="chatbot-header">
+        <div class="header-info">
+          <div class="bot-avatar" aria-hidden="true">🤖</div>
+          <div class="bot-details">
+            <h2 id="chatbot-title" class="bot-name">AI 어시스턴트</h2>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button 
+            class="header-btn" 
+            (click)="toggleQAStats()" 
+            aria-label="Q&A 통계"
+            [matTooltip]="'Q&A 통계 ' + (showQAStats() ? '숨기기' : '보기')"
+            type="button">
+            <mat-icon aria-hidden="true">analytics</mat-icon>
+          </button>
+          <button 
+            class="header-btn" 
+            (click)="minimize()" 
+            aria-label="최소화"
+            type="button">
+            <mat-icon aria-hidden="true">remove</mat-icon>
+          </button>
+          <button 
+            class="header-btn" 
+            (click)="closeChatbot()" 
+            aria-label="채팅 닫기"
+            type="button">
+            <mat-icon aria-hidden="true">close</mat-icon>
+          </button>
+        </div>
+      </header>
+
+      <!-- Q&A 통계 패널 (선택적 표시) -->
+      @if (showQAStats()) {
+        <div class="qa-stats-panel">
+          <h3>📊 Q&A 지식 베이스</h3>
+          <div class="stats-grid">
+            <div class="stat-item">
+              <span class="stat-label">총 Q&A</span>
+              <span class="stat-value">{{ qaStats()?.totalItems || 0 }}개</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">카테고리</span>
+              <span class="stat-value">{{ getCategoryCount() }}개</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">응답 품질</span>
+              <span class="stat-value">{{ getPerformanceStats()?.responseQuality || 0 }}%</span>
+            </div>
+          </div>
+          
+          <!-- Q&A 파일 업로드 (관리자 기능) -->
+          <div class="upload-section">
+            <input 
+              type="file" 
+              accept=".txt" 
+              (change)="uploadQAFile($event)"
+              #fileInput
+              style="display: none;">
+            <button 
+              class="upload-btn" 
+              (click)="fileInput.click()"
+              type="button">
+              📁 Q&A 파일 업로드
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- 메시지 영역 -->
+      <main 
+        class="chatbot-messages" 
+        #chatMessages
+        role="log" 
+        aria-label="채팅 메시지"
+        aria-live="polite"
+        tabindex="0">
+        
+        @if (isEmpty()) {
+          <!-- 빈 상태 -->
+          <div class="empty-chat" role="status">
+            <div class="welcome-icon" aria-hidden="true">💬</div>
+            <p>채팅을 시작해보세요!</p>
+            
+            <!-- 빠른 액션 버튼들 -->
+            <nav class="quick-actions" aria-label="빠른 액션">
+              @for (action of quickActions(); track action) {
+                <button 
+                  class="quick-action-btn" 
+                  (click)="onQuickAction(action)"
+                  type="button">
+                  {{ action }}
+                </button>
+              }
+            </nav>
+          </div>
+        } @else {
+          <!-- 메시지 리스트 -->
+          @for (message of messages(); track trackByMessageId($index, message)) {
+            <article 
+              class="message-wrapper" 
+              [class.user-message]="message.isUser"
+              [class.bot-message]="!message.isUser"
+              [attr.data-message-id]="message.id">
+              
+              <div class="message-content">
+                <div 
+                  class="message-bubble" 
+                  [class.user-bubble]="message.isUser"
+                  [class.bot-bubble]="!message.isUser"
+                  role="group"
+                  [attr.aria-label]="message.isUser ? '사용자 메시지' : '봇 응답'">
+                  
+                  <!-- 메시지 텍스트 -->
+                  <div class="message-text-container">
+                    <p 
+                      [attr.data-username]="message.isUser ? '당신' : ''"
+                      [innerHTML]="message.text"
+                      class="message-text">
+                    </p>
+                    
+                    <!-- 타임스탬프 -->
+                    <time 
+                      class="message-time"
+                      [attr.datetime]="message.timestamp | date:'yyyy-MM-ddTHH:mm:ss'"
+                      [title]="message.timestamp | date:'yyyy년 MM월 dd일 HH:mm:ss'">
+                      {{ message.timestamp | date:'HH:mm' }}
+                    </time>
+                  </div>
+                </div>
+              </div>
+            </article>
+          }
+        }
+
+        <!-- 타이핑 인디케이터 -->
+        @if (isTyping()) {
+          <div 
+            class="message-wrapper bot-message" 
+            role="status" 
+            aria-label="봇이 입력 중입니다">
+            <div class="message-content">
+              <div class="message-bubble bot-bubble">
+                <div class="typing-indicator" aria-hidden="true">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+                <span class="sr-only">Q&A 검색 및 응답 생성 중...</span>
+              </div>
+            </div>
+          </div>
+        }
+      </main>
+
+      <!-- 입력 영역 -->
+      <footer class="chatbot-input">
+        <form class="input-container" (ngSubmit)="sendMessage()" novalidate>
+          <label for="chat-input" class="sr-only">메시지 입력</label>
+          <input 
+            #userInputRef
+            id="chat-input"
+            class="native-input"
+            placeholder="메시지 보내기... (Q&A 검색 가능)"
+            [value]="userInputValue()"
+            (input)="userInputValue.set($any($event.target).value)"
+            (keydown)="onInputKeyPress($event)"
+            [disabled]="isTyping()"
+            [attr.aria-describedby]="isTyping() ? 'typing-status' : null"
+            maxlength="500"
+            autocomplete="off"
+            spellcheck="true"
+            type="text">
+          
+          <!-- 숨김 상태 표시 -->
+          @if (isTyping()) {
+            <div id="typing-status" class="sr-only" aria-live="polite">
+              Q&A 데이터베이스를 검색하며 응답을 생성하고 있습니다
+            </div>
+          }
+          
+          <button 
+            class="send-button"
+            [disabled]="!canSend()"
+            type="submit"
+            [attr.aria-label]="canSend() ? '메시지 보내기' : '메시지를 입력해주세요'">
+            <mat-icon aria-hidden="true">send</mat-icon>
+          </button>
+        </form>
+
+        <!-- 빠른 액션 (메시지가 적을 때만 표시) -->
+        @if (messages().length <= 1) {
+          <nav class="input-quick-actions" aria-label="빠른 질문">
+            @for (action of quickActions().slice(0, 4); track action) {
+              <button 
+                class="quick-action-chip" 
+                (click)="onQuickAction(action)"
+                [disabled]="isTyping()"
+                type="button"
+                [attr.aria-label]="'빠른 질문: ' + action">
+                {{ action }}
+              </button>
+            }
+          </nav>
+        }
+      </footer>
+    </div>
+  }
+</div>

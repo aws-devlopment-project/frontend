@@ -1,0 +1,866 @@
+/* === 기본 컨테이너 === */
+.dashboard-container {
+  padding: 24px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* === 대시보드 헤더 === */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  padding: 32px;
+  background: linear-gradient(135deg, #3182ce 0%, #2b6cb0 100%);
+  border-radius: 20px;
+  color: white;
+  box-shadow: 0 8px 32px rgba(49, 130, 206, 0.3);
+}
+
+.header-content h1 {
+  font-size: 32px;
+  font-weight: 800;
+  margin: 0 0 8px 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.header-content p {
+  font-size: 16px;
+  margin: 0;
+  opacity: 0.9;
+}
+
+.achievement-badge {
+  text-align: center;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 20px;
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+}
+
+.achievement-number {
+  display: block;
+  font-size: 36px;
+  font-weight: 800;
+  color: #68d391;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.achievement-label {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+/* === 통계 섹션 === */
+.stats-section {
+  margin-bottom: 32px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #3182ce, #2b6cb0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 4px 12px rgba(49, 130, 206, 0.3);
+}
+
+.stat-icon mat-icon {
+  font-size: 24px;
+}
+
+.stat-content {
+  flex: 1;
+}
+
+.stat-number {
+  font-size: 24px;
+  font-weight: 800;
+  color: #2d3748;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  color: #718096;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* === 퀘스트 섹션 === */
+.quests-section {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 20px;
+  padding: 32px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.section-header {
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.section-header h2 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 24px;
+  font-weight: 700;
+  color: #2d3748;
+  margin-bottom: 8px;
+}
+
+.section-header p {
+  color: #718096;
+  font-size: 16px;
+  margin: 0;
+}
+
+/* === 퀘스트 그리드 === */
+.quest-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.quest-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 16px;
+  padding: 24px;
+  border: 2px solid #e2e8f0;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.quest-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #3182ce, #2b6cb0);
+}
+
+.quest-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+}
+
+.quest-card.selectable {
+  border-color: #3182ce;
+  background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+}
+
+.quest-card.selectable:hover {
+  border-color: #2b6cb0;
+  background: linear-gradient(135deg, #ebf8ff 0%, #bee3f8 100%);
+  box-shadow: 0 8px 24px rgba(49, 130, 206, 0.3);
+}
+
+.quest-card.selectable::before {
+  height: 6px;
+  background: linear-gradient(90deg, #3182ce, #1e40af);
+}
+
+.quest-card.completed {
+  background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%);
+  border-color: #48bb78;
+  cursor: default;
+  pointer-events: none;
+}
+
+.quest-card.completed::before {
+  background: linear-gradient(90deg, #48bb78, #38a169);
+}
+
+.quest-card.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* === 퀘스트 헤더 === */
+.quest-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.quest-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #3182ce, #2b6cb0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(49, 130, 206, 0.3);
+}
+
+.quest-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.quest-info h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #2d3748;
+  margin: 0 0 8px 0;
+}
+
+.quest-info p {
+  color: #718096;
+  font-size: 14px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.quest-status {
+  flex-shrink: 0;
+}
+
+.quest-status mat-icon {
+  font-size: 24px;
+}
+
+/* === 진행률 섹션 === */
+.progress-section {
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.progress-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4a5568;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.progress-text {
+  font-size: 12px;
+  color: #718096;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.8s ease-out;
+  background: linear-gradient(90deg, #48bb78, #38a169);
+}
+
+.progress-percentage {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2d3748;
+}
+
+/* === 완료 표시 === */
+.completion-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: linear-gradient(135deg, #48bb78, #38a169);
+  color: white;
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
+}
+
+/* === 액션 힌트 === */
+.action-hint {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  background: rgba(49, 130, 206, 0.1);
+  color: #3182ce;
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid rgba(49, 130, 206, 0.2);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.quest-card.selectable:hover .action-hint {
+  opacity: 1;
+}
+
+/* === 퀘스트 요약 === */
+.quest-summary {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.summary-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: white;
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+  min-width: 200px;
+}
+
+.summary-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(10px);
+}
+
+.summary-icon mat-icon {
+  font-size: 24px;
+}
+
+.summary-content {
+  flex: 1;
+}
+
+.summary-number {
+  font-size: 24px;
+  font-weight: 800;
+  margin-bottom: 4px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.summary-label {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+/* === 모달 스타일 === */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.feedback-modal,
+.confirm-modal {
+  background: white;
+  border-radius: 24px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2);
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  overflow: hidden;
+  animation: slideInUp 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 24px 24px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  position: relative;
+}
+
+.modal-icon {
+  font-size: 32px;
+}
+
+.modal-header h3 {
+  font-size: 20px;
+  font-weight: 700;
+  flex: 1;
+  margin: 0;
+}
+
+.close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+.modal-content {
+  padding: 24px;
+}
+
+.modal-content h4 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 8px;
+}
+
+.modal-content p {
+  color: #718096;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.feedback-question {
+  font-weight: 600;
+  color: #4a5568 !important;
+  margin-bottom: 20px !important;
+}
+
+/* === 완료 확인 모달 추가 스타일 === */
+.completion-info {
+  background: rgba(102, 126, 234, 0.05);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 16px 0;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: #4a5568;
+  font-size: 14px;
+}
+
+.info-item:last-child {
+  margin-bottom: 0;
+}
+
+.info-item mat-icon {
+  font-size: 18px;
+  color: #667eea;
+}
+
+/* === 피드백 좋아요/싫어요 === */
+.like-section {
+  margin-bottom: 20px;
+}
+
+.like-buttons {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.like-btn,
+.dislike-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  font-weight: 500;
+  color: #4a5568;
+}
+
+.like-btn:hover {
+  border-color: #48bb78;
+  background: rgba(72, 187, 120, 0.05);
+  color: #38a169;
+  transform: translateY(-2px);
+}
+
+.dislike-btn:hover {
+  border-color: #f56565;
+  background: rgba(245, 101, 101, 0.05);
+  color: #e53e3e;
+  transform: translateY(-2px);
+}
+
+.like-btn.selected {
+  border-color: #48bb78;
+  background: linear-gradient(135deg, #48bb78, #38a169);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(72, 187, 120, 0.3);
+}
+
+.dislike-btn.selected {
+  border-color: #f56565;
+  background: linear-gradient(135deg, #f56565, #e53e3e);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(245, 101, 101, 0.3);
+}
+
+.selection-feedback {
+  text-align: center;
+  padding: 12px 16px;
+  background: rgba(102, 126, 234, 0.1);
+  border-radius: 12px;
+  color: #553c9a;
+  font-size: 14px;
+  font-weight: 500;
+  border: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+/* === 피드백 입력 === */
+.feedback-input {
+  margin-bottom: 24px;
+}
+
+.feedback-input .mat-mdc-form-field {
+  width: 100%;
+}
+
+/* === 모달 액션 === */
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  padding: 0 24px 24px;
+}
+
+.modal-actions .btn {
+  min-width: 120px;
+}
+
+/* === 버튼 스타일 === */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  justify-content: center;
+}
+
+.btn.primary {
+  background: linear-gradient(135deg, #3182ce, #2b6cb0);
+  color: white;
+  box-shadow: 0 4px 12px rgba(49, 130, 206, 0.3);
+}
+
+.btn.primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(49, 130, 206, 0.4);
+}
+
+.btn.secondary {
+  background: white;
+  color: #3182ce;
+  border: 2px solid #3182ce;
+}
+
+.btn.secondary:hover:not(:disabled) {
+  background: #3182ce;
+  color: white;
+  transform: translateY(-2px);
+}
+
+.btn.large {
+  padding: 16px 32px;
+  font-size: 16px;
+  min-width: 200px;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* === 로딩 및 에러 상태 === */
+.loading-container,
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  text-align: center;
+  padding: 40px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e2e8f0;
+  border-top: 4px solid #3182ce;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+.error-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.error-container h3 {
+  color: #e53e3e;
+  margin-bottom: 8px;
+}
+
+/* === 빈 상태 === */
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #718096;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.empty-state h3 {
+  color: #4a5568;
+  margin-bottom: 8px;
+}
+
+/* === 토스트 메시지 === */
+.toast {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 10001;
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(10px);
+  animation: slideInRight 0.3s ease-out;
+  max-width: 400px;
+}
+
+.toast.success {
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  color: white;
+}
+
+.toast.error {
+  background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+  color: white;
+}
+
+.toast.fade-out {
+  animation: fadeOutRight 0.3s ease-in forwards;
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toast-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.toast-message {
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+/* === 애니메이션 === */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(50px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeOutRight {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* === 반응형 디자인 === */
+@media (max-width: 768px) {
+  .dashboard-container {
+    padding: 16px;
+  }
+  
+  .dashboard-header {
+    flex-direction: column;
+    text-align: center;
+    gap: 16px;
+    padding: 24px;
+  }
+  
+  .quest-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .like-buttons {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .modal-actions {
+    flex-direction: column;
+  }
+  
+  .modal-actions .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-header {
+    padding: 20px;
+  }
+  
+  .header-content h1 {
+    font-size: 24px;
+  }
+  
+  .achievement-number {
+    font-size: 28px;
+  }
+  
+  .quest-card {
+    padding: 20px;
+  }
+  
+  .feedback-modal,
+  .confirm-modal {
+    width: 95%;
+    margin: 16px;
+  }
+  
+  .toast {
+    top: 16px;
+    right: 16px;
+    left: 16px;
+    max-width: none;
+  }
+}

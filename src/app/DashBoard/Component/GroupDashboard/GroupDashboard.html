@@ -1,0 +1,263 @@
+<div class="dashboard-container">
+  <!-- 피드백 모달 -->
+  @if (showFeedback()) {
+    <div class="modal-overlay">
+      <div class="feedback-modal">
+        <div class="modal-header">
+          <div class="modal-icon">🎉</div>
+          <h3>퀘스트 완료!</h3>
+          <button class="close-btn" (click)="closeFeedback()">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+        
+        <div class="modal-content">
+          <h4>{{ feedbackData()?.questTitle }}</h4>
+          <p>축하합니다! 퀘스트를 성공적으로 완료하셨습니다.</p>
+          <p class="feedback-question">이 퀘스트는 어떠셨나요?</p>
+          
+          <!-- 좋아요/싫어요 버튼 -->
+          <div class="like-section">
+            <div class="like-buttons">
+              <button 
+                class="like-btn"
+                [class.selected]="feedbackLike() === true"
+                (click)="setFeedbackLike(true)"
+                [disabled]="isSubmittingFeedback()">
+                <mat-icon>thumb_up</mat-icon>
+                <span>좋았어요</span>
+              </button>
+              <button 
+                class="dislike-btn"
+                [class.selected]="feedbackLike() === false"
+                (click)="setFeedbackLike(false)"
+                [disabled]="isSubmittingFeedback()">
+                <mat-icon>thumb_down</mat-icon>
+                <span>아쉬워요</span>
+              </button>
+            </div>
+            
+            @if (feedbackLike() !== null) {
+              <div class="selection-feedback">
+                {{ feedbackLike() ? '👍 좋은 경험이셨군요!' : '👎 개선할 점을 알려주세요!' }}
+              </div>
+            }
+          </div>
+          
+          <!-- 텍스트 입력 -->
+          <div class="feedback-input">
+            <mat-form-field appearance="outline">
+              <mat-label>소감을 알려주세요</mat-label>
+              <textarea 
+                matInput 
+                rows="3"
+                maxlength="200"
+                [placeholder]="feedbackLike() === true ? 
+                  '어떤 점이 좋았는지 알려주세요...' :
+                  '어떤 점이 아쉬웠는지 알려주세요...'"
+                [value]="feedbackText()"
+                (input)="onFeedbackTextChange($event)"
+                [disabled]="isSubmittingFeedback()">
+              </textarea>
+              <mat-hint>{{ feedbackTextLength() }}/200자</mat-hint>
+              @if (!isFeedbackValid() && feedbackTextLength() > 0) {
+                <mat-error>최소 5자 이상 입력해주세요</mat-error>
+              }
+            </mat-form-field>
+          </div>
+          
+          <div class="modal-actions">
+            <button 
+              class="btn primary" 
+              [disabled]="!isFeedbackValid() || isSubmittingFeedback()"
+              (click)="submitFeedback()">
+              @if (isSubmittingFeedback()) {
+                <div class="spinner"></div>
+                전송 중...
+              } @else {
+                <mat-icon>send</mat-icon>
+                피드백 전송
+              }
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- 퀘스트 완료 확인 모달 -->
+  @if (showQuestConfirmModal()) {
+    <div class="modal-overlay">
+      <div class="confirm-modal">
+        <div class="modal-header">
+          <div class="modal-icon">✅</div>
+          <h3>퀘스트 완료 확인</h3>
+        </div>
+        
+        <div class="modal-content">
+          <h4>{{ questConfirmData()?.questTitle }}</h4>
+          <p>{{ questConfirmData()?.questDescription }}</p>
+          <p><strong>이 퀘스트를 완료하시겠습니까?</strong></p>
+          
+          <div class="completion-info">
+            <div class="info-item">
+              <mat-icon>info</mat-icon>
+              <span>완료 후 되돌릴 수 없습니다</span>
+            </div>
+            <div class="info-item">
+              <mat-icon>feedback</mat-icon>
+              <span>완료 후 피드백을 남겨주세요</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="modal-actions">
+          <button 
+            class="btn secondary" 
+            (click)="cancelQuestCompletion()"
+            [disabled]="isCompletingQuest()">
+            취소
+          </button>
+          <button 
+            class="btn primary" 
+            (click)="confirmSingleQuestCompletion()"
+            [disabled]="isCompletingQuest()">
+            @if (isCompletingQuest()) {
+              <div class="spinner"></div>
+              완료 처리 중...
+            } @else {
+              <mat-icon>check_circle</mat-icon>
+              완료하기
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- 로딩 상태 -->
+  @if (isLoading()) {
+    <div class="loading-container">
+      <div class="spinner"></div>
+      <p>그룹 데이터를 불러오는 중...</p>
+    </div>
+  }
+  
+  <!-- 에러 상태 -->
+  @else if (error() !== null) {
+    <div class="error-container">
+      <div class="error-icon">⚠️</div>
+      <h3>데이터를 불러올 수 없습니다</h3>
+      <p>{{ error() }}</p>
+      <button class="btn primary" (click)="retry()">
+        <mat-icon>refresh</mat-icon>
+        다시 시도
+      </button>
+    </div>
+  }
+  
+  <!-- 메인 대시보드 -->
+  @else {
+    <!-- 헤더 -->
+    <div class="dashboard-header">
+      <div class="header-content">
+        <h1>{{ title() }}</h1>
+        <p>오늘도 목표를 향해 한 걸음 더 나아가요! 💪</p>
+      </div>
+      <div class="achievement-badge">
+        <span class="achievement-number">{{ achievementRate() }}%</span>
+        <span class="achievement-label">개인 달성률</span>
+      </div>
+    </div>
+
+    <!-- 통계 카드 -->
+    <div class="stats-section">
+      <div class="stats-grid">
+        @for (stat of stats(); track stat.id) {
+          <div class="stat-card">
+            <div class="stat-icon">
+              <mat-icon>{{ stat.icon }}</mat-icon>
+            </div>
+            <div class="stat-content">
+              <div class="stat-number">{{ stat.value }}{{ stat.unit }}</div>
+              <div class="stat-label">{{ stat.label }}</div>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- 퀘스트 섹션 -->
+    <div class="quests-section">
+      <div class="section-header">
+        <h2>
+          <mat-icon>assignment</mat-icon>
+          일일 퀘스트
+        </h2>
+        <p>퀘스트를 클릭하여 개별적으로 완료하고 피드백을 남겨보세요</p>
+      </div>
+      
+      @if (quests().length > 0) {
+        <div class="quest-grid">
+          @for (quest of quests(); track quest.id) {
+            <div 
+              class="{{ getQuestCardClass(quest) }}"
+              (click)="onQuestClick(quest)">
+              
+              <!-- 퀘스트 헤더 -->
+              <div class="quest-header">
+                <div class="quest-icon">{{ quest.icon }}</div>
+                <div class="quest-info">
+                  <h3>{{ quest.title }}</h3>
+                  <p>{{ quest.description }}</p>
+                </div>
+                <div class="quest-status">
+                  <mat-icon [style.color]="getPersonalStatusColor(quest)">
+                    {{ getPersonalStatusIcon(quest) }}
+                  </mat-icon>
+                </div>
+              </div>
+
+              <!-- 완료 표시 -->
+              @if (isPersonallyCompleted(quest)) {
+                <div class="completion-badge">
+                  <mat-icon>verified</mat-icon>
+                  <span>완료됨</span>
+                </div>
+              }
+
+              <!-- 완료 가능 표시 -->
+              @if (canSelectQuest(quest)) {
+                <div class="action-hint">
+                  <mat-icon>touch_app</mat-icon>
+                  <span>클릭하여 완료하기</span>
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- 완료된 퀘스트 수 표시 -->
+        <div class="quest-summary">
+          <div class="summary-card">
+            <div class="summary-icon">
+              <mat-icon>assignment_turned_in</mat-icon>
+            </div>
+            <div class="summary-content">
+              <div class="summary-number">
+                {{ getCompletedQuestCount() }} / {{ quests().length }}
+              </div>
+              <div class="summary-label">완료된 퀘스트</div>
+            </div>
+          </div>
+        </div>
+      } @else {
+        <div class="empty-state">
+          <div class="empty-icon">📝</div>
+          <h3>아직 퀘스트가 없습니다</h3>
+          <p>곧 새로운 퀘스트가 추가될 예정입니다!</p>
+        </div>
+      }
+    </div>
+  }
+</div>

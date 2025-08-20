@@ -1,0 +1,481 @@
+<div class="donation-container">
+    <!-- 헤더 영역 -->
+    <div class="donation-header">
+        <div class="header-content">
+            <h1>Make a Good Friends</h1>
+            <p>GlobalGiving과 함께하는 세계적인 나눔 프로젝트</p>
+            <div class="stats-summary">
+                <span class="stat-item">
+                    <mat-icon>public</mat-icon>
+                    총 {{ totalProjects() }}개 프로젝트
+                </span>
+                <span class="stat-item">
+                    <mat-icon>trending_up</mat-icon>
+                    평균 {{ averageProgress() }}% 달성
+                </span>
+            </div>
+        </div>
+        <div class="user-points-card">
+            <div class="points-info">
+                <span class="points-label">보유 포인트</span>
+                <span class="points-amount">{{ userPoints() | number }}P</span>
+            </div>
+            <button class="refresh-btn" (click)="refreshPoints()" [disabled]="isRefreshing()">
+                <mat-icon [class.spin]="isRefreshing()">refresh</mat-icon>
+            </button>
+        </div>
+    </div>
+
+    <!-- 로딩 상태 -->
+    @if (isLoading()) {
+        <div class="loading-container">
+            <div class="loading-spinner"></div>
+            <p>GlobalGiving에서 최신 기부 프로젝트를 불러오는 중...</p>
+        </div>
+    }
+
+    <!-- 에러 상태 -->
+    @else if (hasError()) {
+        <div class="error-container">
+            <mat-icon class="error-icon">error</mat-icon>
+            <h3>프로젝트를 불러올 수 없습니다</h3>
+            <p>네트워크 연결을 확인하고 다시 시도해주세요.</p>
+            <button class="primary-button" (click)="loadDonationItems()">
+                다시 시도
+            </button>
+        </div>
+    }
+
+    <!-- 기부 항목 목록 -->
+    @else {
+        <!-- 필터 및 검색 -->
+        <div class="filter-section">
+            <!-- 검색 영역 -->
+            <div class="search-container">
+                <div class="search-input-wrapper">
+                    <mat-icon class="search-icon">search</mat-icon>
+                    <input 
+                        type="text"
+                        class="search-input"
+                        [(ngModel)]="searchTerm" 
+                        (ngModelChange)="onSearchChange()"
+                        placeholder="프로젝트, 기관명, 국가를 검색해보세요">
+                    <button *ngIf="searchTerm" class="clear-search" (click)="searchTerm = ''; onSearchChange()">
+                        <mat-icon>close</mat-icon>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 필터 컨트롤 -->
+            <div class="filter-controls">
+                <!-- 카테고리 필터 칩 -->
+                <div class="filter-group">
+                    <label class="filter-label">카테고리</label>
+                    <div class="filter-chips">
+                        <button 
+                            *ngFor="let category of categories" 
+                            class="filter-chip"
+                            [class.active]="selectedCategory() === category"
+                            (click)="setSelectedCategory(category)">
+                            <mat-icon>{{ getCategoryIcon(category) }}</mat-icon>
+                            <span>{{ category }}</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 드롭다운 필터들 -->
+                <div class="dropdown-filters">
+                    <!-- 테마 필터 -->
+                    <div class="custom-select-wrapper">
+                        <label class="select-label">테마</label>
+                        <div class="custom-select" [class.active]="isThemeDropdownOpen" (click)="toggleThemeDropdown()">
+                            <div class="select-trigger">
+                                <mat-icon class="select-icon">{{ getThemeIcon() }}</mat-icon>
+                                <span class="select-value">{{ getSelectedThemeLabel() }}</span>
+                                <mat-icon class="dropdown-arrow" [class.rotated]="isThemeDropdownOpen">expand_more</mat-icon>
+                            </div>
+                            <div class="select-dropdown" *ngIf="isThemeDropdownOpen">
+                                <div 
+                                    *ngFor="let theme of themeOptions" 
+                                    class="select-option"
+                                    [class.selected]="selectedTheme() === theme.value"
+                                    (click)="selectTheme(theme.value); $event.stopPropagation()">
+                                    <mat-icon>{{ getThemeOptionIcon(theme.value) }}</mat-icon>
+                                    <span>{{ theme.label }}</span>
+                                    <mat-icon *ngIf="selectedTheme() === theme.value" class="check-icon">check</mat-icon>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 국가 필터 -->
+                    <div class="custom-select-wrapper">
+                        <label class="select-label">국가</label>
+                        <div class="custom-select" [class.active]="isCountryDropdownOpen" (click)="toggleCountryDropdown()">
+                            <div class="select-trigger">
+                                <mat-icon class="select-icon">{{ getCountryIcon() }}</mat-icon>
+                                <span class="select-value">{{ getSelectedCountryLabel() }}</span>
+                                <mat-icon class="dropdown-arrow" [class.rotated]="isCountryDropdownOpen">expand_more</mat-icon>
+                            </div>
+                            <div class="select-dropdown" *ngIf="isCountryDropdownOpen">
+                                <div 
+                                    *ngFor="let country of countryOptions" 
+                                    class="select-option"
+                                    [class.selected]="selectedCountry() === country.value"
+                                    (click)="selectCountry(country.value); $event.stopPropagation()">
+                                    <span class="country-flag">{{ getCountryFlag(country.value) }}</span>
+                                    <span>{{ country.label }}</span>
+                                    <mat-icon *ngIf="selectedCountry() === country.value" class="check-icon">check</mat-icon>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 정렬 필터 -->
+                    <div class="custom-select-wrapper">
+                        <label class="select-label">정렬</label>
+                        <div class="custom-select" [class.active]="isSortDropdownOpen" (click)="toggleSortDropdown()">
+                            <div class="select-trigger">
+                                <mat-icon class="select-icon">{{ getSortIcon() }}</mat-icon>
+                                <span class="select-value">{{ getSortLabel() }}</span>
+                                <mat-icon class="dropdown-arrow" [class.rotated]="isSortDropdownOpen">expand_more</mat-icon>
+                            </div>
+                            <div class="select-dropdown" *ngIf="isSortDropdownOpen">
+                                <div 
+                                    class="select-option"
+                                    [class.selected]="sortBy === 'urgency'"
+                                    (click)="selectSort('urgency'); $event.stopPropagation()">
+                                    <mat-icon>priority_high</mat-icon>
+                                    <span>긴급도순</span>
+                                    <mat-icon *ngIf="sortBy === 'urgency'" class="check-icon">check</mat-icon>
+                                </div>
+                                <div 
+                                    class="select-option"
+                                    [class.selected]="sortBy === 'progress'"
+                                    (click)="selectSort('progress'); $event.stopPropagation()">
+                                    <mat-icon>trending_up</mat-icon>
+                                    <span>진행률순</span>
+                                    <mat-icon *ngIf="sortBy === 'progress'" class="check-icon">check</mat-icon>
+                                </div>
+                                <div 
+                                    class="select-option"
+                                    [class.selected]="sortBy === 'amount'"
+                                    (click)="selectSort('amount'); $event.stopPropagation()">
+                                    <mat-icon>attach_money</mat-icon>
+                                    <span>목표금액순</span>
+                                    <mat-icon *ngIf="sortBy === 'amount'" class="check-icon">check</mat-icon>
+                                </div>
+                                <div 
+                                    class="select-option"
+                                    [class.selected]="sortBy === 'newest'"
+                                    (click)="selectSort('newest'); $event.stopPropagation()">
+                                    <mat-icon>new_releases</mat-icon>
+                                    <span>최신순</span>
+                                    <mat-icon *ngIf="sortBy === 'newest'" class="check-icon">check</mat-icon>
+                                </div>
+                                <div 
+                                    class="select-option"
+                                    [class.selected]="sortBy === 'remaining'"
+                                    (click)="selectSort('remaining'); $event.stopPropagation()">
+                                    <mat-icon>schedule</mat-icon>
+                                    <span>마감임박순</span>
+                                    <mat-icon *ngIf="sortBy === 'remaining'" class="check-icon">check</mat-icon>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 필터 상태 및 액션 -->
+            <div class="filter-status">
+                <div class="active-filters">
+                    <span class="results-badge">
+                        <mat-icon>filter_list</mat-icon>
+                        {{ filteredItems().length }}개 프로젝트
+                    </span>
+                    
+                    <!-- 활성 필터 태그들 -->
+                    <div class="active-filter-tags">
+                        <span *ngIf="selectedCategory() !== '전체'" class="filter-tag">
+                            <mat-icon>{{ getCategoryIcon(selectedCategory()) }}</mat-icon>
+                            {{ selectedCategory() }}
+                            <button (click)="setSelectedCategory('전체')" class="remove-filter">
+                                <mat-icon>close</mat-icon>
+                            </button>
+                        </span>
+                        
+                        <span *ngIf="selectedTheme() !== 'all'" class="filter-tag">
+                            <mat-icon>{{ getThemeOptionIcon(selectedTheme()) }}</mat-icon>
+                            {{ getSelectedThemeLabel() }}
+                            <button (click)="selectTheme('all')" class="remove-filter">
+                                <mat-icon>close</mat-icon>
+                            </button>
+                        </span>
+                        
+                        <span *ngIf="selectedCountry() !== 'all'" class="filter-tag">
+                            <span class="country-flag">{{ getCountryFlag(selectedCountry()) }}</span>
+                            {{ getSelectedCountryLabel() }}
+                            <button (click)="selectCountry('all')" class="remove-filter">
+                                <mat-icon>close</mat-icon>
+                            </button>
+                        </span>
+                        
+                        <span *ngIf="searchTerm" class="filter-tag search-tag">
+                            <mat-icon>search</mat-icon>
+                            "{{ searchTerm }}"
+                            <button (click)="searchTerm = ''; onSearchChange()" class="remove-filter">
+                                <mat-icon>close</mat-icon>
+                            </button>
+                        </span>
+                    </div>
+                </div>
+                
+                <button 
+                    *ngIf="hasActiveFilters()" 
+                    class="reset-filters-btn" 
+                    (click)="resetFilters()">
+                    <mat-icon>clear_all</mat-icon>
+                    모든 필터 지우기
+                </button>
+            </div>
+        </div>
+
+        <!-- 프로젝트 그리드 -->
+        <div class="donation-grid">
+            <div 
+                *ngFor="let item of filteredItems()" 
+                class="donation-card"
+                [class.urgent]="item.urgency === 'high'"
+                [class.globalgiving-project]="isGlobalGivingProject(item)">
+                
+                <div class="card-image" (click)="openDonationDialog(item)">
+                    <img [src]="item.imageUrl" [alt]="item.title">
+                    <div class="badge-container">
+                        <div class="category-badge">
+                            <mat-icon>{{ getCategoryIcon(item.category) }}</mat-icon>
+                            {{ item.category }}
+                        </div>
+                        @if (item.urgency === 'high') {
+                            <div class="urgency-badge">긴급</div>
+                        }
+                        @if (isGlobalGivingProject(item)) {
+                            <div class="globalgiving-badge">
+                                <mat-icon>public</mat-icon>
+                                GlobalGiving
+                            </div>
+                        }
+                    </div>
+                </div>
+                
+                <div class="card-content">
+                    <h3 (click)="openDonationDialog(item)">{{ item.title }}</h3>
+                    <div class="organization-info">
+                        <span class="organization">{{ item.organizationName }}</span>
+                        @if (item.countryCode) {
+                            <span class="country">{{ getCountryName(item.countryCode) }}</span>
+                        }
+                    </div>
+                    <p class="description">{{ item.description }}</p>
+                    
+                    <div class="progress-section">
+                        <div class="progress-info">
+                            <span class="current">{{ item.currentAmount | number }}원</span>
+                            <span class="target">/ {{ item.targetAmount | number }}원</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div 
+                                class="progress-bar" 
+                                [style.width.%]="getProgressPercentage(item)">
+                            </div>
+                        </div>
+                        <div class="progress-details">
+                            <span class="percentage">{{ getProgressPercentage(item) }}% 달성</span>
+                            <span class="remaining">{{ getRemainingAmount(item) | number }}원 남음</span>
+                        </div>
+                    </div>
+                    
+                    <div class="card-actions">
+                        <div class="donation-info">
+                            <span class="min-donation">최소: {{ item.minDonation | number }}P</span>
+                            @if (item.endDate) {
+                                <span class="end-date">{{ getDaysRemaining(item.endDate) }}일 남음</span>
+                            }
+                        </div>
+                        
+                        <div class="action-buttons">
+                            <button class="secondary-button small" 
+                                    (click)="viewProjectDetails(item)"
+                                    [disabled]="!item.projectLink && !item.globalGivingId">
+                                <mat-icon>info</mat-icon>
+                                상세보기
+                            </button>
+                            <button class="primary-button small" (click)="openDonationDialog(item)">
+                                <mat-icon>volunteer_activism</mat-icon>
+                                기부하기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 더 많은 프로젝트 로드 버튼 -->
+        @if (filteredItems().length > 0 && !isLoadingMore()) {
+            <div class="load-more-section">
+                <button class="secondary-button large" (click)="loadMoreProjects()">
+                    <mat-icon>expand_more</mat-icon>
+                    더 많은 프로젝트 보기
+                </button>
+            </div>
+        }
+
+        @if (isLoadingMore()) {
+            <div class="loading-more">
+                <div class="loading-spinner small"></div>
+                <p>추가 프로젝트를 불러오는 중...</p>
+            </div>
+        }
+
+        <!-- 기부 내역 섹션 -->
+        <div class="donation-history-section">
+            <h2>나의 기부 내역</h2>
+            @if (donationHistory().length > 0) {
+                <div class="history-list">
+                    <div *ngFor="let record of donationHistory()" class="history-item">
+                        <div class="history-info">
+                            <h4>{{ getDonationItemTitle(record.donationItemId) }}</h4>
+                            <p>{{ record.donationDate | date:'yyyy.MM.dd HH:mm' }}</p>
+                        </div>
+                        <div class="history-amount">
+                            <span [class]="'status-' + record.status">{{ record.amount | number }}P</span>
+                        </div>
+                    </div>
+                </div>
+            } @else {
+                <div class="empty-history">
+                    <mat-icon>volunteer_activism</mat-icon>
+                    <p>아직 기부 내역이 없습니다.<br>GlobalGiving 프로젝트로 첫 번째 기부를 시작해보세요!</p>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<!-- 기부하기 다이얼로그 -->
+@if (selectedItem()) {
+    <div class="donation-dialog-overlay" (click)="closeDonationDialog()">
+        <div class="donation-dialog" (click)="$event.stopPropagation()">
+            <div class="dialog-header">
+                <div class="dialog-title-section">
+                    <h2>{{ selectedItem()?.title }}</h2>
+                    @if (isGlobalGivingProject(selectedItem()!)) {
+                        <div class="globalgiving-badge dialog">
+                            <mat-icon>public</mat-icon>
+                            GlobalGiving 프로젝트
+                        </div>
+                    }
+                </div>
+                <button class="close-btn" (click)="closeDonationDialog()">
+                    <mat-icon>close</mat-icon>
+                </button>
+            </div>
+            
+            <div class="dialog-content">
+                <div class="item-summary">
+                    <img [src]="selectedItem()?.imageUrl" [alt]="selectedItem()?.title">
+                    <div class="summary-info">
+                        <div class="organization-country">
+                            <p class="organization">{{ selectedItem()?.organizationName }}</p>
+                            @if (selectedItem()?.countryCode) {
+                                <p class="country">📍 {{ getCountryName(selectedItem()?.countryCode) }}</p>
+                            }
+                        </div>
+                        <p class="description">{{ selectedItem()?.description }}</p>
+                        <div class="progress-mini">
+                            <span>현재 {{ getProgressPercentage(selectedItem()!) }}% 달성</span>
+                            <div class="progress-bar-mini">
+                                <div class="progress-fill" [style.width.%]="getProgressPercentage(selectedItem()!)"></div>
+                            </div>
+                        </div>
+                        
+                        @if (selectedItem()?.projectLink || selectedItem()?.globalGivingId) {
+                            <button class="link-button" (click)="viewProjectDetails(selectedItem()!)">
+                                <mat-icon>open_in_new</mat-icon>
+                                프로젝트 상세 정보 보기
+                            </button>
+                        }
+                    </div>
+                </div>
+                
+                <div class="donation-form">
+                    <label>기부할 포인트</label>
+                    <div class="amount-input">
+                        <input 
+                            type="number" 
+                            [(ngModel)]="donationAmount"
+                            [min]="selectedItem()?.minDonation ?? 0"
+                            [max]="userPoints()"
+                            placeholder="기부할 포인트를 입력하세요">
+                        <span>P</span>
+                    </div>
+                    
+                    <div class="quick-amounts">
+                        <button 
+                            *ngFor="let amount of getQuickAmounts()"
+                            type="button"
+                            class="quick-amount-btn"
+                            [class.disabled]="amount > userPoints()"
+                            (click)="setDonationAmount(amount)"
+                            [disabled]="amount > userPoints()">
+                            {{ amount | number }}P
+                        </button>
+                    </div>
+                    
+                    <div class="donation-summary">
+                        <div class="summary-row">
+                            <span>기부 포인트:</span>
+                            <span class="amount">{{ donationAmount | number }}P</span>
+                        </div>
+                        <div class="summary-row">
+                            <span>기부 후 잔여:</span>
+                            <span class="remaining">{{ (userPoints() - donationAmount) | number }}P</span>
+                        </div>
+                        @if (isGlobalGivingProject(selectedItem()!)) {
+                            <div class="summary-note">
+                                <mat-icon>info</mat-icon>
+                                <span>이 기부는 GlobalGiving을 통해 전 세계적으로 영향을 미칩니다.</span>
+                            </div>
+                        }
+                    </div>
+                    
+                    <div class="dialog-actions">
+                        <button 
+                            type="button" 
+                            class="secondary-button"
+                            (click)="closeDonationDialog()">
+                            취소
+                        </button>
+                        <button 
+                            type="button" 
+                            class="primary-button"
+                            (click)="processDonation()"
+                            [disabled]="!isValidDonation() || isProcessing()">
+                            @if (isProcessing()) {
+                                <mat-icon class="spin">hourglass_empty</mat-icon>
+                                처리중...
+                            } @else {
+                                <mat-icon>volunteer_activism</mat-icon>
+                                @if (isGlobalGivingProject(selectedItem()!)) {
+                                    전 세계에 기부하기
+                                } @else {
+                                    기부하기
+                                }
+                            }
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}

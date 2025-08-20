@@ -1,4 +1,20 @@
 <header class="header">
-  <span class="header-title">Nameless</span>
-  <app-header-searchBar></app-header-searchBar>
+  <div class="header-left">
+    <h1 class="header-title">Nameless</h1>
+    @if (showSearch()) {
+      <app-header-searchBar 
+        (searchQuery)="onSearchQuery($event)"
+        (searchResultSelected)="onSearchQueryResultSelected($event)"
+        (groupSelected)="navigateToGroup($event)"
+        (channelSelected)="onChannelSelected($event)">
+      </app-header-searchBar>
+    }
+  </div>
+  <div class="header-right">
+    @if (isActivateGroup()) {
+      <button class="mobile-menu-button" (click)="usePassiveActivateGroupTabForMobile()">
+        <mat-icon>{{ getSidebarToggleIcon() }}</mat-icon>
+      </button>
+    }
+  </div>
 </header>

@@ -1,5 +1,8 @@
-export interface club {
-    id: string,
-    chatList: string[][],
-    members: string[],
+export interface Club {
+    clubId: number,
+    name: string,
+    icon?: string,
+    description?: string,
+    memberNum?: number,
+    tag?: string[]
 }

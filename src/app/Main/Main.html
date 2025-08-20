@@ -1,0 +1,222 @@
+<div class="app-container">
+  <!-- 로딩 상태 표시 -->
+  @if (shouldShowLoading()) {
+    <div class="page-placeholder">
+      <div class="loading-container">
+        <div class="loading-spinner"></div>
+        <h2>{{ getLoadingMessage() }}</h2>
+        <p>잠시만 기다려 주세요...</p>
+        
+        <!-- 디버그 정보 (개발 환경에서만) -->
+        @if (environment.production === false) {
+          <div class="debug-info">
+            <details>
+              <summary>디버그 정보</summary>
+              <pre>{{
+                {
+                  initialized: sharedState.initialized(),
+                  hasValidData: sharedState.hasValidData(),
+                  hasJoinedGroups: sharedState.hasJoinedGroups(),
+                  loadingState: sharedState.loadingState(),
+                  error: sharedState.error()
+                } | json
+              }}</pre>
+            </details>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- 에러 상태 표시 -->
+  @else if (shouldShowError()) {
+    <div class="page-placeholder">
+      <div class="error-container">
+        <div class="error-icon">⚠️</div>
+        <h2>문제가 발생했습니다</h2>
+        <p>{{ errorMessage() }}</p>
+        
+        <div class="error-actions">
+          <button (click)="refreshData()" class="primary-button">
+            다시 시도
+          </button>
+          <button (click)="clearError()" class="secondary-button">
+            오류 무시
+          </button>
+        </div>
+        
+        <!-- 상세한 에러 정보 (개발 환경에서만) -->
+        @if (environment.production === false) {
+          <details class="error-details">
+            <summary>상세 정보</summary>
+            <pre>{{ errorMessage() }}</pre>
+          </details>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- 정상 상태 - 메인 컨텐츠 -->
+  @else if (shouldShowContent()) {
+    <!-- 사이드바 - 메뉴바는 항상, 그룹바는 조건부 표시 -->
+    <app-sidebar 
+      (navigationChange)="onNavigationChange($event)"
+      (groupSelect)="onGroupSelect($event)"
+      (channelSelect)="onChannelSelect($event)">
+
+    </app-sidebar>
+
+    <!-- 메인 콘텐츠 영역 -->
+    <div class="main-area">
+      <!-- 헤더 -->
+      <app-header
+        [showSearch]="true"
+        [currentPage]="sharedState.currentPageTitle()"
+        (searchQuery)="onSearchQuery($event)"
+        (notificationClick)="onNotificationClick()"
+        (helpClick)="onHelpClick()"
+        (profileClick)="onProfileClick()">
+      </app-header>
+
+      <!-- 콘텐츠 영역 -->
+      <main class="content-area">
+        @switch (sharedState.activeTab()) {
+          @case ('home') {
+            <app-home-dashboard></app-home-dashboard>
+          }
+          
+          @case ('group') {
+            @if (sharedState.isChannelSelected()) {
+              <!-- 채널 선택됨 - 채팅 인터페이스 표시 -->
+              <app-main-container></app-main-container>
+            }
+            @else if (sharedState.isGroupSelected()) {
+              <!-- 그룹 선택됨 - 그룹 대시보드 표시 -->
+              <app-group-dashboard></app-group-dashboard>
+            }
+            @else {
+              <!-- 그룹/채널 미선택 상태 -->
+              <div class="page-placeholder">
+                @if (sharedState.hasJoinedGroups()) {
+                  <!-- 기존 사용자 - 그룹 선택 안내 -->
+                  <h2>그룹을 선택해 주세요</h2>
+                  <p>{{ getGroupSelectionMessage() }}</p>
+                } @else {
+                  <!-- 새 사용자 - 그룹 참여 안내 -->
+                  <div class="new-user-welcome">
+                    <div class="welcome-icon">🎯</div>
+                    <h2>환영합니다!</h2>
+                    <p>아직 참여한 그룹이 없습니다.<br>새로운 그룹에 참여해서 목표를 달성해보세요!</p>
+                    
+                    <div class="welcome-features">
+                      <div class="feature-item">
+                        <div class="feature-icon">👥</div>
+                        <div class="feature-text">
+                          <h4>함께 성장</h4>
+                          <p>같은 목표를 가진 사람들과 함께 동기부여받으세요</p>
+                        </div>
+                      </div>
+                      
+                      <div class="feature-item">
+                        <div class="feature-icon">📊</div>
+                        <div class="feature-text">
+                          <h4>진행상황 추적</h4>
+                          <p>개인 및 그룹의 달성률을 한눈에 확인하세요</p>
+                        </div>
+                      </div>
+                      
+                      <div class="feature-item">
+                        <div class="feature-icon">🏆</div>
+                        <div class="feature-text">
+                          <h4>성취감 극대화</h4>
+                          <p>다양한 활동을 통해 성취감을 느껴보세요</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                }
+                
+                <div class="empty-state">
+                  @if (!sharedState.hasJoinedGroups()) {
+                    <div class="empty-state-actions">
+                      <button class="primary-button btn-large" [routerLink]="['/group/join']">
+                        <mat-icon>group_add</mat-icon>
+                        그룹 참여하기
+                      </button>
+                      <button class="secondary-button" (click)="onNavigationChange('home')">
+                        <mat-icon>home</mat-icon>
+                        홈으로 이동
+                      </button>
+                    </div>
+                  } @else {
+                    <p>왼쪽 사이드바에서 그룹을 선택하면 활동을 시작할 수 있습니다.</p>
+                  }
+                </div>
+              </div>
+            }
+          }
+          
+          @case ('activity') {
+            @if (sharedState.hasJoinedGroups()) {
+              <app-activity-dashboard></app-activity-dashboard>
+            } @else {
+              <!-- 활동 탭이지만 참여한 그룹이 없는 경우 -->
+              <div class="page-placeholder">
+                <h2>활동 통계</h2>
+                <p>그룹에 참여하면 활동 통계를 확인할 수 있습니다.</p>
+                <div class="empty-state">
+                  <button class="primary-button" [routerLink]="['/group/join']">
+                    <mat-icon>group_add</mat-icon>
+                    그룹 참여하기
+                  </button>
+                </div>
+              </div>
+            }
+          }
+          
+          @case ('member') {
+            <app-member-dashboard></app-member-dashboard>
+          }
+          @case ('donation') {
+            <app-donation-page></app-donation-page>
+          }
+          
+          @default {
+            <!-- 알 수 없는 탭 - 홈으로 리다이렉트 -->
+            <div class="page-placeholder">
+              <h2>페이지를 찾을 수 없습니다</h2>
+              <p>요청하신 페이지를 찾을 수 없습니다.</p>
+              <button (click)="onNavigationChange('home')" class="primary-button">
+                홈으로 돌아가기
+              </button>
+            </div>
+          }
+        }
+        @if (this.sharedState.activeTab() !== 'channel') {
+          <app-chatbot></app-chatbot>
+        }
+      </main>
+    </div>
+  }
+
+  <!-- 초기화되지 않은 상태 -->
+  @else {
+    <div class="page-placeholder">
+      <div class="initialization-container">
+        <div class="loading-spinner"></div>
+        <h2>애플리케이션을 시작하는 중...</h2>
+        <p>초기 설정을 진행하고 있습니다.</p>
+        
+        <!-- 초기화 타임아웃 시 재시도 옵션 -->
+        <div class="initialization-timeout" 
+             [style.display]="'none'"
+             #timeoutElement>
+          <p>초기화가 오래 걸리고 있습니다.</p>
+          <button (click)="refreshData()" class="secondary-button">
+            다시 시도
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

@@ -1,4 +1,5 @@
 # See https://docs.github.com/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+.angular
 
 # Compiled output
 /dist
@@ -41,7 +42,8 @@ testem.log
 .DS_Store
 Thumbs.db
 
-# environment
-/src/app/Auth/Configure/aws-export.ts
-/src/environments/environment.development.ts
-/src/environemnts/environment.product.ts
+proxy.conf.json
+
+node_modules/
+npm-debug.log*
+.npm

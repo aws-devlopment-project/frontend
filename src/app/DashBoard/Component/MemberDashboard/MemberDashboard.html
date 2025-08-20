@@ -1,0 +1,635 @@
+<div class="member-options">
+  <div class="options-container">
+    <!-- 사이드바 메뉴 -->
+    <div class="options-sidebar">
+      <div class="user-summary">
+        <div class="user-avatar-image">
+          <img [src]="getCurrentAvatarUrl()" 
+              (error)="onAvatarImageError($event)"
+              alt="사용자 아바타"
+              class="avatar-image">
+        </div>
+        <div class="user-info">
+          <h3>{{ userProfile().username }}</h3>
+          <p>가입 {{ getJoinDuration() }} 차</p>
+          <!-- OAuth 사용자 표시 -->
+          @if (isOAuthUser()) {
+            <div class="auth-provider-badge">
+              <mat-icon>account_circle</mat-icon>
+              <span>{{ authProvider() === 'google' ? 'Google' : 'OAuth' }} 계정</span>
+            </div>
+          }
+        </div>
+        
+        <!-- 로그아웃 버튼 추가 -->
+        <div class="user-actions">
+          <button class="btn btn-logout" 
+                  (click)="logout()"
+                  [disabled]="isLoading()">
+            @if (isLoading()) {
+              <div class="btn-spinner"></div>
+              로그아웃 중...
+            } @else {
+              <mat-icon>logout</mat-icon>
+              로그아웃
+            }
+          </button>
+        </div>
+      </div>
+      
+      <nav class="options-menu">
+        @for (item of menuItems; track item.id) {
+          <button class="menu-item" 
+                  [class.active]="activeSection() === item.id"
+                  (click)="setActiveSection(item.id)">
+            <mat-icon>{{ item.icon }}</mat-icon>
+            <div class="menu-content">
+              <span class="menu-label">{{ item.label }}</span>
+              <span class="menu-description">{{ item.description }}</span>
+            </div>
+          </button>
+        }
+      </nav>
+    </div>
+
+    <!-- 메인 콘텐츠 -->
+    <div class="options-content">
+      <!-- 프로필 관리 -->
+      @if (activeSection() === 'profile') {
+        <div class="section-content">
+          <div class="section-header">
+            <h2>프로필 관리</h2>
+            <p>개인 정보를 수정하고 프로필을 관리하세요</p>
+          </div>
+          
+          <div class="profile-section">
+            <div class="profile-avatar-section">
+              <div class="avatar-display-image">
+                <img [src]="getCurrentAvatarUrl()" 
+                     (error)="onAvatarImageError($event)"
+                     alt="사용자 아바타"
+                     class="profile-avatar-img">
+              </div>
+              <button class="btn btn-secondary" (click)="toggleAvatarSelector()">
+                아바타 변경
+              </button>
+              
+              <!-- 아바타 업로드 -->
+              @if (showAvatarSelector()) {
+                <div class="avatar-uploader">
+                  <h4>아바타 이미지 업로드</h4>
+                  
+                  <!-- 파일 입력 (숨김) -->
+                  <input #fileInput 
+                        type="file" 
+                        accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                        (change)="onFileSelected($event)"
+                        style="display: none;">
+                  
+                  <!-- 드래그 앤 드롭 영역 -->
+                  <div class="avatar-drop-zone"
+                      [class.drag-over]="isDragOver()"
+                      (click)="triggerFileInput()"
+                      (dragover)="onDragOver($event)"
+                      (dragleave)="onDragLeave($event)"
+                      (drop)="onFileDrop($event)">
+                    <div class="drop-zone-content">
+                      <mat-icon class="drop-zone-icon">cloud_upload</mat-icon>
+                      <p class="drop-zone-text">클릭하거나 파일을 드래그하여 업로드</p>
+                      <p class="drop-zone-hint">JPG, PNG, GIF, WebP (최대 5MB)</p>
+                    </div>
+                  </div>
+                  
+                  <!-- 업로드 진행률 -->
+                  @if (uploadProgress() > 0 && uploadProgress() < 100) {
+                    <div class="upload-progress">
+                      <div class="upload-progress-bar" 
+                          [style.width.%]="uploadProgress()"></div>
+                    </div>
+                  }
+                  
+                  <!-- 에러 메시지 -->
+                  @if (uploadError()) {
+                    <div class="upload-error">
+                      <mat-icon>error</mat-icon>
+                      {{ uploadError() }}
+                    </div>
+                  }
+                  
+                  <!-- 성공 메시지 -->
+                  @if (uploadSuccess()) {
+                    <div class="upload-success">
+                      <mat-icon>check_circle</mat-icon>
+                      아바타가 성공적으로 업데이트되었습니다.
+                    </div>
+                  }
+                  
+                  <!-- 미리보기 영역 -->
+                  @if (avatarPreviewUrl()) {
+                    <div class="avatar-preview">
+                      <img [src]="avatarPreviewUrl()" 
+                          alt="아바타 미리보기"
+                          class="preview-image">
+                      <p class="preview-info">미리보기</p>
+                    </div>
+                  }
+                  
+                  <!-- 업로드 버튼들 -->
+                  <div class="avatar-upload-actions">
+                    @if (!selectedAvatarFile()) {
+                      <button class="btn btn-secondary btn-sm" 
+                              (click)="triggerFileInput()"
+                              [disabled]="avatarUploading()">
+                        <mat-icon>photo_camera</mat-icon>
+                        이미지 선택
+                      </button>
+                    } @else {
+                      <button class="btn btn-primary btn-sm" 
+                              (click)="confirmAvatarChange()"
+                              [disabled]="avatarUploading()">
+                        @if (avatarUploading()) {
+                          <div class="btn-spinner"></div>
+                          업로드 중...
+                        } @else {
+                          <mat-icon>check</mat-icon>
+                          적용하기
+                        }
+                      </button>
+                      
+                      <button class="btn btn-secondary btn-sm" 
+                              (click)="resetAvatarSelection()"
+                              [disabled]="avatarUploading()">
+                        <mat-icon>refresh</mat-icon>
+                        다시 선택
+                      </button>
+                    }
+                    
+                    <button class="btn btn-secondary btn-sm" 
+                            (click)="toggleAvatarSelector()"
+                            [disabled]="avatarUploading()">
+                      취소
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+            
+            <div class="profile-form">
+              <div class="form-group">
+                <label>사용자명</label>
+                
+                <!-- OAuth 사용자의 경우 읽기 전용 -->
+                @if (isOAuthUser()) {
+                  <div class="form-input-readonly oauth-readonly">
+                    {{ userProfile().username }}
+                    <div class="oauth-notice">
+                      <mat-icon>info</mat-icon>
+                      <span>{{ authProvider() === 'google' ? 'Google' : 'OAuth' }} 계정은 사용자명을 변경할 수 없습니다.</span>
+                    </div>
+                  </div>
+                } @else {
+                  <!-- 일반 사용자의 경우 편집 가능 -->
+                  <div class="username-input-container">
+                    <input type="text" 
+                           [(ngModel)]="userProfile().username"
+                           [disabled]="usernameUpdating()"
+                           class="form-input"
+                           [class.changed]="isUsernameChanged()"
+                           placeholder="사용자명을 입력하세요"
+                           maxlength="20">
+                    
+                    <!-- 사용자명 변경 버튼들 -->
+                    @if (isUsernameChanged()) {
+                      <div class="username-actions">
+                        <button class="btn btn-primary btn-sm" 
+                                (click)="updateUsername()"
+                                [disabled]="usernameUpdating()">
+                          @if (usernameUpdating()) {
+                            <div class="btn-spinner"></div>
+                            저장 중...
+                          } @else {
+                            <mat-icon>check</mat-icon>
+                            저장
+                          }
+                        </button>
+                        
+                        <button class="btn btn-secondary btn-sm" 
+                                (click)="cancelUsernameChange()"
+                                [disabled]="usernameUpdating()">
+                          <mat-icon>cancel</mat-icon>
+                          취소
+                        </button>
+                      </div>
+                    }
+                  </div>
+                  
+                  <!-- 사용자명 관련 메시지 -->
+                  @if (usernameUpdateError()) {
+                    <div class="error-message">
+                      <mat-icon>error</mat-icon>
+                      {{ usernameUpdateError() }}
+                    </div>
+                  }
+                  
+                  @if (usernameUpdateSuccess()) {
+                    <div class="success-message">
+                      <mat-icon>check_circle</mat-icon>
+                      사용자명이 성공적으로 변경되었습니다!
+                    </div>
+                  }
+                  
+                  <!-- 사용자명 가이드 -->
+                  <small class="form-hint">
+                    한글, 영문, 숫자, 하이픈, 언더스코어 사용 가능 (2-20자)
+                  </small>
+                }
+              </div>
+              
+              <div class="form-group">
+                <label>이메일</label>
+                <div class="form-input-readonly">{{ userProfile().email }}</div>
+                <small class="form-hint">이메일은 변경할 수 없습니다.</small>
+              </div>
+              
+              <!-- 인증 방법 표시 -->
+              <div class="form-group">
+                <label>인증 방법</label>
+                <div class="auth-method-display">
+                  @if (isOAuthUser()) {
+                    <div class="auth-method oauth">
+                      <mat-icon>account_circle</mat-icon>
+                      <span>{{ authProvider() === 'google' ? 'Google OAuth' : 'OAuth 로그인' }}</span>
+                      <div class="auth-method-badge oauth">OAuth</div>
+                    </div>
+                  } @else {
+                    <div class="auth-method cognito">
+                      <mat-icon>security</mat-icon>
+                      <span>이메일/비밀번호 로그인</span>
+                      <div class="auth-method-badge cognito">Cognito</div>
+                    </div>
+                  }
+                </div>
+                <small class="form-hint">
+                  @if (isOAuthUser()) {
+                    OAuth 계정은 {{ authProvider() === 'google' ? 'Google' : '외부 제공업체' }}에서 관리됩니다.
+                  } @else {
+                    이메일과 비밀번호로 직접 로그인하는 계정입니다.
+                  }
+                </small>
+              </div>
+              
+              <!-- 프로필 통계 -->
+              <div class="profile-stats">
+                <div class="stat-item">
+                  <div class="stat-value">{{ userProfile().totalQuests }}</div>
+                  <div class="stat-label">총 퀘스트</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-value">{{ userProfile().completedQuests }}</div>
+                  <div class="stat-label">완료</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-value">{{ getCompletionRate() }}%</div>
+                  <div class="stat-label">달성률</div>
+                </div>
+              </div>
+              
+              <!-- 사용자 배지 -->
+              @if (userProfile().badges.length > 0) {
+                <div class="user-badges">
+                  <h4>획득 배지</h4>
+                  <div class="badges-list">
+                    @for (badge of userProfile().badges; track badge) {
+                      <div class="badge-item">{{ badge }}</div>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- 그룹 관리 -->
+      @if (activeSection() === 'groups') {
+        <div class="section-content">
+          <div class="section-header">
+            <h2>그룹 관리</h2>
+            <p>참여 중인 그룹을 관리하세요</p>
+          </div>
+          
+          <!-- 로딩 상태 표시 -->
+          @if (groupsLoading()) {
+            <div class="empty-state">
+              <p>그룹 정보를 불러오는 중...</p>
+            </div>
+          } @else {
+            <div class="groups-list">
+              @for (group of joinedGroups(); track group?.groupname) {
+                <div class="group-item-expanded">
+                  <div class="group-header">
+                    <div class="group-info">
+                      <h4>{{ group?.groupname }}</h4>
+                      <p>{{ group?.clubList?.length || 0 }}개 채널 참여 중</p>
+                    </div>
+                    <div class="group-actions">
+                      <button class="btn btn-danger btn-sm" 
+                              (click)="leaveGroup(group?.groupname || '')">
+                        그룹 탈퇴
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <!-- 채널 목록 -->
+                  @if (group?.clubList && group.clubList.length > 0) {
+                    <div class="channels-list">
+                      <h5>참여 채널</h5>
+                      @for (channel of group.clubList; track channel) {
+                        <div class="channel-item">
+                          <div class="channel-info">
+                            <mat-icon>tag</mat-icon>
+                            <span>{{ channel.name }}</span>
+                          </div>
+                          <button class="btn btn-warning btn-sm" 
+                                  (click)="leaveClub(group.groupname, channel.name)">
+                            채널 탈퇴
+                          </button>
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              } @empty {
+                <div class="empty-state">
+                  <p>참여 중인 그룹이 없습니다.</p>
+                  <button [routerLink]="['/group/join']" class="btn btn-primary">새 그룹 찾기</button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      <!-- 고객 지원 -->
+      @if (activeSection() === 'support') {
+        <div class="section-content">
+          <div class="section-header">
+            <h2>고객 지원</h2>
+            <p>도움이 필요하시면 언제든 문의해 주세요</p>
+          </div>
+          
+          <div class="support-options">
+            <div class="support-option" (click)="contactSupport()">
+              <mat-icon>email</mat-icon>
+              <div class="support-info">
+                <h4>이메일 문의</h4>
+                <p>support@example.com</p>
+              </div>
+            </div>
+            
+            <div class="support-option" (click)="openHelpCenter()">
+              <mat-icon>help_center</mat-icon>
+              <div class="support-info">
+                <h4>도움말 센터</h4>
+                <p>자주 묻는 질문과 가이드</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- 계정 관리 -->
+      @if (activeSection() === 'account') {
+        <div class="section-content">
+          <div class="section-header">
+            <h2>계정 관리</h2>
+            <p>비밀번호 변경 및 계정 탈퇴를 진행할 수 있습니다</p>
+          </div>
+          
+          <div class="account-options">
+            <!-- 비밀번호 변경 (Cognito 사용자만) -->
+            @if (canChangePassword()) {
+              <div class="account-option">
+                <div class="option-info">
+                  <h4>비밀번호 변경</h4>
+                  <p>보안을 위해 정기적으로 비밀번호를 변경해 주세요</p>
+                </div>
+                <button class="btn btn-primary" (click)="changePassword()">
+                  <mat-icon>lock</mat-icon>
+                  비밀번호 변경
+                </button>
+              </div>
+            } @else {
+              <!-- OAuth 사용자용 안내 -->
+              <div class="account-option oauth-disabled">
+                <div class="option-info">
+                  <h4>비밀번호 변경</h4>
+                  <p>{{ authProvider() === 'google' ? 'Google' : 'OAuth' }} 계정은 {{ authProvider() === 'google' ? 'Google' : '외부 제공업체' }}에서 비밀번호를 관리합니다</p>
+                </div>
+                <div class="oauth-notice-box">
+                  <mat-icon>info</mat-icon>
+                  <span>{{ authProvider() === 'google' ? 'Google 계정 설정' : 'OAuth 제공업체' }}에서 변경하세요</span>
+                </div>
+              </div>
+            }
+            
+            <div class="account-option danger-zone">
+              <div class="option-info">
+                <h4>계정 탈퇴</h4>
+                <p>계정을 탈퇴하면 모든 데이터가 삭제되며 복구할 수 없습니다</p>
+              </div>
+              @if (!showDeleteConfirm()) {
+                <button class="btn btn-danger" (click)="showDeleteAccountConfirm()">
+                  <mat-icon>person_remove</mat-icon>
+                  계정 탈퇴
+                </button>
+              } @else {
+                <div class="delete-confirm">
+                  <div class="confirm-message">
+                    <mat-icon>warning</mat-icon>
+                    <div>
+                      <h5>정말로 계정을 탈퇴하시겠습니까?</h5>
+                      <p>이 작업은 되돌릴 수 없으며, 모든 데이터가 영구적으로 삭제됩니다.</p>
+                      <ul class="delete-consequences">
+                        <li>프로필 및 개인 정보</li>
+                        <li>퀘스트 완료 기록 ({{ userProfile().completedQuests }}개)</li>
+                        <li>획득한 배지 ({{ userProfile().badges.length }}개)</li>
+                        <li>참여 중인 그룹 ({{ joinedGroups()?.length || 0 }}개)</li>
+                        <li>{{ userProfile().currentStreak }}일 연속 기록</li>
+                      </ul>
+                    </div>
+                  </div>
+                  
+                  <div class="confirm-actions">
+                    <button class="btn btn-secondary" (click)="cancelDeleteAccount()">
+                      취소
+                    </button>
+                    <button class="btn btn-danger" 
+                            [disabled]="isLoading()"
+                            (click)="deleteAccount()">
+                      @if (isLoading()) {
+                        <div class="btn-spinner"></div>
+                        처리 중...
+                      } @else {
+                        <mat-icon>delete_forever</mat-icon>
+                        계정 탈퇴 확인
+                      }
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+</div>
+
+<!-- 비밀번호 변경 모달 (Cognito 사용자만) -->
+@if (showPasswordChangeModal() && canChangePassword()) {
+  <div class="modal-backdrop" (click)="closePasswordChangeModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>비밀번호 변경</h3>
+        <button class="modal-close" (click)="closePasswordChangeModal()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      
+      <div class="modal-body">
+        <!-- 현재 비밀번호 -->
+        <div class="form-group">
+          <label>현재 비밀번호</label>
+          <input type="password"
+                 class="form-input"
+                 [value]="passwordForm().currentPassword"
+                 (input)="updatePasswordForm('currentPassword', $any($event.target).value)"
+                 placeholder="현재 비밀번호를 입력하세요"
+                 autocomplete="current-password">
+        </div>
+
+        <!-- 새 비밀번호 -->
+        <div class="form-group">
+          <label>새 비밀번호</label>
+          <div class="password-input-container">
+            <input type="password"
+                   class="form-input"
+                   [value]="passwordForm().newPassword"
+                   (input)="updatePasswordForm('newPassword', $any($event.target).value)"
+                   placeholder="새 비밀번호를 입력하세요"
+                   autocomplete="new-password">
+            
+            <!-- 비밀번호 강도 표시기 -->
+            @if (passwordForm().newPassword.length > 0) {
+              <div class="password-strength-container">
+                <div class="password-strength-bar">
+                  <div class="strength-indicator" 
+                       [class]="'strength-' + newPasswordStrength()"
+                       [style.width.%]="newPasswordCompletionPercentage">
+                  </div>
+                </div>
+                <span class="strength-text">
+                  {{ newPasswordStrength() === 'weak' ? '약함' : 
+                     newPasswordStrength() === 'medium' ? '보통' : '강함' }}
+                  ({{ newPasswordCompletionPercentage }}%)
+                </span>
+              </div>
+              
+              <!-- 비밀번호 요구사항 체크리스트 -->
+              <div class="password-requirements">
+                <div class="requirement-item" 
+                     [class.completed]="newPasswordRequirements().minLength">
+                  <span class="requirement-icon">
+                    {{ newPasswordRequirements().minLength ? '✓' : '○' }}
+                  </span>
+                  최소 8자 이상
+                </div>
+                <div class="requirement-item" 
+                     [class.completed]="newPasswordRequirements().hasLowercase">
+                  <span class="requirement-icon">
+                    {{ newPasswordRequirements().hasLowercase ? '✓' : '○' }}
+                  </span>
+                  소문자 포함
+                </div>
+                <div class="requirement-item" 
+                     [class.completed]="newPasswordRequirements().hasUppercase">
+                  <span class="requirement-icon">
+                    {{ newPasswordRequirements().hasUppercase ? '✓' : '○' }}
+                  </span>
+                  대문자 포함
+                </div>
+                <div class="requirement-item" 
+                     [class.completed]="newPasswordRequirements().hasNumber">
+                  <span class="requirement-icon">
+                    {{ newPasswordRequirements().hasNumber ? '✓' : '○' }}
+                  </span>
+                  숫자 포함
+                </div>
+                <div class="requirement-item" 
+                     [class.completed]="newPasswordRequirements().hasSpecialChar">
+                  <span class="requirement-icon">
+                    {{ newPasswordRequirements().hasSpecialChar ? '✓' : '○' }}
+                  </span>
+                  특수문자 포함
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- 새 비밀번호 확인 -->
+        <div class="form-group">
+          <label>새 비밀번호 확인</label>
+          <input type="password"
+                 class="form-input"
+                 [class.error]="passwordForm().confirmPassword.length > 0 && !passwordsMatch"
+                 [value]="passwordForm().confirmPassword"
+                 (input)="updatePasswordForm('confirmPassword', $any($event.target).value)"
+                 placeholder="새 비밀번호를 다시 입력하세요"
+                 autocomplete="new-password">
+          
+          @if (passwordForm().confirmPassword.length > 0 && !passwordsMatch) {
+            <small class="text-danger">
+              비밀번호가 일치하지 않습니다.
+            </small>
+          }
+        </div>
+
+        <!-- 에러 메시지 -->
+        @if (passwordChangeError()) {
+          <div class="error-message">
+            <mat-icon>error</mat-icon>
+            {{ passwordChangeError() }}
+          </div>
+        }
+
+        <!-- 성공 메시지 -->
+        @if (passwordChangeSuccess()) {
+          <div class="success-message">
+            <mat-icon>check_circle</mat-icon>
+            비밀번호가 성공적으로 변경되었습니다!
+          </div>
+        }
+      </div>
+      
+      <div class="modal-footer">
+        <button class="btn btn-secondary" 
+                (click)="closePasswordChangeModal()"
+                [disabled]="passwordChangeLoading()">
+          취소
+        </button>
+        <button class="btn btn-primary" 
+                (click)="submitPasswordChange()"
+                [disabled]="!isPasswordFormValid() || passwordChangeLoading()">
+          @if (passwordChangeLoading()) {
+            <div class="btn-spinner"></div>
+            변경 중...
+          } @else {
+            비밀번호 변경
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+}
